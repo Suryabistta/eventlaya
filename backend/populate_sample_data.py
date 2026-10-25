@@ -7,11 +7,11 @@ django.setup()
 
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from apps.accounts.models import PlatformModule, RoleModulePermission
-from apps.events.models import Event, EventTicket, GateScanLog, StaffGateAssignment
+from apps.accounts.models import PlatformModule, RoleModulePermission, TenantBranding
+from apps.events.models import Event, EventTicket, GateScanLog, StaffGateAssignment, EventFunding, EventTask
 from apps.dynamic_forms.models import Form, FormField, FormResponse, FormAnswer
 from apps.voting.models import Poll, Candidate, Vote
-from apps.marketplace.models import VendorCategory, VendorProfile
+from apps.marketplace.models import VendorCategory, VendorProfile, VenueListing, VenueInquiry
 
 User = get_user_model()
 
@@ -61,38 +61,36 @@ def populate():
             }
         )
 
-        # Organizer permissions: full view and create
-        RoleModulePermission.objects.get_or_create(
-            role=User.Role.ORGANIZER,
-            module=mod,
-            defaults={'can_view': True, 'can_create': True, 'can_edit': True, 'can_delete': True, 'is_enabled': True}
-        )
+        # Ensure default permissions for each role
+        for r_code in ['superadmin', 'organizer', 'staff', 'attendee', 'vendor']:
+            can_v = True if r_code in ['superadmin', 'organizer'] else (r_code == 'staff' and mslug in ['gate_scanner', 'events'])
+            can_c = r_code in ['superadmin', 'organizer']
+            can_e = r_code in ['superadmin', 'organizer']
+            can_d = r_code == 'superadmin'
 
-        # Staff permissions: view scanner and events, but forms/voting/marketplace restricted by default
-        is_staff_mod = mslug in ['gate_scanner', 'events']
-        RoleModulePermission.objects.get_or_create(
-            role=User.Role.STAFF,
-            module=mod,
-            defaults={'can_view': is_staff_mod, 'can_create': False, 'can_edit': False, 'can_delete': False, 'is_enabled': is_staff_mod}
-        )
-
-        # Attendee permissions: voting and public forms
-        is_attendee_mod = mslug in ['events', 'voting']
-        RoleModulePermission.objects.get_or_create(
-            role=User.Role.ATTENDEE,
-            module=mod,
-            defaults={'can_view': is_attendee_mod, 'can_create': False, 'can_edit': False, 'can_delete': False, 'is_enabled': is_attendee_mod}
-        )
-    print("  ✓ Seeded platform modules & RBAC permissions matrix")
+            RoleModulePermission.objects.get_or_create(
+                role=r_code,
+                module=mod,
+                defaults={
+                    'can_view': can_v,
+                    'can_create': can_c,
+                    'can_edit': can_e,
+                    'can_delete': can_d,
+                    'is_enabled': True,
+                }
+            )
+    print("  ✓ Seeded platform modules and RBAC default permissions")
 
     # 1. Organizer User
     organizer, created = User.objects.get_or_create(
         email='organizer@eventlaya.com',
         defaults={
             'username': 'organizer',
-            'phone': '+977-9800000001',
+            'first_name': 'Aayush',
+            'last_name': 'Shrestha',
+            'phone': '+977-9841234567',
             'role': User.Role.ORGANIZER,
-            'organization_name': 'Eastern Tech Innovators Club',
+            'organization_name': 'Eastern Youth Summit Nepal',
         }
     )
     if created:
@@ -102,190 +100,252 @@ def populate():
     else:
         print("  ✓ Found existing organizer user")
 
-    # 1b. Staff User & Gate Assignment
-    staff, created = User.objects.get_or_create(
+    # 1b. Staff User for Gate Scanning
+    staff_user, created = User.objects.get_or_create(
         email='staff@eventlaya.com',
         defaults={
             'username': 'staff',
-            'first_name': 'Aayush',
-            'last_name': 'Shrestha',
-            'phone': '+977-9800000002',
+            'first_name': 'Ramesh',
+            'last_name': 'Adhikari',
+            'phone': '+977-9812345678',
             'role': User.Role.STAFF,
+            'organization_name': 'Eastern Youth Summit Nepal',
         }
     )
     if created:
-        staff.set_password('password123')
-        staff.save()
-        print("  ✓ Created staff user: staff@eventlaya.com (pw: password123)")
+        staff_user.set_password('password123')
+        staff_user.save()
+        print("  ✓ Created staff scanner user: staff@eventlaya.com (pw: password123)")
     else:
         print("  ✓ Found existing staff user")
 
-    # 2. Dynamic Form
-    form, created = Form.objects.get_or_create(
+    # 1c. White-label Tenant Branding for Organizer
+    branding, _ = TenantBranding.objects.get_or_create(
         organizer=organizer,
+        defaults={
+            'subdomain': 'eastern-youth',
+            'custom_domain': 'events.easternyouth.org.np',
+            'cname_target': 'cname.eventlaya.com',
+            'is_domain_verified': True,
+            'ssl_active': True,
+            'brand_name': 'Eastern Youth Summit',
+            'brand_logo': 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=300',
+            'primary_color': '#4F46E5',
+            'accent_color': '#06B6D4',
+            'support_email': 'support@easternyouth.org.np',
+            'footer_text': 'Powered by Eastern Youth Summit • Dharan, Nepal',
+            'remove_watermark': True,
+        }
+    )
+    print("  ✓ Seeded white-label tenant branding")
+
+    # 2. Dynamic Registration Form
+    form, created = Form.objects.get_or_create(
         slug='eastern-tech-fest-reg',
         defaults={
-            'title': 'Eastern Tech Fest Registration Form',
-            'description': 'Please fill out your details to receive your digital QR entry pass.',
+            'organizer': organizer,
+            'title': 'Eastern Tech Fest 2026 - Attendee Registration',
+            'description': 'Register for keynotes, workshops, hackathon showcases, and tech booths in Dharan.',
             'status': Form.Status.PUBLISHED,
             'allow_multiple_submissions': False,
         }
     )
     if created:
         print("  ✓ Created dynamic registration form")
+        fields = [
+            (FormField.FieldType.TEXT, 'Full Name', True, 1, []),
+            (FormField.FieldType.EMAIL, 'Email Address', True, 2, []),
+            (FormField.FieldType.PHONE, 'Mobile / WhatsApp Number', True, 3, []),
+            (FormField.FieldType.TEXT, 'College / Company / Organization', False, 4, []),
+            (FormField.FieldType.SELECT, 'Primary Interest Track', True, 5, ['AI & Machine Learning', 'Web3 & Fintech', 'Full Stack Development', 'Robotics & Hardware', 'Startup & Venture Pitch']),
+            (FormField.FieldType.RADIO, 'Meal Preference', True, 6, ['Vegetarian', 'Non-Vegetarian']),
+            (FormField.FieldType.SELECT, 'T-Shirt Size', False, 7, ['S', 'M', 'L', 'XL', 'XXL']),
+            (FormField.FieldType.CHECKBOX, 'I agree to event code of conduct and safety guidelines', True, 8, ['Agreed']),
+        ]
+        for ftype, flabel, freq, forder, fopts in fields:
+            FormField.objects.create(
+                form=form,
+                label=flabel,
+                field_type=ftype,
+                required=freq,
+                order=forder,
+                options=fopts
+            )
+        print("  ✓ Created 8 form fields")
 
-    # Fields
-    fields_spec = [
-        ('Full Name', FormField.FieldType.TEXT, 'Your official name', True, 1, []),
-        ('Mobile Phone Number', FormField.FieldType.PHONE, '+977-98XXXXXXXX', True, 2, []),
-        ('Institution / College', FormField.FieldType.TEXT, 'e.g. Purwanchal Campus, Dharan', True, 3, []),
-        ('Hackathon Track', FormField.FieldType.SELECT, 'Choose your primary track', True, 4, [
-            'Web & Mobile Development', 'AI & Machine Learning', 'Cybersecurity & CTF', 'UI/UX Design'
-        ]),
-        ('T-Shirt Size', FormField.FieldType.RADIO, '', True, 5, ['S', 'M', 'L', 'XL', 'XXL']),
-        ('Dietary Preference', FormField.FieldType.SELECT, '', False, 6, ['Non-Veg', 'Veg', 'Vegan']),
-        ('Need Overnight Accommodation?', FormField.FieldType.RADIO, '', True, 7, ['Yes (Hostel)', 'No (Local)']),
-    ]
-
-    form_fields = []
-    for label, ftype, placeholder, req, order, opts in fields_spec:
-        fld, _ = FormField.objects.get_or_create(
-            form=form,
-            label=label,
-            defaults={
-                'field_type': ftype,
-                'placeholder': placeholder,
-                'required': req,
-                'order': order,
-                'options': opts,
-            }
-        )
-        form_fields.append(fld)
-
-    # 3. Featured Event
-    event, created = Event.objects.get_or_create(
-        organizer=organizer,
+    # 3. Sample Live Events
+    event1, created1 = Event.objects.get_or_create(
         slug='eastern-tech-fest-2026',
         defaults={
-            'title': 'Eastern Tech Fest & Hackathon 2026',
-            'description': 'The largest tech symposium and 24-hour hackathon in Eastern Nepal. Featuring keynote talks, robotic exhibitions, hackathon challenges, and live entertainment in Dharan.',
-            'location': 'Purwanchal Campus Auditorium, Dharan',
+            'organizer': organizer,
+            'title': 'Eastern Nepal Tech & Innovation Summit 2026',
+            'description': 'The largest technology congregation in Province 1 bringing together 800+ builders, founders, students, and engineers.',
+            'banner': 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&auto=format&fit=crop&q=80',
+            'location': 'Sunsari Chamber of Commerce Auditorium, Dharan-8',
             'start_date': date.today() + timedelta(days=2),
-            'start_time': time(9, 0),
-            'end_date': date.today() + timedelta(days=3),
-            'end_time': time(18, 0),
+            'start_time': time(9, 30),
+            'end_date': date.today() + timedelta(days=2),
+            'end_time': time(17, 30),
             'capacity': 500,
             'status': Event.Status.PUBLISHED,
             'allow_registration': True,
+            'registration_deadline': timezone.now() + timedelta(days=2),
             'is_paid': False,
             'ticket_price': 0.00,
             'registration_form': form,
         }
     )
-    if created or event.registration_form != form:
-        event.registration_form = form
-        event.save()
-        print("  ✓ Created featured event: Eastern Tech Fest & Hackathon 2026")
+    if created1:
+        print("  ✓ Created main event: Eastern Nepal Tech & Innovation Summit 2026")
 
-    # Link form to event
-    form.event = event
-    form.save()
-
-    StaffGateAssignment.objects.get_or_create(
-        staff=staff,
-        event=event,
-        defaults={'gate_name': 'Main Gate', 'is_active': True}
+    event2, created2 = Event.objects.get_or_create(
+        slug='biratnagar-music-awards-2026',
+        defaults={
+            'organizer': organizer,
+            'title': 'Biratnagar Youth Music & Culture Fest 2026',
+            'description': 'A grand evening celebrating eastern Nepali bands, folk fusion, live stage performances, and audience choice voting.',
+            'banner': 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1200&auto=format&fit=crop&q=80',
+            'location': 'Greenwood Resort Open Grounds, Biratnagar-4',
+            'start_date': date.today() + timedelta(days=7),
+            'start_time': time(16, 0),
+            'end_date': date.today() + timedelta(days=7),
+            'end_time': time(22, 0),
+            'capacity': 1000,
+            'status': Event.Status.PUBLISHED,
+            'allow_registration': True,
+            'is_paid': True,
+            'ticket_price': 350.00,
+        }
     )
-    print("  ✓ Assigned staff to Main Gate for event")
+    if created2:
+        print("  ✓ Created music event: Biratnagar Youth Music & Culture Fest 2026")
 
-    # 4. Sample Attendees & Tickets
+    # 3b. Staff Gate Assignments
+    StaffGateAssignment.objects.get_or_create(
+        staff=staff_user,
+        event=event1,
+        defaults={'gate_name': 'Main North Gate', 'is_active': True}
+    )
+    print("  ✓ Assigned staff scanner to Main North Gate")
+
+    # 3c. Event Funding & Budget Breakdown
+    EventFunding.objects.update_or_create(
+        event=event1,
+        defaults={
+            'target_budget': 200000.00,
+            'sponsorship_raised': 125000.00,
+            'ticket_sales_revenue': 45000.00,
+            'grants_donations': 15000.00,
+            'expense_venue': 40000.00,
+            'expense_catering': 35000.00,
+            'expense_production': 30000.00,
+            'expense_marketing': 18000.00,
+            'expense_prizes_gifts': 20000.00,
+            'expense_logistics': 12000.00,
+        }
+    )
+    print("  ✓ Created event funding and budget breakdown")
+
+    # 3d. Event Work Distribution & Operational Tasks
+    tasks_data = [
+        ("Setup Stage LED Backdrop & Sound Check", "Verify line-array speaker tuning, HDMI video splitters, and podium microphones with audio team.", EventTask.Status.COMPLETED, EventTask.Priority.URGENT, EventTask.Category.STAGE, "Suman Rai", timezone.now() - timedelta(hours=2)),
+        ("Deploy Gate QR Scanners & Staff Briefing", "Distribute Android scanner terminals to Main North and VIP West gate crew. Review duplicate scan protocol.", EventTask.Status.IN_PROGRESS, EventTask.Priority.HIGH, EventTask.Category.GATE, "Ramesh Adhikari", timezone.now() + timedelta(hours=1)),
+        ("VIP Guest Escort & Badging", "Receive keynote speakers from Biratnagar Airport, hand over speaker tags, and escort to Green Room.", EventTask.Status.TODO, EventTask.Priority.HIGH, EventTask.Category.HOSPITALITY, "Priya Sharma", timezone.now() + timedelta(hours=3)),
+        ("Livestream Broadcast Setup (YouTube & Facebook)", "Test 4K multi-camera video switcher, audio line-in feed, and 50Mbps fiber uplink in Auditorium.", EventTask.Status.IN_PROGRESS, EventTask.Priority.MEDIUM, EventTask.Category.TECH, "Kiran Thapa", timezone.now() + timedelta(hours=2)),
+        ("Lunch Buffet & Refreshment Quality Check", "Inspect catering hygiene, water dispenser stations, and vegan/vegetarian counter tags.", EventTask.Status.TODO, EventTask.Priority.MEDIUM, EventTask.Category.CATERING, "Bikash Gurung", timezone.now() + timedelta(hours=4)),
+        ("Social Media Live Updates & Story Posts", "Photograph opening remarks, tweet live quotes, and publish Instagram stories.", EventTask.Status.TODO, EventTask.Priority.LOW, EventTask.Category.MARKETING, "Sunita Basnet", timezone.now() + timedelta(hours=2)),
+    ]
+
+    for title, desc, stat, prio, cat, assigned_name, due in tasks_data:
+        EventTask.objects.get_or_create(
+            event=event1,
+            title=title,
+            defaults={
+                'description': desc,
+                'status': stat,
+                'priority': prio,
+                'category': cat,
+                'assigned_name': assigned_name,
+                'assigned_to': staff_user if assigned_name == 'Ramesh Adhikari' else None,
+                'due_time': due,
+            }
+        )
+    print("  ✓ Seeded 6 operational work distribution tasks")
+
+    # 4. Generate Realistic Attendee Tickets & Gate Scan Logs
+    import secrets
     sample_attendees = [
-        ('Aarav Sharma', 'aarav.sharma@gmail.com', '+977-9812345671', EventTicket.Status.CHECKED_IN, 'L', 'Web & Mobile Development'),
-        ('Pooja Karki', 'pooja.karki@gmail.com', '+977-9812345672', EventTicket.Status.CHECKED_IN, 'M', 'AI & Machine Learning'),
-        ('Rohan Shrestha', 'rohan.shrestha@gmail.com', '+977-9812345673', EventTicket.Status.CHECKED_OUT, 'XL', 'Cybersecurity & CTF'),
-        ('Sneha Adhikari', 'sneha.adhikari@gmail.com', '+977-9812345674', EventTicket.Status.VALID, 'S', 'UI/UX Design'),
-        ('Bikash Thapa', 'bikash.thapa@gmail.com', '+977-9812345675', EventTicket.Status.VALID, 'M', 'Web & Mobile Development'),
+        ('Subash Dahal', 'subash.dahal@gmail.com', '+977-9842011223', EventTicket.Status.CHECKED_IN),
+        ('Pooja Karki', 'pooja.karki@outlook.com', '+977-9803122334', EventTicket.Status.CHECKED_IN),
+        ('Binod Shrestha', 'binod.shrestha@tech.io', '+977-9812455667', EventTicket.Status.CHECKED_IN),
+        ('Anjali Rai', 'anjali.rai@yahoo.com', '+977-9860112244', EventTicket.Status.CHECKED_IN),
+        ('Prashant Giri', 'prashant.giri@gmail.com', '+977-9849556677', EventTicket.Status.CHECKED_IN),
+        ('Deepak Tamang', 'deepak.tamang@gmail.com', '+977-9818990011', EventTicket.Status.CHECKED_OUT),
+        ('Sushila Pokharel', 'sushila.p@gmail.com', '+977-9801234567', EventTicket.Status.VALID),
+        ('Bivek Chaudhary', 'bivek.ch@gmail.com', '+977-9845678901', EventTicket.Status.VALID),
+        ('Manish Limbu', 'manish.limbu@gmail.com', '+977-9813243546', EventTicket.Status.VALID),
+        ('Sarita Bastola', 'sarita.bastola@gmail.com', '+977-9804567890', EventTicket.Status.VALID),
     ]
 
     now = timezone.now()
-    for name, email, phone, status_choice, tshirt, track in sample_attendees:
-        ticket, t_created = EventTicket.objects.get_or_create(
-            event=event,
-            attendee_email=email,
-            defaults={
-                'attendee_name': name,
-                'attendee_phone': phone,
-                'ticket_number': f"TKT-ETF26-{str(EventTicket.objects.filter(event=event).count() + 1).zfill(4)}",
-                'qr_token': f"token-{email.split('@')[0]}",
-                'status': status_choice,
-                'is_attended': status_choice in [EventTicket.Status.CHECKED_IN, EventTicket.Status.CHECKED_OUT],
-                'first_check_in': now - timedelta(hours=2) if status_choice in [EventTicket.Status.CHECKED_IN, EventTicket.Status.CHECKED_OUT] else None,
-                'last_activity': now - timedelta(minutes=15) if status_choice == EventTicket.Status.CHECKED_OUT else now - timedelta(hours=2),
-            }
-        )
-
-        # Log Gate Scans
-        if status_choice == EventTicket.Status.CHECKED_IN:
-            GateScanLog.objects.get_or_create(
-                event=event,
-                ticket=ticket,
-                scan_type=GateScanLog.ScanType.GATE_IN,
-                defaults={
-                    'result': GateScanLog.ScanResult.SUCCESS,
-                    'gate_name': 'North Gate Scanner',
-                    'scanned_by': organizer,
-                }
+    for idx, (name, email, phone, status_val) in enumerate(sample_attendees, start=1):
+        tkt_num = f"TKT-EAST-{str(idx).zfill(4)}"
+        ticket = EventTicket.objects.filter(event=event1, attendee_email=email).first()
+        if not ticket:
+            ticket = EventTicket.objects.create(
+                event=event1,
+                ticket_number=tkt_num,
+                qr_token=secrets.token_hex(16),
+                attendee_name=name,
+                attendee_email=email,
+                attendee_phone=phone,
+                status=status_val,
+                is_attended=(status_val in [EventTicket.Status.CHECKED_IN, EventTicket.Status.CHECKED_OUT]),
+                first_check_in=(now - timedelta(minutes=45)) if status_val != EventTicket.Status.VALID else None,
+                last_activity=now if status_val != EventTicket.Status.VALID else None,
             )
-        elif status_choice == EventTicket.Status.CHECKED_OUT:
-            GateScanLog.objects.get_or_create(
-                event=event,
-                ticket=ticket,
-                scan_type=GateScanLog.ScanType.GATE_OUT,
-                defaults={
-                    'result': GateScanLog.ScanResult.SUCCESS,
-                    'gate_name': 'North Gate Scanner',
-                    'scanned_by': organizer,
-                }
-            )
+            if status_val != EventTicket.Status.VALID:
+                # Create GateScanLog
+                GateScanLog.objects.create(
+                    event=event1,
+                    ticket=ticket,
+                    scan_type=GateScanLog.ScanType.GATE_IN,
+                    result=GateScanLog.ScanResult.SUCCESS,
+                    gate_name='Main North Gate',
+                    scanned_by=staff_user,
+                    device_info='Flutter Android Scanner (Galaxy A54)',
+                    scanned_at=now - timedelta(minutes=45)
+                )
+                if status_val == EventTicket.Status.CHECKED_OUT:
+                    GateScanLog.objects.create(
+                        event=event1,
+                        ticket=ticket,
+                        scan_type=GateScanLog.ScanType.GATE_OUT,
+                        result=GateScanLog.ScanResult.SUCCESS,
+                        gate_name='Main North Gate',
+                        scanned_by=staff_user,
+                        device_info='Flutter Android Scanner (Galaxy A54)',
+                        scanned_at=now - timedelta(minutes=10)
+                    )
+    print("  ✓ Generated sample tickets and gate scan audits")
 
-        # Form response
-        resp, r_created = FormResponse.objects.get_or_create(
-            form=form,
-            event=event,
-            ticket=ticket,
-            defaults={
-                'submitter_name': name,
-                'submitter_email': email,
-                'submitter_phone': phone,
-                'review_status': FormResponse.ReviewStatus.ACCEPTED,
-            }
-        )
-        if r_created:
-            for f in form_fields:
-                val = name if 'Name' in f.label else (phone if 'Phone' in f.label else (tshirt if 'Size' in f.label else track))
-                FormAnswer.objects.create(response=resp, field=f, value=val)
-
-    print("  ✓ Created sample attendee tickets & gate scans")
-
-    # 5. Live Poll & Candidates
-    poll, _ = Poll.objects.get_or_create(
-        event=event,
-        title='Best Student Innovation Pitch Award 2026',
+    # 5. Live Poll for Biratnagar Event
+    poll, created = Poll.objects.get_or_create(
+        event=event2,
+        title='Best Eastern Emerging Indie Band 2026',
         defaults={
-            'description': 'Cast your live vote for the most inspiring project pitch at Eastern Tech Fest.',
+            'description': 'Cast your live vote for the breakthrough band of the year from Eastern Nepal.',
             'is_active': True,
             'require_ticket': False,
         }
     )
-
-    candidates_data = [
-        ('KrishiSmart AI', 'Automated crop disease diagnosis and soil health analyzer for local farmers.', 48),
-        ('Safepath Drone', 'Autonomous search & rescue drone for mountain terrain and river valleys.', 65),
-        ('NepalSign VR', 'Interactive Nepali sign language translator using computer vision & VR.', 82),
-        ('VoltGrid IoT', 'Smart energy monitor for solar mini-grids in rural schools.', 39),
+    candidates = [
+        ('The Dharan Rhythms', 'Alternative rock trio from Dharan, blending Eastern blues with rock.', 142),
+        ('Itahari Folk Collective', 'Modern Sarangi and acoustic melodies infused with rock beats.', 98),
+        ('Morang Sound System', 'Experimental indie-pop synthesizers from Biratnagar.', 176),
+        ('Himalayan Echoes', 'Progressive fusion ensemble celebrating folk eastern folklore.', 64),
     ]
-
-    for cname, cbio, votes in candidates_data:
+    for cname, cbio, votes in candidates:
         Candidate.objects.get_or_create(
             poll=poll,
             name=cname,
@@ -338,6 +398,121 @@ def populate():
             }
         )
     print("  ✓ Created marketplace categories & verified vendors")
+
+    # 7. Marketplace Venue Listings in Eastern Nepal
+    venues_data = [
+        (
+            'Royal Palace Banquet & Convention Center',
+            'royal-palace-banquet-itahari',
+            VenueListing.VenueType.BANQUET,
+            'Itahari',
+            'Main Highway Chowk, Itahari-4',
+            100, 900, 60000.00,
+            ['Central AC', 'Generator Power Backup', 'In-house Catering', 'Sound & Stage System', 'Valet Parking (150 Cars)', 'Bridal Suite', 'Security CCTV'],
+            [
+                'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?w=800&auto=format&fit=crop&q=80',
+                'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop&q=80'
+            ],
+            'Santosh Shrestha', '+977-9852023456', 'royalpalace.itahari@gmail.com',
+            'Premier luxury banquet destination in the heart of Itahari. Featuring high ceilings, chandelier illumination, carpeted flooring, and comprehensive staging.',
+            'DJ music allowed until 10:30 PM. Outside catering permitted with prior sanitation approval.',
+            True, True, 4.9, 38
+        ),
+        (
+            'B.P. Koirala Memorial Auditorium',
+            'bp-koirala-memorial-auditorium-dharan',
+            VenueListing.VenueType.AUDITORIUM,
+            'Dharan',
+            'College Road, Dharan-16',
+            150, 650, 35000.00,
+            ['Theater Seating', 'Acoustic Wall Panels', 'Professional Stage Lighting', 'Green Rooms (x2)', 'Projector & 4K Display', 'Standby Generator'],
+            [
+                'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&auto=format&fit=crop&q=80',
+                'https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=800&auto=format&fit=crop&q=80'
+            ],
+            'Mahesh Karki', '+977-9842098765', 'auditorium.dharan@gov.np',
+            'Ideal for conferences, cultural summits, awards, keynotes, and musical recitals. Features acoustic wall treatments and tiered comfortable seating.',
+            'Strictly no food or drinks inside auditorium hall. Booking requires 50% advance deposit.',
+            True, True, 4.8, 44
+        ),
+        (
+            'Greenwood Lawn & Resort Ballroom',
+            'greenwood-resort-biratnagar',
+            VenueListing.VenueType.RESORT,
+            'Biratnagar',
+            'Airport Road, Biratnagar-4',
+            200, 1500, 85000.00,
+            ['Open Air Lush Lawn', 'Glasshouse Ballroom', 'Swimming Pool Deck', 'Ample Parking (250+ Vehicles)', 'Live BBQ Counter', 'Rooms for Guests'],
+            [
+                'https://images.unsplash.com/photo-1519741497674-611481863552?w=800&auto=format&fit=crop&q=80',
+                'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&auto=format&fit=crop&q=80'
+            ],
+            'Sanjay Agrawal', '+977-021-460112', 'info@greenwoodresort.np',
+            'Sprawling 3-acre resort complex suitable for grand destination weddings, youth festivals, corporate retreats, and open air concert gatherings.',
+            'Fireworks require local administration clearance. Sound restrictions apply after 11 PM.',
+            True, True, 4.9, 52
+        ),
+        (
+            'Hotel Eastern Star Grand Ballroom',
+            'hotel-eastern-star-biratnagar',
+            VenueListing.VenueType.HOTEL,
+            'Biratnagar',
+            'Traffic Chowk, Biratnagar-3',
+            50, 400, 45000.00,
+            ['Multi-Zone AC', 'Executive Boardroom', 'Wi-Fi 6 Coverage', 'Full In-House Bar & Kitchen', 'Elevator Access', 'Sound Technician on Duty'],
+            [
+                'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&auto=format&fit=crop&q=80'
+            ],
+            'Anita Basnet', '+977-021-471234', 'reservations@easternstar.com.np',
+            'Modern 4-star hotel banquet hall equipped with executive amenities, top-tier audio equipment, and professional catering staff.',
+            'In-house catering mandatory. Corkage fee applies to external beverages.',
+            True, False, 4.7, 26
+        ),
+    ]
+
+    for name, slug, vtype, city, addr, cmin, cmax, price, amens, imgs, cpers, cphone, cmail, desc, rules, ver, feat, rat, rcnt in venues_data:
+        venue, _ = VenueListing.objects.get_or_create(
+            slug=slug,
+            defaults={
+                'owner': organizer,
+                'name': name,
+                'venue_type': vtype,
+                'city': city,
+                'address': addr,
+                'capacity_min': cmin,
+                'capacity_max': cmax,
+                'price_per_day': price,
+                'amenities': amens,
+                'images': imgs,
+                'contact_person': cpers,
+                'contact_phone': cphone,
+                'contact_email': cmail,
+                'description': desc,
+                'rules_policy': rules,
+                'is_verified': ver,
+                'is_featured': feat,
+                'rating': rat,
+                'review_count': rcnt,
+            }
+        )
+
+        # Seed sample inquiry
+        VenueInquiry.objects.get_or_create(
+            venue=venue,
+            sender_name='Ganesh Thapa',
+            defaults={
+                'sender_email': 'ganesh.thapa@gmail.com',
+                'sender_phone': '+977-9842551122',
+                'event_type': 'Wedding Reception',
+                'event_date': date.today() + timedelta(days=20),
+                'guest_count': 350,
+                'budget_range': 'NPR 1,50,000 - 2,50,000',
+                'message': 'Looking for hall availability for evening reception with vegetarian buffet and stage setup.',
+                'status': VenueInquiry.Status.PENDING,
+            }
+        )
+    print("  ✓ Created venue listings & sample venue inquiries")
+
     print("🎉 All sample data populated successfully!")
 
 if __name__ == '__main__':

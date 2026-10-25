@@ -10,6 +10,8 @@ import { VotingPage } from './pages/VotingPage'
 import { MarketplacePage } from './pages/MarketplacePage'
 import { PublicEventPage } from './pages/PublicEventPage'
 import { SuperadminPage } from './pages/SuperadminPage'
+import EventAnalyticsPage from './pages/EventAnalyticsPage'
+import WhiteLabelPage from './pages/WhiteLabelPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,6 +32,9 @@ export const App: React.FC = () => {
             <Routes>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/events" element={<EventsPage />} />
+              <Route path="/analytics" element={<EventAnalyticsPage />} />
+              <Route path="/events/:id/analytics" element={<EventAnalyticsPage />} />
+              <Route path="/white-label" element={<WhiteLabelPage />} />
               <Route path="/forms" element={<FormBuilderPage />} />
               <Route path="/scanner" element={<GateScannerPage />} />
               <Route path="/voting" element={<VotingPage />} />

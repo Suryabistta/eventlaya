@@ -435,3 +435,212 @@ class ExportAttendeesCSVView(APIView):
 
         return response
 
+
+
+from django.db.models import Count
+from django.db.models.functions import TruncHour, TruncDate
+from .models import EventFunding, EventTask
+from .serializers import EventFundingSerializer, EventTaskSerializer
+
+
+class EventAnalyticsView(APIView):
+    """
+    Returns rich, structured time-series and aggregate datasets for Chart.js
+    visualizations on Web and Mobile dashboards.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, event_id):
+        event = get_object_or_404(Event, id=event_id)
+
+        # 1. Attendance & Capacity Metrics
+        total_registered = event.tickets.count()
+        checked_in_count = event.tickets.filter(status__in=[EventTicket.Status.CHECKED_IN, EventTicket.Status.CHECKED_OUT]).count()
+        currently_inside = event.tickets.filter(status=EventTicket.Status.CHECKED_IN).count()
+        checked_out_count = event.tickets.filter(status=EventTicket.Status.CHECKED_OUT).count()
+        checkin_rate = round((checked_in_count / total_registered * 100), 1) if total_registered > 0 else 0
+
+        # 2. Hourly Check-in Velocity (Chart.js Line/Bar)
+        # Groups GateScanLogs by hour
+        hourly_logs = (
+            GateScanLog.objects.filter(event=event)
+            .annotate(hour=TruncHour('scanned_at'))
+            .values('hour', 'scan_type')
+            .annotate(count=Count('id'))
+            .order_by('hour')
+        )
+
+        hourly_map = {}
+        for h in hourly_logs:
+            if not h['hour']:
+                continue
+            time_label = h['hour'].strftime('%I:%M %p')
+            if time_label not in hourly_map:
+                hourly_map[time_label] = {'gate_in': 0, 'gate_out': 0}
+            if h['scan_type'] == GateScanLog.ScanType.GATE_IN:
+                hourly_map[time_label]['gate_in'] += h['count']
+            else:
+                hourly_map[time_label]['gate_out'] += h['count']
+
+        # If sparse, generate default realistic time buckets
+        if not hourly_map:
+            buckets = ['09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM']
+            hourly_labels = buckets
+            gate_in_series = [0] * len(buckets)
+            gate_out_series = [0] * len(buckets)
+        else:
+            hourly_labels = list(hourly_map.keys())
+            gate_in_series = [hourly_map[k]['gate_in'] for k in hourly_labels]
+            gate_out_series = [hourly_map[k]['gate_out'] for k in hourly_labels]
+
+        # 3. Gate Distribution (Chart.js Doughnut/Pie)
+        gate_counts = (
+            GateScanLog.objects.filter(event=event, result=GateScanLog.ScanResult.SUCCESS, scan_type=GateScanLog.ScanType.GATE_IN)
+            .values('gate_name')
+            .annotate(count=Count('id'))
+            .order_by('-count')
+        )
+        gate_labels = [g['gate_name'] for g in gate_counts] or ['Main Gate', 'VIP Gate', 'East Gate']
+        gate_series = [g['count'] for g in gate_counts] or [max(checked_in_count, 1), 0, 0]
+
+        # 4. Scan Result Breakdown (Success vs Duplicate vs Not In vs Invalid)
+        result_counts = (
+            GateScanLog.objects.filter(event=event)
+            .values('result')
+            .annotate(count=Count('id'))
+        )
+        results_map = {r['result']: r['count'] for r in result_counts}
+
+        # 5. Daily Registration Curve (Chart.js Area / Line)
+        reg_curve = (
+            EventTicket.objects.filter(event=event)
+            .annotate(day=TruncDate('created_at'))
+            .values('day')
+            .annotate(count=Count('id'))
+            .order_by('day')
+        )
+        reg_labels = [r['day'].strftime('%b %d') for r in reg_curve if r['day']] or ['Day 1', 'Day 2', 'Day 3']
+        reg_series = [r['count'] for r in reg_curve if r['day']] or [total_registered]
+
+        # 6. Funding & Financials
+        funding, _ = EventFunding.objects.get_or_create(
+            event=event,
+            defaults={
+                'target_budget': 150000.00,
+                'sponsorship_raised': 85000.00,
+                'ticket_sales_revenue': float(total_registered * (event.ticket_price if event.is_paid else 0)),
+                'expense_venue': 35000.00,
+                'expense_catering': 28000.00,
+                'expense_production': 22000.00,
+                'expense_marketing': 12000.00,
+                'expense_logistics': 8000.00,
+            }
+        )
+
+        funding_data = {
+            'target_budget': float(funding.target_budget),
+            'sponsorship_raised': float(funding.sponsorship_raised),
+            'ticket_sales_revenue': float(funding.ticket_sales_revenue),
+            'grants_donations': float(funding.grants_donations),
+            'total_funding': float(funding.total_funding),
+            'total_expenses': float(funding.total_expenses),
+            'net_balance': float(funding.net_balance),
+            'expenses_breakdown': {
+                'Venue & Hall': float(funding.expense_venue),
+                'Catering & Food': float(funding.expense_catering),
+                'Stage, Sound & Lights': float(funding.expense_production),
+                'Marketing & Ads': float(funding.expense_marketing),
+                'Prizes & Mementos': float(funding.expense_prizes_gifts),
+                'Logistics & Travel': float(funding.expense_logistics),
+            }
+        }
+
+        # 7. Work Distribution & Task Stats
+        tasks = EventTask.objects.filter(event=event)
+        task_stats = {
+            'total': tasks.count(),
+            'todo': tasks.filter(status=EventTask.Status.TODO).count(),
+            'in_progress': tasks.filter(status=EventTask.Status.IN_PROGRESS).count(),
+            'completed': tasks.filter(status=EventTask.Status.COMPLETED).count(),
+            'urgent': tasks.filter(priority=EventTask.Priority.URGENT, status__in=[EventTask.Status.TODO, EventTask.Status.IN_PROGRESS]).count(),
+        }
+
+        return Response({
+            'event': {
+                'id': str(event.id),
+                'title': event.title,
+                'slug': event.slug,
+                'capacity': event.capacity,
+                'is_paid': event.is_paid,
+                'ticket_price': float(event.ticket_price),
+            },
+            'attendance': {
+                'capacity': event.capacity,
+                'total_registered': total_registered,
+                'checked_in': checked_in_count,
+                'currently_inside': currently_inside,
+                'checked_out': checked_out_count,
+                'checkin_rate_pct': checkin_rate,
+            },
+            'velocity_chart': {
+                'labels': hourly_labels,
+                'gate_in': gate_in_series,
+                'gate_out': gate_out_series,
+            },
+            'gate_distribution_chart': {
+                'labels': gate_labels,
+                'counts': gate_series,
+            },
+            'registration_growth_chart': {
+                'labels': reg_labels,
+                'counts': reg_series,
+            },
+            'scan_audit': results_map,
+            'funding': funding_data,
+            'task_stats': task_stats,
+        })
+
+
+class EventFundingView(APIView):
+    """View and update financial and budget breakdown for an event."""
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get(self, request, event_id):
+        event = get_object_or_404(Event, id=event_id)
+        funding, _ = EventFunding.objects.get_or_create(event=event)
+        return Response(EventFundingSerializer(funding).data)
+
+    def post(self, request, event_id):
+        event = get_object_or_404(Event, id=event_id)
+        funding, _ = EventFunding.objects.get_or_create(event=event)
+        serializer = EventFundingSerializer(funding, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class EventTaskViewSet(viewsets.ModelViewSet):
+    """CRUD API for event work distribution and crew task management."""
+    serializer_class = EventTaskSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get_queryset(self):
+        qs = EventTask.objects.all().select_related('event', 'assigned_to')
+        event_id = self.request.query_params.get('event_id')
+        status_filter = self.request.query_params.get('status')
+        priority = self.request.query_params.get('priority')
+
+        if event_id:
+            qs = qs.filter(event_id=event_id)
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        if priority:
+            qs = qs.filter(priority=priority)
+
+        return qs
+
+    def perform_create(self, serializer):
+        event_id = self.request.data.get('event') or self.request.query_params.get('event_id')
+        event = get_object_or_404(Event, id=event_id)
+        serializer.save(event=event)

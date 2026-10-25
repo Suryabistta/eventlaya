@@ -2,7 +2,8 @@ from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     RegisterView, CurrentUserView, CustomTokenObtainPairView, FCMTokenView,
-    UserModulesView, SuperadminRBACManageView, SuperadminToggleModuleView
+    UserModulesView, SuperadminRBACManageView, SuperadminToggleModuleView,
+    TenantBrandingView, TenantVerifyDomainView, TenantResolveView
 )
 
 urlpatterns = [
@@ -14,4 +15,7 @@ urlpatterns = [
     path('modules/', UserModulesView.as_view(), name='user_modules'),
     path('rbac/', SuperadminRBACManageView.as_view(), name='superadmin_rbac'),
     path('rbac/toggle/', SuperadminToggleModuleView.as_view(), name='superadmin_rbac_toggle'),
+    path('tenant-branding/', TenantBrandingView.as_view(), name='tenant_branding'),
+    path('tenant-branding/verify-domain/', TenantVerifyDomainView.as_view(), name='tenant_verify_domain'),
+    path('tenant-branding/resolve/', TenantResolveView.as_view(), name='tenant_resolve'),
 ]

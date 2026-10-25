@@ -40,3 +40,36 @@ class EventSerializer(serializers.ModelSerializer):
             'registered_count', 'checked_in_count', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'organizer', 'created_at', 'updated_at']
+
+
+class EventFundingSerializer(serializers.ModelSerializer):
+    total_funding = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    total_expenses = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    net_balance = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+
+    class Meta:
+        from .models import EventFunding
+        model = EventFunding
+        fields = [
+            'id', 'event', 'target_budget', 'sponsorship_raised',
+            'ticket_sales_revenue', 'grants_donations', 'total_funding',
+            'expense_venue', 'expense_catering', 'expense_production',
+            'expense_marketing', 'expense_prizes_gifts', 'expense_logistics',
+            'total_expenses', 'net_balance', 'updated_at'
+        ]
+        read_only_fields = ['id', 'updated_at']
+
+
+class EventTaskSerializer(serializers.ModelSerializer):
+    event_title = serializers.CharField(source='event.title', read_only=True)
+    assigned_email = serializers.CharField(source='assigned_to.email', read_only=True, default='')
+
+    class Meta:
+        from .models import EventTask
+        model = EventTask
+        fields = [
+            'id', 'event', 'event_title', 'title', 'description',
+            'assigned_to', 'assigned_email', 'assigned_name', 'status',
+            'priority', 'category', 'due_time', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']

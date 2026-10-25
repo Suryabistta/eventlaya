@@ -78,3 +78,29 @@ class FCMToken(models.Model):
 
     def __str__(self):
         return f"{self.user.email} [{self.platform}]"
+
+
+class TenantBranding(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    organizer = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='tenant_branding')
+    subdomain = models.CharField(max_length=64, unique=True, db_index=True)
+    custom_domain = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
+    cname_target = models.CharField(max_length=255, default='cname.eventlaya.com')
+    is_domain_verified = models.BooleanField(default=False)
+    ssl_active = models.BooleanField(default=False)
+
+    brand_name = models.CharField(max_length=255, blank=True)
+    brand_logo = models.CharField(max_length=500, blank=True)
+    primary_color = models.CharField(max_length=20, default='#4F46E5')
+    accent_color = models.CharField(max_length=20, default='#06B6D4')
+    custom_css = models.TextField(blank=True)
+    support_email = models.EmailField(blank=True)
+    footer_text = models.CharField(max_length=255, blank=True)
+    remove_watermark = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.brand_name or self.subdomain} ({self.custom_domain or self.subdomain + '.eventlaya.com'})"
+

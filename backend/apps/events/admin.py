@@ -24,3 +24,17 @@ class StaffGateAssignmentAdmin(admin.ModelAdmin):
     list_display = ('staff', 'event', 'gate_name', 'is_active', 'created_at')
     search_fields = ('staff__email', 'event__title', 'gate_name')
     list_filter = ('is_active', 'event')
+
+
+from .models import EventFunding, EventTask
+
+@admin.register(EventFunding)
+class EventFundingAdmin(admin.ModelAdmin):
+    list_display = ('event', 'target_budget', 'sponsorship_raised', 'ticket_sales_revenue', 'total_expenses', 'net_balance')
+    search_fields = ('event__title',)
+
+@admin.register(EventTask)
+class EventTaskAdmin(admin.ModelAdmin):
+    list_display = ('title', 'event', 'status', 'priority', 'category', 'assigned_name', 'due_time')
+    list_filter = ('status', 'priority', 'category', 'event')
+    search_fields = ('title', 'description', 'assigned_name', 'event__title')

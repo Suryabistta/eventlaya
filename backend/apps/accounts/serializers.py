@@ -51,3 +51,20 @@ class RoleModulePermissionSerializer(serializers.ModelSerializer):
             'is_globally_enabled'
         ]
 
+
+
+class TenantBrandingSerializer(serializers.ModelSerializer):
+    organizer_email = serializers.CharField(source='organizer.email', read_only=True)
+    organizer_name = serializers.CharField(source='organizer.organization_name', read_only=True)
+
+    class Meta:
+        from .models import TenantBranding
+        model = TenantBranding
+        fields = [
+            'id', 'organizer', 'organizer_email', 'organizer_name',
+            'subdomain', 'custom_domain', 'cname_target', 'is_domain_verified',
+            'ssl_active', 'brand_name', 'brand_logo', 'primary_color',
+            'accent_color', 'custom_css', 'support_email', 'footer_text',
+            'remove_watermark', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'organizer', 'cname_target', 'created_at', 'updated_at']

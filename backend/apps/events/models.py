@@ -153,3 +153,86 @@ class StaffGateAssignment(models.Model):
 
     def __str__(self):
         return f"{self.staff.email} → {self.event.title} [{self.gate_name}]"
+
+
+class EventFunding(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    event = models.OneToOneField(Event, on_delete=models.CASCADE, related_name='funding')
+    target_budget = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+
+    # Incomes / Funding sources
+    sponsorship_raised = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    ticket_sales_revenue = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    grants_donations = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+
+    # Expenses breakdown
+    expense_venue = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    expense_catering = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    expense_production = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    expense_marketing = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    expense_prizes_gifts = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    expense_logistics = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def total_funding(self):
+        return self.sponsorship_raised + self.ticket_sales_revenue + self.grants_donations
+
+    @property
+    def total_expenses(self):
+        return (
+            self.expense_venue + self.expense_catering + self.expense_production +
+            self.expense_marketing + self.expense_prizes_gifts + self.expense_logistics
+        )
+
+    @property
+    def net_balance(self):
+        return self.total_funding - self.total_expenses
+
+    def __str__(self):
+        return f"Funding for {self.event.title} (Raised: {self.total_funding})"
+
+
+class EventTask(models.Model):
+    class Status(models.TextChoices):
+        TODO = 'todo', 'To Do'
+        IN_PROGRESS = 'in_progress', 'In Progress'
+        COMPLETED = 'completed', 'Completed'
+
+    class Priority(models.TextChoices):
+        LOW = 'low', 'Low'
+        MEDIUM = 'medium', 'Medium'
+        HIGH = 'high', 'High'
+        URGENT = 'urgent', 'Urgent'
+
+    class Category(models.TextChoices):
+        STAGE = 'stage', 'Stage & Sound'
+        GATE = 'gate', 'Gate & Security'
+        HOSPITALITY = 'hospitality', 'VIP & Guest Hospitality'
+        MARKETING = 'marketing', 'Media & Coverage'
+        CATERING = 'catering', 'Food & Refreshments'
+        TECH = 'tech', 'Technical & Registration'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='tasks')
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='assigned_event_tasks'
+    )
+    assigned_name = models.CharField(max_length=255, blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.TODO)
+    priority = models.CharField(max_length=20, choices=Priority.choices, default=Priority.MEDIUM)
+    category = models.CharField(max_length=20, choices=Category.choices, default=Category.TECH)
+    due_time = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-priority', 'status', 'due_time', '-created_at']
+
+    def __str__(self):
+        return f"[{self.get_status_display()}] {self.title} ({self.event.title})"
+

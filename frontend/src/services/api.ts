@@ -125,11 +125,164 @@ export interface VendorCategory {
   vendors_count: number
 }
 
+export interface VenueListing {
+  id: string
+  owner_name?: string
+  name: string
+  slug: string
+  venue_type: 'banquet' | 'resort' | 'auditorium' | 'hotel' | 'open_ground' | 'community'
+  venue_type_display?: string
+  city: string
+  address: string
+  capacity_min: number
+  capacity_max: number
+  price_per_day: string | number
+  amenities: string[]
+  images: string[]
+  contact_person: string
+  contact_phone: string
+  contact_email: string
+  description: string
+  rules_policy: string
+  is_verified: boolean
+  is_featured: boolean
+  rating: string | number
+  review_count: number
+  inquiries_count?: number
+  created_at?: string
+}
+
+export interface VenueInquiry {
+  id?: string
+  venue?: string
+  venue_name?: string
+  sender_name: string
+  sender_email: string
+  sender_phone: string
+  event_type: string
+  event_date: string
+  guest_count: number
+  budget_range?: string
+  message: string
+  status?: string
+  created_at?: string
+}
+
+export interface TenantBranding {
+  id?: string
+  subdomain: string
+  custom_domain?: string
+  cname_target?: string
+  is_domain_verified: boolean
+  ssl_active: boolean
+  brand_name: string
+  brand_logo: string
+  primary_color: string
+  accent_color: string
+  custom_css?: string
+  support_email: string
+  footer_text: string
+  remove_watermark: boolean
+  is_whitelabel?: boolean
+}
+
+export interface EventAnalytics {
+  event: {
+    id: string
+    title: string
+    slug: string
+    capacity: number
+    is_paid: boolean
+    ticket_price: number
+  }
+  attendance: {
+    capacity: number
+    total_registered: number
+    checked_in: number
+    currently_inside: number
+    checked_out: number
+    checkin_rate_pct: number
+  }
+  velocity_chart: {
+    labels: string[]
+    gate_in: number[]
+    gate_out: number[]
+  }
+  gate_distribution_chart: {
+    labels: string[]
+    counts: number[]
+  }
+  registration_growth_chart: {
+    labels: string[]
+    counts: number[]
+  }
+  scan_audit: Record<string, number>
+  funding: {
+    target_budget: number
+    sponsorship_raised: number
+    ticket_sales_revenue: number
+    grants_donations: number
+    total_funding: number
+    total_expenses: number
+    net_balance: number
+    expenses_breakdown: Record<string, number>
+  }
+  task_stats: {
+    total: number
+    todo: number
+    in_progress: number
+    completed: number
+    urgent: number
+  }
+}
+
+export interface EventFundingData {
+  id?: string
+  event: string
+  target_budget: number | string
+  sponsorship_raised: number | string
+  ticket_sales_revenue: number | string
+  grants_donations: number | string
+  total_funding?: number | string
+  expense_venue: number | string
+  expense_catering: number | string
+  expense_production: number | string
+  expense_marketing: number | string
+  expense_prizes_gifts: number | string
+  expense_logistics: number | string
+  total_expenses?: number | string
+  net_balance?: number | string
+}
+
+export interface EventTask {
+  id: string
+  event: string
+  event_title?: string
+  title: string
+  description?: string
+  assigned_to?: string
+  assigned_email?: string
+  assigned_name: string
+  status: 'todo' | 'in_progress' | 'completed'
+  priority: 'low' | 'medium' | 'high' | 'urgent'
+  category: 'stage' | 'gate' | 'hospitality' | 'marketing' | 'catering' | 'tech'
+  due_time?: string
+  created_at: string
+}
+
 // Helpers
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
+  const token = localStorage.getItem('access_token')
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
   const res = await fetch(`${API_BASE}${url}`, {
     headers: {
-      'Content-Type': 'application/json',
+      ...headers,
       ...options?.headers,
     },
     ...options,
@@ -173,7 +326,7 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  // Marketplace
+  // Marketplace & Venues
   getCategories: () => request<VendorCategory[]>('/marketplace/categories/'),
   getVendors: (params?: { category?: string; city?: string }) => {
     const q = new URLSearchParams()
@@ -182,4 +335,49 @@ export const api = {
     const str = q.toString()
     return request<Vendor[]>(`/marketplace/vendors/${str ? `?${str}` : ''}`)
   },
+  getVenues: (params?: { city?: string; type?: string; min_capacity?: number; max_price?: number; search?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.city) q.append('city', params.city)
+    if (params?.type) q.append('type', params.type)
+    if (params?.min_capacity) q.append('min_capacity', params.min_capacity.toString())
+    if (params?.max_price) q.append('max_price', params.max_price.toString())
+    if (params?.search) q.append('search', params.search)
+    const str = q.toString()
+    return request<VenueListing[]>(`/marketplace/venues/${str ? `?${str}` : ''}`)
+  },
+  createVenue: (body: Partial<VenueListing>) =>
+    request<VenueListing>('/marketplace/venues/', { method: 'POST', body: JSON.stringify(body) }),
+  sendVenueInquiry: (venueId: string, body: VenueInquiry) =>
+    request<VenueInquiry>(`/marketplace/venues/${venueId}/inquiries/`, { method: 'POST', body: JSON.stringify(body) }),
+
+  // White-Label Tenant Branding
+  getTenantBranding: () => request<TenantBranding>('/auth/tenant-branding/'),
+  updateTenantBranding: (body: Partial<TenantBranding>) =>
+    request<TenantBranding>('/auth/tenant-branding/', { method: 'POST', body: JSON.stringify(body) }),
+  verifyTenantDomain: () =>
+    request<{ message: string; is_domain_verified: boolean; ssl_active: boolean; cname_target: string }>('/auth/tenant-branding/verify-domain/', {
+      method: 'POST',
+    }),
+  resolveTenant: (host: string) => request<TenantBranding>(`/auth/tenant-branding/resolve/?host=${encodeURIComponent(host)}`),
+
+  // Analytics & Financials
+  getEventAnalytics: (eventId: string) => request<EventAnalytics>(`/events/${eventId}/analytics/`),
+  getEventFunding: (eventId: string) => request<EventFundingData>(`/events/${eventId}/funding/`),
+  updateEventFunding: (eventId: string, body: Partial<EventFundingData>) =>
+    request<EventFundingData>(`/events/${eventId}/funding/`, { method: 'POST', body: JSON.stringify(body) }),
+
+  // Work Distribution / Crew Tasks
+  getEventTasks: (eventId: string, params?: { status?: string; priority?: string }) => {
+    const q = new URLSearchParams()
+    q.append('event_id', eventId)
+    if (params?.status) q.append('status', params.status)
+    if (params?.priority) q.append('priority', params.priority)
+    return request<EventTask[]>(`/events/tasks/?${q.toString()}`)
+  },
+  createEventTask: (body: { event: string; title: string; description?: string; category?: string; priority?: string; assigned_name?: string; due_time?: string }) =>
+    request<EventTask>('/events/tasks/', { method: 'POST', body: JSON.stringify(body) }),
+  updateEventTask: (taskId: string, body: Partial<EventTask>) =>
+    request<EventTask>(`/events/tasks/${taskId}/`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteEventTask: (taskId: string) =>
+    request<{ message: string }>(`/events/tasks/${taskId}/`, { method: 'DELETE' }),
 }

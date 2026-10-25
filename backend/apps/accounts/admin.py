@@ -26,3 +26,12 @@ class RoleModulePermissionAdmin(admin.ModelAdmin):
     list_editable = ('is_enabled', 'can_view', 'can_create', 'can_edit', 'can_delete')
     list_filter = ('role', 'is_enabled', 'module')
 
+
+
+from .models import TenantBranding
+
+@admin.register(TenantBranding)
+class TenantBrandingAdmin(admin.ModelAdmin):
+    list_display = ('brand_name', 'organizer', 'subdomain', 'custom_domain', 'is_domain_verified', 'ssl_active')
+    search_fields = ('brand_name', 'subdomain', 'custom_domain', 'organizer__email')
+    list_filter = ('is_domain_verified', 'ssl_active')

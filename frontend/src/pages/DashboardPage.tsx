@@ -60,18 +60,32 @@ export const DashboardPage: React.FC = () => {
 
           <div className="flex flex-wrap gap-3 pt-2">
             <Link
+              to="/analytics"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/30 transition"
+            >
+              <TrendingUp className="w-4 h-4" />
+              Analytics & Work Distribution
+            </Link>
+            <Link
               to="/scanner"
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold shadow-md shadow-brand-600/30 transition"
             >
               <QrCode className="w-4 h-4" />
-              Open Gate Scanner Terminal
+              Gate Terminal
+            </Link>
+            <Link
+              to="/white-label"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold backdrop-blur-xs transition"
+            >
+              <Sparkles className="w-4 h-4" />
+              White-Label Settings
             </Link>
             <Link
               to="/forms"
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold backdrop-blur-xs transition"
             >
               <FileSpreadsheet className="w-4 h-4" />
-              Manage Dynamic Forms
+              Dynamic Forms
             </Link>
             <Link
               to="/e/eastern-tech-fest-2026"

@@ -10,6 +10,7 @@ import 'attendees_screen.dart';
 import 'scan_logs_screen.dart';
 import 'staff_screen.dart';
 import 'rbac_module_screen.dart';
+import 'event_tasks_screen.dart';
 
 class AdminHomeScreen extends ConsumerStatefulWidget {
   const AdminHomeScreen({super.key});
@@ -402,6 +403,24 @@ class _DashboardTab extends ConsumerWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+
+            const SizedBox(height: 10),
+
+            // Work Distribution & Tasks Button
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const EventTasksScreen()),
+                );
+              },
+              icon: const Icon(Icons.assignment_turned_in_outlined, color: AppColors.secondary),
+              label: const Text('Crew Work Distribution & Tasks', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.divider),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
             ),
 

@@ -9,7 +9,9 @@ import {
   FileSpreadsheet,
   ExternalLink,
   Sparkles,
-  Shield
+  Shield,
+  TrendingUp,
+  Globe
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -19,10 +21,12 @@ export const Navbar: React.FC = () => {
   const navItems = [
     { label: 'Dashboard', path: '/', icon: LayoutDashboard },
     { label: 'Events', path: '/events', icon: Calendar },
-    { label: 'Form Builder', path: '/forms', icon: FileSpreadsheet },
+    { label: 'Analytics & Tasks', path: '/analytics', icon: TrendingUp },
     { label: 'Gate Scanner', path: '/scanner', icon: QrCode },
+    { label: 'Form Builder', path: '/forms', icon: FileSpreadsheet },
     { label: 'Live Voting', path: '/voting', icon: Vote },
     { label: 'Marketplace', path: '/marketplace', icon: Store },
+    { label: 'White-Label', path: '/white-label', icon: Globe },
     { label: 'Superadmin', path: '/superadmin', icon: Shield },
   ]
 
@@ -55,8 +59,8 @@ export const Navbar: React.FC = () => {
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-8">
-          <Link to="/" className="flex items-center gap-2.5">
+        <div className="flex items-center gap-6">
+          <Link to="/" className="flex items-center gap-2.5 shrink-0">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-brand-500/25">
               <Sparkles className="w-5 h-5" />
             </div>
@@ -65,22 +69,22 @@ export const Navbar: React.FC = () => {
             </span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden lg:flex items-center gap-0.5">
             {navItems.map((item) => {
               const Icon = item.icon
-              const isActive = location.pathname === item.path
+              const isActive = location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path))
               return (
                 <Link
                   key={item.path}
                   to={item.path}
                   className={cn(
-                    'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                    'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors',
                     isActive
                       ? 'bg-brand-50 text-brand-700 font-semibold'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
                   )}
                 >
-                  <Icon className={cn('w-4 h-4', isActive ? 'text-brand-600' : 'text-slate-400')} />
+                  <Icon className={cn('w-3.5 h-3.5', isActive ? 'text-brand-600' : 'text-slate-400')} />
                   {item.label}
                 </Link>
               )
@@ -98,11 +102,12 @@ export const Navbar: React.FC = () => {
             Public Event Page
             <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
           </Link>
+
           <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
             <div className="w-8 h-8 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center justify-center">
               ET
             </div>
-            <div className="hidden lg:block text-left text-xs">
+            <div className="hidden xl:block text-left text-xs">
               <p className="font-semibold text-slate-900 leading-none">Eastern Tech Club</p>
               <p className="text-slate-400 text-[10px] leading-tight">Organizer</p>
             </div>
