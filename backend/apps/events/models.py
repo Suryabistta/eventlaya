@@ -98,7 +98,12 @@ class EventTicket(models.Model):
         count = event.tickets.count() + 1
         code_prefix = str(event.id)[:6].upper()
         ticket_number = f"TKT-{code_prefix}-{str(count).zfill(4)}"
+        while cls.objects.filter(ticket_number=ticket_number).exists():
+            count += 1
+            ticket_number = f"TKT-{code_prefix}-{str(count).zfill(4)}"
         qr_token = secrets.token_hex(20)
+        while cls.objects.filter(qr_token=qr_token).exists():
+            qr_token = secrets.token_hex(20)
         return cls.objects.create(
             event=event,
             ticket_number=ticket_number,

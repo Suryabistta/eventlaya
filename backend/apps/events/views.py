@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from django.utils import timezone
 from django.db import models
 from django.shortcuts import get_object_or_404
@@ -49,24 +49,34 @@ class PublicEventDetailView(APIView):
 
 
 class GateScanView(APIView):
-    """Handles Gate In and Gate Out scans with duplicate detection and audit logs."""
+    """Handles Gate In and Gate Out scans with duplicate detection, date verification, and audit logs."""
     permission_classes = [permissions.AllowAny] # In production: Scanner/Staff role
 
     def post(self, request, event_id):
+        import json
         event = get_object_or_404(Event, id=event_id)
-        qr_token = request.data.get('qr_token', '').strip()
+        raw_token = request.data.get('qr_token', '').strip()
         scan_type = request.data.get('scan_type', GateScanLog.ScanType.GATE_IN)
-        gate_name = request.data.get('gate_name', 'Main Gate')
+        gate_name = request.data.get('gate_name', 'Main Gate').strip() or 'Main Gate'
         device_info = request.data.get('device_info', '')
         scanned_at_client = request.data.get('scanned_at_client')
 
-        if not qr_token:
+        if not raw_token:
             return Response({'error': 'qr_token is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Look up ticket by qr_token or ticket_number
-        ticket = EventTicket.objects.filter(event=event).filter(
-            models.Q(qr_token=qr_token) | models.Q(ticket_number=qr_token)
-        ).first()
+        # 1. Normalize QR Token (extract from JSON, URL query, or path)
+        qr_token = raw_token
+        if raw_token.startswith('{') and raw_token.endswith('}'):
+            try:
+                parsed = json.loads(raw_token)
+                qr_token = parsed.get('qr_token') or parsed.get('token') or parsed.get('ticket_number') or raw_token
+            except Exception:
+                pass
+        elif 'token=' in raw_token:
+            qr_token = raw_token.split('token=')[-1].split('&')[0]
+        elif '/' in raw_token and ('http' in raw_token or 'eventlaya' in raw_token or 'ticket' in raw_token):
+            qr_token = raw_token.rstrip('/').split('/')[-1]
+        qr_token = qr_token.strip()
 
         now = timezone.now()
         if scanned_at_client:
@@ -75,11 +85,76 @@ class GateScanView(APIView):
             except Exception:
                 pass
 
+        # 2. Event Status & Lifecycle Validation
+        if event.status == Event.Status.CANCELLED:
+            return Response({
+                'status': 'event_cancelled',
+                'result': 'cancelled',
+                'message': f"⛔ Gate Entry Denied: The event '{event.title}' has been CANCELLED by the organizer.",
+                'ticket': None,
+                'attendee_name': None,
+                'gate_name': gate_name,
+                'scan_type': scan_type,
+                'scanned_at': now.isoformat(),
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # 3. Event Date Window Validation
+        current_date = now.date()
+        # If scanned more than 1 day before the event date
+        if event.start_date and current_date < (event.start_date - timedelta(days=1)):
+            return Response({
+                'status': 'early_scan',
+                'result': 'early_date',
+                'message': f"⛔ Date Mismatch: '{event.title}' is scheduled for {event.start_date}. Gate validation opens on event date.",
+                'ticket': None,
+                'attendee_name': None,
+                'gate_name': gate_name,
+                'scan_type': scan_type,
+                'scanned_at': now.isoformat(),
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # If event is already completed or ended in the past
+        last_date = event.end_date or event.start_date
+        if event.status == Event.Status.COMPLETED or (last_date and current_date > (last_date + timedelta(days=1))):
+            return Response({
+                'status': 'event_expired',
+                'result': 'expired',
+                'message': f"⛔ Event Concluded: '{event.title}' finished on {last_date}.",
+                'ticket': None,
+                'attendee_name': None,
+                'gate_name': gate_name,
+                'scan_type': scan_type,
+                'scanned_at': now.isoformat(),
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # 4. Look up ticket by qr_token or ticket_number (case-insensitive for manual entry)
+        ticket = EventTicket.objects.filter(event=event).filter(
+            models.Q(qr_token__iexact=qr_token) | models.Q(ticket_number__iexact=qr_token)
+        ).first()
+
+        # 5. Handle Cross-Event Checkpoint Mismatch
         if not ticket:
+            other_ticket = EventTicket.objects.filter(
+                models.Q(qr_token__iexact=qr_token) | models.Q(ticket_number__iexact=qr_token)
+            ).select_related('event').first()
+
+            if other_ticket:
+                return Response({
+                    'status': 'wrong_event',
+                    'result': 'wrong_event',
+                    'message': f"⛔ Wrong Event Checkpoint: Ticket is issued for '{other_ticket.event.title}', NOT '{event.title}'. Please redirect attendee.",
+                    'ticket': EventTicketSerializer(other_ticket).data,
+                    'attendee_name': other_ticket.attendee_name,
+                    'expected_event': other_ticket.event.title,
+                    'gate_name': gate_name,
+                    'scan_type': scan_type,
+                    'scanned_at': now.isoformat(),
+                }, status=status.HTTP_400_BAD_REQUEST)
+
             return Response({
                 'status': 'invalid',
                 'result': 'invalid',
-                'message': 'Invalid ticket: No matching attendee record found for this event.',
+                'message': '❌ Invalid Ticket: No attendee record matching this QR token found.',
                 'ticket': None,
                 'attendee_name': None,
                 'gate_name': gate_name,
@@ -87,11 +162,12 @@ class GateScanView(APIView):
                 'scanned_at': now.isoformat(),
             }, status=status.HTTP_404_NOT_FOUND)
 
+        # 6. Ticket Cancellation Check
         if ticket.status == EventTicket.Status.CANCELLED:
             return Response({
                 'status': 'cancelled',
                 'result': 'cancelled',
-                'message': 'Ticket has been cancelled.',
+                'message': '⛔ Entry Denied: This ticket was cancelled or revoked.',
                 'ticket': EventTicketSerializer(ticket).data,
                 'attendee_name': ticket.attendee_name,
                 'gate_name': gate_name,
@@ -101,6 +177,7 @@ class GateScanView(APIView):
 
         user = request.user if request.user.is_authenticated else None
 
+        # 7. Gate In Check
         if scan_type == GateScanLog.ScanType.GATE_IN:
             if ticket.status == EventTicket.Status.CHECKED_IN:
                 # Duplicate entry scan alert!
@@ -150,7 +227,9 @@ class GateScanView(APIView):
                         'ticket': EventTicketSerializer(ticket).data
                     }, status=status.HTTP_200_OK)
 
-            # Successful check-in
+            # Handle Pass-Back / Re-entry vs First Check-in
+            is_reentry = (ticket.status == EventTicket.Status.CHECKED_OUT)
+
             ticket.status = EventTicket.Status.CHECKED_IN
             ticket.is_attended = True
             if not ticket.first_check_in:
@@ -172,10 +251,12 @@ class GateScanView(APIView):
             current_inside = event.tickets.filter(status=EventTicket.Status.CHECKED_IN).count()
             notify_capacity_milestone(event, current_inside, event.capacity)
 
+            welcome_msg = f"🔄 Re-Entry Granted: Welcome back {ticket.attendee_name}!" if is_reentry else f"✅ Access Granted: Welcome {ticket.attendee_name}!"
+
             return Response({
-                'status': 'gate_in',
+                'status': 're_entry' if is_reentry else 'gate_in',
                 'result': 'success',
-                'message': f"✅ Access Granted: Welcome {ticket.attendee_name}!",
+                'message': welcome_msg,
                 'attendee_name': ticket.attendee_name,
                 'gate_name': gate_name,
                 'scan_type': scan_type,

@@ -59,7 +59,7 @@ export interface Ticket {
 }
 
 export interface ScanResult {
-  result: 'success' | 'duplicate' | 'not_in' | 'invalid' | 'cancelled'
+  result: 'success' | 'duplicate' | 'not_in' | 'invalid' | 'cancelled' | 'wrong_event' | 'early_date' | 'expired'
   message: string
   ticket?: Ticket
 }

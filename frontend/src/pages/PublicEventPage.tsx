@@ -27,6 +27,7 @@ export const PublicEventPage: React.FC = () => {
   const [phone, setPhone] = useState('')
   const [answers, setAnswers] = useState<Record<string, unknown>>({})
   const [issuedTicket, setIssuedTicket] = useState<Ticket | null>(null)
+  const [isExistingRegistration, setIsExistingRegistration] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const { data, isLoading, isError } = useQuery({
@@ -37,8 +38,9 @@ export const PublicEventPage: React.FC = () => {
   const registerMutation = useMutation({
     mutationFn: (body: { name: string; email: string; phone?: string; answers?: Record<string, unknown> }) =>
       api.registerForEvent(slug, body),
-    onSuccess: (res) => {
+    onSuccess: (res: any) => {
       setIssuedTicket(res.ticket)
+      setIsExistingRegistration(Boolean(res.already_registered))
       setErrorMessage(null)
       // Confetti celebration!
       confetti({
@@ -262,8 +264,14 @@ export const PublicEventPage: React.FC = () => {
             <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-1">
               <CheckCircle className="w-7 h-7 text-white" />
             </div>
-            <h2 className="text-xl font-extrabold">You are Registered!</h2>
-            <p className="text-emerald-100 text-xs">Here is your official digital entry pass for {event.title}.</p>
+            <h2 className="text-xl font-extrabold">
+              {isExistingRegistration ? 'Welcome Back!' : 'You are Registered!'}
+            </h2>
+            <p className="text-emerald-100 text-xs">
+              {isExistingRegistration
+                ? `You were already registered for this event. Here is your official entry pass.`
+                : `Here is your official digital entry pass for ${event.title}.`}
+            </p>
           </div>
 
           <div className="p-6 space-y-6">

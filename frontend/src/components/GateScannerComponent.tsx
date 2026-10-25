@@ -306,6 +306,8 @@ export const GateScannerComponent: React.FC<Props> = ({ eventId, onScanComplete 
                 lastResult.result === 'success' && 'bg-emerald-50 border-emerald-200 text-emerald-900',
                 lastResult.result === 'duplicate' && 'bg-amber-50 border-amber-300 text-amber-900 shadow-md',
                 lastResult.result === 'not_in' && 'bg-blue-50 border-blue-200 text-blue-900',
+                (lastResult.result === 'wrong_event' || lastResult.result === 'early_date') && 'bg-purple-50 border-purple-300 text-purple-900 shadow-md',
+                (lastResult.result === 'cancelled' || lastResult.result === 'expired') && 'bg-red-50 border-red-300 text-red-900 shadow-md',
                 lastResult.result === 'invalid' && 'bg-rose-50 border-rose-200 text-rose-900'
               )}
             >
@@ -314,12 +316,14 @@ export const GateScannerComponent: React.FC<Props> = ({ eventId, onScanComplete 
                   {lastResult.result === 'success' && <CheckCircle2 className="w-6 h-6 text-emerald-600" />}
                   {lastResult.result === 'duplicate' && <AlertTriangle className="w-6 h-6 text-amber-600 animate-bounce" />}
                   {lastResult.result === 'not_in' && <LogOut className="w-6 h-6 text-blue-600" />}
+                  {(lastResult.result === 'wrong_event' || lastResult.result === 'early_date') && <AlertTriangle className="w-6 h-6 text-purple-600" />}
+                  {(lastResult.result === 'cancelled' || lastResult.result === 'expired') && <AlertTriangle className="w-6 h-6 text-red-600" />}
                   {lastResult.result === 'invalid' && <AlertTriangle className="w-6 h-6 text-rose-600" />}
                 </div>
 
                 <div className="flex-1">
                   <span className="text-[10px] font-black tracking-wider uppercase px-2 py-0.5 rounded-full inline-block mb-1.5 bg-white/70">
-                    {lastResult.result.toUpperCase()}
+                    {lastResult.result.replace('_', ' ').toUpperCase()}
                   </span>
                   <h4 className="font-bold text-sm leading-tight">{lastResult.message}</h4>
 

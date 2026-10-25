@@ -47,6 +47,7 @@ class ScanResultModel {
     switch (status) {
       case 'gate_in':
       case 'gate_out':
+      case 're_entry':
       case 'success':
         outcome = ScanOutcome.success;
         break;
@@ -65,9 +66,14 @@ class ScanResultModel {
         outcome = ScanOutcome.invalidToken;
         break;
       case 'cancelled':
+      case 'event_cancelled':
+      case 'expired':
+      case 'event_expired':
         outcome = ScanOutcome.cancelled;
         break;
       case 'wrong_event':
+      case 'early_scan':
+      case 'early_date':
         outcome = ScanOutcome.wrongEvent;
         break;
       case 'capacity_full':

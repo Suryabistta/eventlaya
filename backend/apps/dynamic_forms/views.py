@@ -61,12 +61,13 @@ class EventRegisterView(APIView):
             return Response({'error': 'Name and Email are required.'}, status=status.HTTP_400_BAD_REQUEST)
 
         # Check if already registered
-        existing_ticket = EventTicket.objects.filter(event=event, attendee_email=email).first()
+        existing_ticket = EventTicket.objects.filter(event=event, attendee_email__iexact=email).first()
         if existing_ticket:
             return Response({
-                'error': 'An attendee with this email is already registered for this event.',
-                'ticket': EventTicketSerializer(existing_ticket).data
-            }, status=status.HTTP_409_CONFLICT)
+                'message': f'You are already registered! Here is your digital ticket pass for {event.title}.',
+                'ticket': EventTicketSerializer(existing_ticket).data,
+                'already_registered': True
+            }, status=status.HTTP_200_OK)
 
         form = event.registration_form
 
