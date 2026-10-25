@@ -12,6 +12,7 @@ import { PublicEventPage } from './pages/PublicEventPage'
 import { SuperadminPage } from './pages/SuperadminPage'
 import EventAnalyticsPage from './pages/EventAnalyticsPage'
 import WhiteLabelPage from './pages/WhiteLabelPage'
+import PricingPage from './pages/PricingPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,6 +40,7 @@ export const App: React.FC = () => {
               <Route path="/scanner" element={<GateScannerPage />} />
               <Route path="/voting" element={<VotingPage />} />
               <Route path="/marketplace" element={<MarketplacePage />} />
+              <Route path="/pricing" element={<PricingPage />} />
               <Route path="/superadmin" element={<SuperadminPage />} />
               <Route path="/e/:slug" element={<PublicEventPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />

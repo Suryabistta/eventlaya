@@ -11,7 +11,8 @@ import {
   Sparkles,
   Shield,
   TrendingUp,
-  Globe
+  Globe,
+  CreditCard
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -27,6 +28,7 @@ export const Navbar: React.FC = () => {
     { label: 'Live Voting', path: '/voting', icon: Vote },
     { label: 'Marketplace', path: '/marketplace', icon: Store },
     { label: 'White-Label', path: '/white-label', icon: Globe },
+    { label: 'Pricing & Plans', path: '/pricing', icon: CreditCard },
     { label: 'Superadmin', path: '/superadmin', icon: Shield },
   ]
 

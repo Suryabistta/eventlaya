@@ -108,6 +108,9 @@ class EventRegisterView(APIView):
                             value=answers_map[str(field.id)]
                         )
 
+        from apps.core.email import send_ticket_email
+        send_ticket_email(ticket, event)
+
         return Response({
             'message': 'Registration successful! Your digital ticket is ready.',
             'ticket': EventTicketSerializer(ticket).data,
