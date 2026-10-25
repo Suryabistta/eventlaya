@@ -8,7 +8,8 @@ import {
   Store,
   FileSpreadsheet,
   ExternalLink,
-  Sparkles
+  Sparkles,
+  Shield
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -22,6 +23,7 @@ export const Navbar: React.FC = () => {
     { label: 'Gate Scanner', path: '/scanner', icon: QrCode },
     { label: 'Live Voting', path: '/voting', icon: Vote },
     { label: 'Marketplace', path: '/marketplace', icon: Store },
+    { label: 'Superadmin', path: '/superadmin', icon: Shield },
   ]
 
   // Don't show full dashboard navbar on public event page

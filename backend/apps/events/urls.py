@@ -3,7 +3,8 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     EventViewSet, PublicEventDetailView, GateScanView,
     GateStatsView, EventTicketListView, MyGateAssignmentView,
-    StaffAssignmentManageView
+    StaffAssignmentManageView, EventBroadcastNotificationView,
+    ExportAttendeesCSVView
 )
 
 router = DefaultRouter()
@@ -16,5 +17,7 @@ urlpatterns = [
     path('<uuid:event_id>/gate/scan/', GateScanView.as_view(), name='gate_scan'),
     path('<uuid:event_id>/gate/stats/', GateStatsView.as_view(), name='gate_stats'),
     path('<uuid:event_id>/tickets/', EventTicketListView.as_view(), name='event_tickets'),
+    path('<uuid:event_id>/broadcast/', EventBroadcastNotificationView.as_view(), name='event_broadcast'),
+    path('<uuid:event_id>/export-attendees/', ExportAttendeesCSVView.as_view(), name='export_attendees_csv'),
     path('', include(router.urls)),
 ]

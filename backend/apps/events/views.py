@@ -304,19 +304,53 @@ class MyGateAssignmentView(APIView):
 
 
 class StaffAssignmentManageView(APIView):
-    """Admin/Organizer: Assign staff to a gate."""
+    """Admin/Organizer: List or assign staff to an event gate."""
     permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        event_id = request.query_params.get('event_id')
+        if not event_id:
+            return Response({'error': 'event_id query parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        assignments = StaffGateAssignment.objects.filter(event_id=event_id).select_related('staff')
+        data = [{
+            'id': str(a.id),
+            'staff_id': str(a.staff.id),
+            'staff_name': a.staff.get_full_name() or a.staff.username,
+            'staff_email': a.staff.email,
+            'gate_name': a.gate_name,
+            'is_active': a.is_active,
+            'created_at': a.created_at.isoformat(),
+        } for a in assignments]
+        return Response(data)
 
     def post(self, request):
         from django.contrib.auth import get_user_model
         User = get_user_model()
         
-        staff_email = request.data.get('staff_email')
+        staff_email = request.data.get('staff_email', '').strip()
         event_id = request.data.get('event_id')
-        gate_name = request.data.get('gate_name', 'Main Gate')
+        gate_name = request.data.get('gate_name', 'Main Gate').strip()
         
+        if not staff_email or not event_id:
+            return Response({'error': 'staff_email and event_id are required'}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
-            staff_user = User.objects.get(email=staff_email)
+            # If user doesn't exist, create as staff user
+            staff_user, user_created = User.objects.get_or_create(
+                email=staff_email,
+                defaults={
+                    'username': staff_email.split('@')[0],
+                    'role': User.Role.STAFF,
+                }
+            )
+            if user_created:
+                staff_user.set_password('password123')
+                staff_user.save()
+            elif staff_user.role != User.Role.STAFF and staff_user.role != User.Role.SUPERADMIN:
+                staff_user.role = User.Role.STAFF
+                staff_user.save(update_fields=['role'])
+
             event = Event.objects.get(id=event_id)
         except (User.DoesNotExist, Event.DoesNotExist) as e:
             return Response({'error': str(e)}, status=status.HTTP_404_NOT_FOUND)
@@ -326,8 +360,78 @@ class StaffAssignmentManageView(APIView):
             defaults={'gate_name': gate_name, 'is_active': True}
         )
         return Response({
-            'message': 'Staff assigned' if created else 'Assignment updated',
+            'message': 'Staff assigned to gate successfully' if created else 'Gate assignment updated',
+            'id': str(assignment.id),
             'gate_name': assignment.gate_name,
-            'staff': staff_email,
-            'event': event.title,
+            'staff_email': staff_user.email,
+            'staff_name': staff_user.get_full_name() or staff_user.username,
+            'event_title': event.title,
         })
+
+    def delete(self, request):
+        assignment_id = request.data.get('assignment_id')
+        if not assignment_id:
+            return Response({'error': 'assignment_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        StaffGateAssignment.objects.filter(id=assignment_id).delete()
+        return Response({'message': 'Staff gate assignment removed'})
+
+
+class EventBroadcastNotificationView(APIView):
+    """Send real-time announcement push notification to all staff assigned to this event."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, event_id):
+        event = get_object_or_404(Event, id=event_id)
+        title = request.data.get('title', f"📢 Alert: {event.title}")
+        body = request.data.get('message', '').strip()
+
+        if not body:
+            return Response({'error': 'message body is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        sent_count = send_push_to_event_staff(event, title, body, {
+            'type': 'admin_broadcast',
+            'event_id': str(event.id),
+        })
+
+        return Response({
+            'message': f"Broadcast notification dispatched to active staff members.",
+            'receivers_notified': sent_count,
+            'title': title,
+            'body': body,
+        })
+
+
+class ExportAttendeesCSVView(APIView):
+    """Export all attendee roster records for an event as CSV."""
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, event_id):
+        import csv
+        from django.http import HttpResponse
+
+        event = get_object_or_404(Event, id=event_id)
+        tickets = EventTicket.objects.filter(event=event).order_by('created_at')
+
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="eventlaya_attendees_{event.slug}.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow([
+            'Ticket Number', 'Attendee Name', 'Email', 'Phone',
+            'Status', 'First Check In', 'Last Activity', 'Registered At'
+        ])
+
+        for t in tickets:
+            writer.writerow([
+                t.ticket_number,
+                t.attendee_name,
+                t.attendee_email,
+                t.attendee_phone,
+                t.status,
+                t.first_check_in.strftime('%Y-%m-%d %H:%M:%S') if t.first_check_in else '',
+                t.last_activity.strftime('%Y-%m-%d %H:%M:%S') if t.last_activity else '',
+                t.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            ])
+
+        return response
+

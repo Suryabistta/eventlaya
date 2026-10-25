@@ -11,7 +11,8 @@ import {
   FileSpreadsheet,
   Vote,
   Sparkles,
-  Ticket as TicketIcon
+  Ticket as TicketIcon,
+  Download
 } from 'lucide-react'
 import { api, type Ticket } from '@/services/api'
 import { TicketPassModal } from '@/components/TicketPassModal'
@@ -151,9 +152,20 @@ export const DashboardPage: React.FC = () => {
                 Click any attendee to inspect and print their verified QR entry pass.
               </p>
             </div>
-            <Link to="/events" className="text-xs font-semibold text-brand-600 hover:text-brand-700 flex items-center gap-1">
-              View All <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
+            <div className="flex items-center gap-2">
+              {primaryEvent && (
+                <button
+                  onClick={() => window.open(`/api/events/${primaryEvent.id}/export-attendees/`, '_blank')}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition"
+                >
+                  <Download className="w-3.5 h-3.5 text-slate-400" />
+                  Export CSV
+                </button>
+              )}
+              <Link to="/events" className="text-xs font-semibold text-brand-600 hover:text-brand-700 flex items-center gap-1 px-2">
+                View All <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           </div>
 
           <div className="overflow-x-auto">

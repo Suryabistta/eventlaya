@@ -9,6 +9,7 @@ import { GateScannerPage } from './pages/GateScannerPage'
 import { VotingPage } from './pages/VotingPage'
 import { MarketplacePage } from './pages/MarketplacePage'
 import { PublicEventPage } from './pages/PublicEventPage'
+import { SuperadminPage } from './pages/SuperadminPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,6 +34,7 @@ export const App: React.FC = () => {
               <Route path="/scanner" element={<GateScannerPage />} />
               <Route path="/voting" element={<VotingPage />} />
               <Route path="/marketplace" element={<MarketplacePage />} />
+              <Route path="/superadmin" element={<SuperadminPage />} />
               <Route path="/e/:slug" element={<PublicEventPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

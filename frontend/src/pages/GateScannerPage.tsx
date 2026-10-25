@@ -10,7 +10,13 @@ import {
   Ticket as TicketIcon,
   RefreshCw,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Download,
+  Megaphone,
+  UserPlus,
+  X,
+  Send,
+  Radio
 } from 'lucide-react'
 import { api, type Ticket } from '@/services/api'
 import { GateScannerComponent } from '@/components/GateScannerComponent'
@@ -21,6 +27,19 @@ export const GateScannerPage: React.FC = () => {
   const queryClient = useQueryClient()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
+  const [showStaffModal, setShowStaffModal] = useState(false)
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false)
+
+  // Staff Assignment State
+  const [staffEmail, setStaffEmail] = useState('')
+  const [gateName, setGateName] = useState('Main Gate')
+  const [staffMsg, setStaffMsg] = useState('')
+
+  // Broadcast Message State
+  const [broadcastTitle, setBroadcastTitle] = useState('')
+  const [broadcastBody, setBroadcastBody] = useState('')
+  const [broadcastSending, setBroadcastSending] = useState(false)
+  const [broadcastSuccess, setBroadcastSuccess] = useState('')
 
   const { data: events = [] } = useQuery({
     queryKey: ['events'],
@@ -42,6 +61,18 @@ export const GateScannerPage: React.FC = () => {
     enabled: Boolean(currentEvent?.id),
   })
 
+  // Staff assignments query
+  const { data: staffAssignments = [], refetch: refetchStaff } = useQuery({
+    queryKey: ['staffAssignments', currentEvent?.id],
+    queryFn: async () => {
+      if (!currentEvent?.id) return []
+      const resp = await fetch(`/api/events/staff-assign/?event_id=${currentEvent.id}`)
+      if (!resp.ok) return []
+      return resp.json()
+    },
+    enabled: Boolean(currentEvent?.id),
+  })
+
   const manualCheckInMutation = useMutation({
     mutationFn: ({ qr_token, scan_type }: { qr_token: string; scan_type: 'gate_in' | 'gate_out' }) =>
       api.scanTicket(currentEvent!.id, { qr_token, scan_type, gate_name: 'Manual Terminal' }),
@@ -54,6 +85,63 @@ export const GateScannerPage: React.FC = () => {
   const handleRefreshAll = () => {
     refetchStats()
     refetchTickets()
+    refetchStaff()
+  }
+
+  const handleAssignStaff = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!staffEmail || !currentEvent) return
+    try {
+      const resp = await fetch('/api/events/staff-assign/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          staff_email: staffEmail,
+          event_id: currentEvent.id,
+          gate_name: gateName,
+        }),
+      })
+      const data = await resp.json()
+      setStaffMsg(data.message || 'Staff assigned!')
+      setStaffEmail('')
+      refetchStaff()
+      setTimeout(() => setStaffMsg(''), 3000)
+    } catch {
+      setStaffMsg('Failed to assign staff')
+    }
+  }
+
+  const handleSendBroadcast = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!broadcastBody || !currentEvent) return
+    setBroadcastSending(true)
+    try {
+      const resp = await fetch(`/api/events/${currentEvent.id}/broadcast/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: broadcastTitle || `📢 Alert: ${currentEvent.title}`,
+          message: broadcastBody,
+        }),
+      })
+      const data = await resp.json()
+      setBroadcastSuccess(data.message || 'Notification broadcast sent!')
+      setBroadcastBody('')
+      setBroadcastTitle('')
+      setTimeout(() => {
+        setBroadcastSuccess('')
+        setShowBroadcastModal(false)
+      }, 2000)
+    } catch {
+      setBroadcastSuccess('Broadcast failed')
+    } finally {
+      setBroadcastSending(false)
+    }
+  }
+
+  const handleExportCSV = () => {
+    if (!currentEvent) return
+    window.open(`/api/events/${currentEvent.id}/export-attendees/`, '_blank')
   }
 
   return (
@@ -78,13 +166,39 @@ export const GateScannerPage: React.FC = () => {
           </div>
         </div>
 
-        <button
-          onClick={handleRefreshAll}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition backdrop-blur-xs"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          Refresh Stats
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setShowStaffModal(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600/80 hover:bg-indigo-600 text-white text-xs font-semibold transition"
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            Gate Staff ({staffAssignments.length})
+          </button>
+
+          <button
+            onClick={() => setShowBroadcastModal(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/80 hover:bg-amber-500 text-white text-xs font-semibold transition"
+          >
+            <Megaphone className="w-3.5 h-3.5" />
+            Broadcast Alert
+          </button>
+
+          <button
+            onClick={handleExportCSV}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Export CSV
+          </button>
+
+          <button
+            onClick={handleRefreshAll}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Live Metrics Row */}
@@ -219,6 +333,172 @@ export const GateScannerPage: React.FC = () => {
           eventLocation={currentEvent?.location}
           onClose={() => setSelectedTicket(null)}
         />
+      )}
+
+      {/* Staff Gate Assignment Modal */}
+      {showStaffModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900">Gate Staff Assignments</h3>
+                  <p className="text-xs text-slate-500">Authorize staff scanner access for this event</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowStaffModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {staffMsg && (
+              <div className="mb-4 p-3 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-semibold">
+                {staffMsg}
+              </div>
+            )}
+
+            <form onSubmit={handleAssignStaff} className="space-y-3 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Assign New Gate Staff</h4>
+              <div>
+                <label className="text-[11px] font-semibold text-slate-600">Staff Email Address</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="e.g. staff@eventlaya.com"
+                  value={staffEmail}
+                  onChange={(e) => setStaffEmail(e.target.value)}
+                  className="w-full text-xs mt-1 px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-600">Station / Gate Name</label>
+                <select
+                  value={gateName}
+                  onChange={(e) => setGateName(e.target.value)}
+                  className="w-full text-xs mt-1 px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 bg-white"
+                >
+                  <option value="Main Gate">Main Gate</option>
+                  <option value="VIP Entrance">VIP Entrance</option>
+                  <option value="North Entrance">North Entrance</option>
+                  <option value="South Gate">South Gate</option>
+                  <option value="Staff Entrance">Staff Entrance</option>
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold transition shadow-xs"
+              >
+                Assign Gate Staff Access
+              </button>
+            </form>
+
+            <div>
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">Active Gate Crew</h4>
+              {staffAssignments.length === 0 ? (
+                <p className="text-xs text-slate-400 py-3 text-center">No staff assigned yet. Assign staff above.</p>
+              ) : (
+                <div className="space-y-2">
+                  {staffAssignments.map((a: any) => (
+                    <div
+                      key={a.id}
+                      className="p-3 bg-white rounded-xl border border-slate-200/80 flex items-center justify-between text-xs"
+                    >
+                      <div>
+                        <p className="font-bold text-slate-900">{a.staff_name || a.staff_email}</p>
+                        <p className="text-slate-400 text-[11px]">{a.staff_email}</p>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-bold">
+                        📍 {a.gate_name}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Broadcast Alert Modal */}
+      {showBroadcastModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                  <Megaphone className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900">Broadcast Alert to Gates</h3>
+                  <p className="text-xs text-slate-500">Pushes immediate notifications to staff mobile devices</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowBroadcastModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {broadcastSuccess && (
+              <div className="mb-4 p-3 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-semibold">
+                ✓ {broadcastSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleSendBroadcast} className="space-y-4">
+              <div>
+                <label className="text-[11px] font-semibold text-slate-600">Alert Title</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 📢 Gate 1 Crowd Control Warning"
+                  value={broadcastTitle}
+                  onChange={(e) => setBroadcastTitle(e.target.value)}
+                  className="w-full text-xs mt-1 px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-600">Message Body</label>
+                <textarea
+                  required
+                  rows={3}
+                  placeholder="Type broadcast message for all stationed gate staff..."
+                  value={broadcastBody}
+                  onChange={(e) => setBroadcastBody(e.target.value)}
+                  className="w-full text-xs mt-1 px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowBroadcastModal(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={broadcastSending}
+                  className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition shadow-xs disabled:opacity-50"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  {broadcastSending ? 'Sending...' : 'Dispatch Alert'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   )
