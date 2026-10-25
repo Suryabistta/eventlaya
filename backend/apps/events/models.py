@@ -138,3 +138,18 @@ class GateScanLog(models.Model):
 
     class Meta:
         ordering = ['-scanned_at']
+
+
+class StaffGateAssignment(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    staff = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='gate_assignments')
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='staff_assignments')
+    gate_name = models.CharField(max_length=100, default='Main Gate')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['staff', 'event']
+
+    def __str__(self):
+        return f"{self.staff.email} → {self.event.title} [{self.gate_name}]"

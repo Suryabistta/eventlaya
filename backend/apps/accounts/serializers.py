@@ -27,3 +27,27 @@ class RegisterSerializer(serializers.ModelSerializer):
             role=validated_data.get('role', User.Role.ORGANIZER),
         )
         return user
+
+
+class PlatformModuleSerializer(serializers.ModelSerializer):
+    class Meta:
+        from .models import PlatformModule
+        model = PlatformModule
+        fields = ['id', 'slug', 'name', 'description', 'icon', 'is_globally_enabled', 'order']
+
+
+class RoleModulePermissionSerializer(serializers.ModelSerializer):
+    module_slug = serializers.CharField(source='module.slug', read_only=True)
+    module_name = serializers.CharField(source='module.name', read_only=True)
+    module_icon = serializers.CharField(source='module.icon', read_only=True)
+    is_globally_enabled = serializers.BooleanField(source='module.is_globally_enabled', read_only=True)
+
+    class Meta:
+        from .models import RoleModulePermission
+        model = RoleModulePermission
+        fields = [
+            'id', 'role', 'module', 'module_slug', 'module_name', 'module_icon',
+            'can_view', 'can_create', 'can_edit', 'can_delete', 'is_enabled',
+            'is_globally_enabled'
+        ]
+

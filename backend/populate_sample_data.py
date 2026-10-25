@@ -7,7 +7,8 @@ django.setup()
 
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from apps.events.models import Event, EventTicket, GateScanLog
+from apps.accounts.models import PlatformModule, RoleModulePermission
+from apps.events.models import Event, EventTicket, GateScanLog, StaffGateAssignment
 from apps.dynamic_forms.models import Form, FormField, FormResponse, FormAnswer
 from apps.voting.models import Poll, Candidate, Vote
 from apps.marketplace.models import VendorCategory, VendorProfile
@@ -16,6 +17,73 @@ User = get_user_model()
 
 def populate():
     print("🌱 Populating Eventlaya sample data...")
+
+    # 0. Superadmin / Platform Owner
+    superadmin, created = User.objects.get_or_create(
+        email='superadmin@eventlaya.com',
+        defaults={
+            'username': 'superadmin',
+            'first_name': 'Platform',
+            'last_name': 'Superadmin',
+            'phone': '+977-9800000000',
+            'role': User.Role.SUPERADMIN,
+            'is_staff': True,
+            'is_superuser': True,
+            'organization_name': 'Eventlaya Platform HQ',
+        }
+    )
+    if created:
+        superadmin.set_password('password123')
+        superadmin.save()
+        print("  ✓ Created superadmin user: superadmin@eventlaya.com (pw: password123)")
+    else:
+        print("  ✓ Found existing superadmin user")
+
+    # 0b. Seed Platform Modules & RBAC Permissions
+    modules_data = [
+        ('events', 'Events Management', 'Create, manage, and monitor live events and attendee capacity.', 'Calendar', 1),
+        ('gate_scanner', 'Gate QR Scanner Terminal', 'Real-time entry/exit QR scanning, attendee roster, and fraud detection.', 'QrCode', 2),
+        ('dynamic_forms', 'Dynamic Registration Forms', 'Custom form builder with 10 question types and live preview canvas.', 'FormInput', 3),
+        ('voting', 'Live Audience Voting & Polls', 'Cryptographic one-person-one-vote live polling with instant tallies.', 'Vote', 4),
+        ('marketplace', 'Vendor Services Marketplace', 'Event vendor directory, RFQ requests, and verified service providers.', 'Store', 5),
+        ('staff_management', 'Gate Staff & Assignments', 'Assign station gates, monitor scans, and grant staff privileges.', 'Users', 6),
+    ]
+
+    for mslug, mname, mdesc, micon, morder in modules_data:
+        mod, _ = PlatformModule.objects.get_or_create(
+            slug=mslug,
+            defaults={
+                'name': mname,
+                'description': mdesc,
+                'icon': micon,
+                'order': morder,
+                'is_globally_enabled': True,
+            }
+        )
+
+        # Organizer permissions: full view and create
+        RoleModulePermission.objects.get_or_create(
+            role=User.Role.ORGANIZER,
+            module=mod,
+            defaults={'can_view': True, 'can_create': True, 'can_edit': True, 'can_delete': True, 'is_enabled': True}
+        )
+
+        # Staff permissions: view scanner and events, but forms/voting/marketplace restricted by default
+        is_staff_mod = mslug in ['gate_scanner', 'events']
+        RoleModulePermission.objects.get_or_create(
+            role=User.Role.STAFF,
+            module=mod,
+            defaults={'can_view': is_staff_mod, 'can_create': False, 'can_edit': False, 'can_delete': False, 'is_enabled': is_staff_mod}
+        )
+
+        # Attendee permissions: voting and public forms
+        is_attendee_mod = mslug in ['events', 'voting']
+        RoleModulePermission.objects.get_or_create(
+            role=User.Role.ATTENDEE,
+            module=mod,
+            defaults={'can_view': is_attendee_mod, 'can_create': False, 'can_edit': False, 'can_delete': False, 'is_enabled': is_attendee_mod}
+        )
+    print("  ✓ Seeded platform modules & RBAC permissions matrix")
 
     # 1. Organizer User
     organizer, created = User.objects.get_or_create(
@@ -33,6 +101,24 @@ def populate():
         print("  ✓ Created organizer user: organizer@eventlaya.com (pw: password123)")
     else:
         print("  ✓ Found existing organizer user")
+
+    # 1b. Staff User & Gate Assignment
+    staff, created = User.objects.get_or_create(
+        email='staff@eventlaya.com',
+        defaults={
+            'username': 'staff',
+            'first_name': 'Aayush',
+            'last_name': 'Shrestha',
+            'phone': '+977-9800000002',
+            'role': User.Role.STAFF,
+        }
+    )
+    if created:
+        staff.set_password('password123')
+        staff.save()
+        print("  ✓ Created staff user: staff@eventlaya.com (pw: password123)")
+    else:
+        print("  ✓ Found existing staff user")
 
     # 2. Dynamic Form
     form, created = Form.objects.get_or_create(
@@ -104,6 +190,13 @@ def populate():
     # Link form to event
     form.event = event
     form.save()
+
+    StaffGateAssignment.objects.get_or_create(
+        staff=staff,
+        event=event,
+        defaults={'gate_name': 'Main Gate', 'is_active': True}
+    )
+    print("  ✓ Assigned staff to Main Gate for event")
 
     # 4. Sample Attendees & Tickets
     sample_attendees = [
