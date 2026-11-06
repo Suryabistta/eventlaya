@@ -1,0 +1,9 @@
+/var/log/eventlaya/*.log {
+    weekly
+    rotate 4
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0664 eventlaya eventlaya
+}

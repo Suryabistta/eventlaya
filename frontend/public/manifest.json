@@ -1,19 +1,35 @@
 {
   "short_name": "Eventlaya",
-  "name": "Eventlaya — Event Management SaaS & Services Marketplace",
+  "name": "Eventlaya — Registration, passes and gate check-in",
   "description": "Nepal's integrated event management SaaS, dynamic registration forms, cryptographic voting, and services marketplace.",
   "icons": [
     {
-      "src": "/icon.svg",
-      "type": "image/svg+xml",
-      "sizes": "192x192 512x512",
-      "purpose": "any maskable"
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
     }
   ],
-  "start_url": "/",
+  "start_url": "/app",
   "background_color": "#ffffff",
-  "theme_color": "#4F46E5",
+  "theme_color": "#C2215A",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "categories": ["business", "events", "productivity"]
+  "categories": [
+    "business",
+    "events",
+    "productivity"
+  ]
 }

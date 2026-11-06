@@ -1,16 +1,64 @@
-from rest_framework import generics, permissions, status
+from datetime import timedelta
+
+from rest_framework import generics, permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.views import TokenObtainPairView
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
 from .serializers import RegisterSerializer, UserSerializer
 from .models import FCMToken
 
+SHORT_SESSION = timedelta(hours=12)
+
+
+def login_response(user, remember=True):
+    """The sign-in payload {refresh, access, user} shared by password and social login.
+
+    "Remember me" off → the refresh token lasts SHORT_SESSION instead of SIMPLE_JWT's 30 days.
+    """
+    refresh = RefreshToken.for_user(user)
+    if not remember:
+        refresh.set_exp(lifetime=SHORT_SESSION)
+        # Rotation would otherwise reset exp to 30 days; the refresh view keeps this end time
+        refresh['session_end'] = refresh['exp']
+    return {'refresh': str(refresh), 'access': str(refresh.access_token), 'user': UserSerializer(user).data}
+
+
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    remember = serializers.BooleanField(required=False, default=True)
+    SHORT_SESSION = SHORT_SESSION
+
     def validate(self, attrs):
+        remember = attrs.pop('remember', True)
         data = super().validate(attrs)
+        if not remember:
+            refresh = self.get_token(self.user)
+            refresh.set_exp(lifetime=self.SHORT_SESSION)
+            # Rotation would otherwise reset exp to 30 days; the refresh view keeps this end time
+            refresh['session_end'] = refresh['exp']
+            data['refresh'] = str(refresh)
+            data['access'] = str(refresh.access_token)
         data['user'] = UserSerializer(self.user).data
         return data
+
+
+class SessionAwareRefreshSerializer(TokenRefreshSerializer):
+    """Token refresh that never extends a short ("don't remember me") session past its original end."""
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        if 'refresh' in data:
+            rotated = RefreshToken(data['refresh'])
+            session_end = rotated.get('session_end')
+            if session_end:
+                rotated.payload['exp'] = session_end
+                data['refresh'] = str(rotated)
+        return data
+
+
+class SessionAwareRefreshView(TokenRefreshView):
+    serializer_class = SessionAwareRefreshSerializer
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
@@ -19,11 +67,39 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = [permissions.AllowAny]
     serializer_class = RegisterSerializer
 
+    def perform_create(self, serializer):
+        from .verification import send_code
+        user = serializer.save()
+        send_code(user)  # 6-digit email code; the app asks for it after the first sign-in
+
+
 class CurrentUserView(APIView):
+    """GET the signed-in profile, PATCH to edit it, DELETE to delete the account."""
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         return Response(UserSerializer(request.user).data)
+
+    def patch(self, request):
+        from .serializers import ProfileUpdateSerializer
+        serializer = ProfileUpdateSerializer(request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(UserSerializer(request.user).data)
+
+    def delete(self, request):
+        from .account import check_deletion_confirmation, delete_account, deletion_blocker
+        user = request.user
+        error = check_deletion_confirmation(user, request.data)
+        if error:
+            return error
+        blocker = deletion_blocker(user)
+        if blocker:
+            code, message = blocker
+            http = status.HTTP_403_FORBIDDEN if code == 'admin_account' else status.HTTP_409_CONFLICT
+            return Response({'error': message, 'code': code}, status=http)
+        delete_account(user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class FCMTokenView(APIView):
@@ -58,6 +134,7 @@ class UserModulesView(APIView):
 
     def get(self, request):
         from .models import PlatformModule, RoleModulePermission
+        from .modules import MODULE_REQUIRES, module_enabled
         user = request.user
         is_super = getattr(user, 'is_superadmin', False)
 
@@ -95,6 +172,9 @@ class UserModulesView(APIView):
             # If role permission explicitly disabled this module for this role, skip or flag
             if not is_super and not perm.get('is_enabled', True):
                 continue
+            # A module that requires another (e.g. contests → voting) is off when that one is off
+            if not is_super and not module_enabled(m.slug, user):
+                continue
 
             result.append({
                 'id': m_id,
@@ -103,6 +183,7 @@ class UserModulesView(APIView):
                 'description': m.description,
                 'icon': m.icon,
                 'is_globally_enabled': m.is_globally_enabled,
+                'requires': MODULE_REQUIRES.get(m.slug, []),
                 'permissions': perm,
             })
 
@@ -240,103 +321,169 @@ class SuperadminToggleModuleView(APIView):
 
 
 
+def _branding_for(user):
+    from .models import TenantBranding
+    from .tenancy import unique_subdomain
+    branding = TenantBranding.objects.filter(organizer=user).first()
+    if branding is None:
+        branding = TenantBranding.objects.create(
+            organizer=user,
+            subdomain=unique_subdomain(user),
+            brand_name=user.organization_name or user.get_full_name() or user.username,
+            support_email=user.email,
+        )
+    return branding
+
+
+def _branding_payload(branding):
+    from apps.platform.models import WhiteLabelRequest
+    from .domains import domain_status
+    from .serializers import TenantBrandingSerializer
+    approved = WhiteLabelRequest.approved_for(branding.organizer) is not None
+    data = TenantBrandingSerializer(branding).data
+    data['approved'] = approved
+    data['status'] = domain_status(branding, approved=approved)
+    return data
+
+
 class TenantBrandingView(APIView):
-    """
-    Get or update white-label branding configuration for the authenticated organizer.
-    """
+    """GET / POST the signed-in organizer's white-label branding (+ live domain status)."""
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        from .models import TenantBranding
-        branding, created = TenantBranding.objects.get_or_create(
-            organizer=request.user,
-            defaults={
-                'subdomain': (request.user.organization_name or request.user.username).lower().replace(' ', '-'),
-                'brand_name': request.user.organization_name or request.user.username,
-                'support_email': request.user.email,
-                'primary_color': '#4F46E5',
-                'accent_color': '#06B6D4',
-            }
-        )
-        from .serializers import TenantBrandingSerializer
-        return Response(TenantBrandingSerializer(branding).data)
+        return Response(_branding_payload(_branding_for(request.user)))
 
     def post(self, request):
-        from .models import TenantBranding
         from .serializers import TenantBrandingSerializer
-        branding, _ = TenantBranding.objects.get_or_create(
-            organizer=request.user,
-            defaults={
-                'subdomain': (request.user.organization_name or request.user.username).lower().replace(' ', '-'),
-            }
-        )
+        branding = _branding_for(request.user)
 
-        serializer = TenantBrandingSerializer(branding, data=request.data, partial=True)
+        # White-label is granted by a platform admin (apps.platform), never self-served:
+        # the custom domain and its verification state only change through an approved request,
+        # and the watermark can only be hidden when the approved request included that.
+        from apps.platform.models import WhiteLabelRequest
+        approved = WhiteLabelRequest.approved_for(request.user)
+        data = {k: v for k, v in request.data.items() if k not in TenantBrandingSerializer.Meta.read_only_fields
+                and k not in ('custom_domain', 'remove_watermark')}
+        if 'remove_watermark' in request.data and approved and approved.remove_watermark:
+            data['remove_watermark'] = request.data['remove_watermark']
+
+        serializer = TenantBrandingSerializer(branding, data=data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data)
+            return Response(_branding_payload(serializer.instance))
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class TenantVerifyDomainView(APIView):
-    """
-    Trigger DNS CNAME verification check for the organizer's custom domain.
-    """
+    """POST: check the organizer's custom domain now — DNS (CNAME + ownership TXT), then the certificate."""
     permission_classes = [permissions.IsAuthenticated]
+    MIN_INTERVAL_SECONDS = 5
 
     def post(self, request):
+        from django.utils import timezone
+        from apps.platform.models import WhiteLabelRequest
+        from .domains import check_domain
         from .models import TenantBranding
-        branding = TenantBranding.objects.filter(organizer=request.user).first()
+        if not WhiteLabelRequest.approved_for(request.user):
+            return Response(
+                {'error': 'Custom domains are part of white-label. Request white-label and wait for approval before verifying a domain.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        branding = TenantBranding.objects.filter(organizer=request.user).select_related('organizer').first()
         if not branding or not branding.custom_domain:
-            return Response({'error': 'No custom domain configured'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'No custom domain is approved for your organization yet.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # In production this queries DNS resolver; here we verify format and mark verified
-        custom_domain = branding.custom_domain.strip().lower()
-        if '.' in custom_domain and len(custom_domain) > 4:
-            branding.is_domain_verified = True
-            branding.ssl_active = True
-            branding.save(update_fields=['is_domain_verified', 'ssl_active'])
-            return Response({
-                'message': f"Domain '{custom_domain}' successfully verified! SSL certificate provisioned.",
-                'is_domain_verified': True,
-                'ssl_active': True,
-                'cname_target': branding.cname_target,
-            })
-        else:
-            return Response({'error': 'Invalid domain format'}, status=status.HTTP_400_BAD_REQUEST)
+        recent = branding.dns_checked_at and (timezone.now() - branding.dns_checked_at).total_seconds() < self.MIN_INTERVAL_SECONDS
+        if not recent:
+            check_domain(branding)
+        return Response(verify_response(branding))
+
+
+def verify_response(branding, approved=True):
+    from .domains import domain_status
+    from .tenancy import cname_target
+    st = domain_status(branding, approved=approved)
+    custom = st['custom_domain'] or {}
+    if custom.get('live'):
+        message = f'Your site is live at https://{branding.custom_domain}'
+    elif branding.is_domain_verified:
+        message = f'DNS verified. {branding.provider_message or "The HTTPS certificate is on its way."}'
+    else:
+        message = branding.dns_message or 'Add the DNS records below, then check again.'
+    return {
+        'message': message,
+        'is_domain_verified': branding.is_domain_verified,
+        'ssl_active': branding.ssl_active,
+        'cname_target': cname_target(),
+        'status': st,
+    }
 
 
 class TenantResolveView(APIView):
-    """
-    Public API: Resolves branding options based on the incoming hostname or subdomain.
+    """Public: which white-label site is this host? The web app calls it on boot (tenant mode).
+
+    Host: ?host= (explicit), else X-Tenant-Host, else the Host header.
+    state: 'platform' (eventlaya.com) | 'live' | 'not_set_up' | 'unavailable' (revoked / switched off).
     """
     permission_classes = [permissions.AllowAny]
+    authentication_classes = []
 
     def get(self, request):
-        from .models import TenantBranding
-        host = request.query_params.get('host', '').strip().lower()
+        from . import tenancy
+        host = tenancy.normalize_host(request.query_params.get('host', '')) or tenancy.request_host(request)
         subdomain = request.query_params.get('subdomain', '').strip().lower()
+        if subdomain and not request.query_params.get('host'):
+            host = f'{subdomain}.{tenancy.platform_domain()}'
 
-        branding = None
-        if host:
-            branding = TenantBranding.objects.filter(custom_domain__iexact=host, is_domain_verified=True).first()
-            if not branding and '.eventlaya.com' in host:
-                sub = host.split('.')[0]
-                branding = TenantBranding.objects.filter(subdomain__iexact=sub).first()
-        if not branding and subdomain:
-            branding = TenantBranding.objects.filter(subdomain__iexact=subdomain).first()
-
-        if not branding:
+        branding = tenancy.resolve_tenant(host)
+        state = 'live' if branding else tenancy.lookup(host)[1]
+        if branding is None:
             return Response({
                 'is_whitelabel': False,
+                'state': state,
+                'host': host,
                 'brand_name': 'Eventlaya',
                 'brand_logo': '',
-                'primary_color': '#4F46E5',
-                'accent_color': '#06B6D4',
+                'primary_color': '#C2215A',
+                'accent_color': '#E39400',
                 'remove_watermark': False,
             })
 
-        from .serializers import TenantBrandingSerializer
-        data = TenantBrandingSerializer(branding).data
-        data['is_whitelabel'] = True
+        from .serializers import PublicTenantSerializer
+        data = PublicTenantSerializer(branding).data
+        data.update({'is_whitelabel': True, 'state': 'live', 'host': host, 'counts': _event_counts(branding.organizer_id)})
         return Response(data)
+
+
+def _event_counts(organizer_id):
+    from apps.events.models import Event
+    from apps.events.views import PUBLIC_EVENT_STATUSES
+    counts = {'live': 0, 'upcoming': 0, 'past': 0}
+    for event in Event.objects.filter(organizer_id=organizer_id, status__in=PUBLIC_EVENT_STATUSES):
+        phase = event.phase()
+        if phase == 'live':
+            counts['live'] += 1
+        elif phase == 'upcoming':
+            counts['upcoming'] += 1
+        elif phase == 'ended':
+            counts['past'] += 1
+    return counts
+
+
+class EmailAvailableView(APIView):
+    """Sign-up helper: GET ?email= -> {available: bool}. Throttled like other anonymous calls."""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        from django.contrib.auth import get_user_model
+        from django.core.validators import validate_email
+        from django.core.exceptions import ValidationError
+
+        email = (request.query_params.get('email') or '').strip()
+        try:
+            validate_email(email)
+        except ValidationError:
+            return Response({'available': False, 'error': 'Enter a valid email address.'}, status=status.HTTP_400_BAD_REQUEST)
+        taken = get_user_model().objects.filter(email__iexact=email).exists()
+        return Response({'available': not taken})

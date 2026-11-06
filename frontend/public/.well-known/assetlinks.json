@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.eventlaya.eventlaya_scanner",
+      "sha256_cert_fingerprints": [
+        "2F:25:E2:97:68:70:73:4F:54:42:85:56:A0:07:1D:97:CA:A6:70:4A:20:3F:2C:E0:77:9E:50:C2:1F:C4:65:28"
+      ]
+    }
+  }
+]

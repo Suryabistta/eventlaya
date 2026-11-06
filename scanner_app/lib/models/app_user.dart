@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-enum UserRole { superadmin, organizer, staff, attendee, unknown }
+enum UserRole { superadmin, organizer, staff, attendee, vendor, unknown }
 
 class AppUser {
   final String id;
@@ -10,6 +10,18 @@ class AppUser {
   final UserRole role;
   final String? organizationName;
   final String? phoneNumber;
+  final String? city;
+
+  /// Path or URL of the profile photo, if any.
+  final String? avatar;
+  final bool emailVerified;
+
+  /// False for Google/Facebook-only accounts that never set a password.
+  final bool hasPassword;
+  final List<String> socialProviders;
+
+  /// Organizer marketplace access: `none`, `pending` or `approved`.
+  final String marketplaceAccess;
 
   AppUser({
     required this.id,
@@ -19,6 +31,12 @@ class AppUser {
     required this.role,
     this.organizationName,
     this.phoneNumber,
+    this.city,
+    this.avatar,
+    this.emailVerified = true,
+    this.hasPassword = true,
+    this.socialProviders = const [],
+    this.marketplaceAccess = 'none',
   });
 
   String get fullName {
@@ -29,6 +47,12 @@ class AppUser {
   bool get isSuperAdmin => role == UserRole.superadmin;
   bool get isAdmin => role == UserRole.organizer || isSuperAdmin;
   bool get isStaff => role == UserRole.staff;
+
+  /// Marketplace business account (venue owner / service vendor).
+  bool get isVendor => role == UserRole.vendor;
+
+  /// Owns marketplace listings: vendors, and organizers with approved access.
+  bool get hasBusinessPortal => isVendor || marketplaceAccess == 'approved';
   bool get canAccessAdmin => isAdmin;
 
   factory AppUser.fromJson(Map<String, dynamic> json) {
@@ -46,6 +70,9 @@ class AppUser {
       case 'attendee':
         role = UserRole.attendee;
         break;
+      case 'vendor':
+        role = UserRole.vendor;
+        break;
       default:
         role = UserRole.unknown;
     }
@@ -57,6 +84,16 @@ class AppUser {
       role: role,
       organizationName: json['organization_name']?.toString(),
       phoneNumber: json['phone']?.toString() ?? json['phone_number']?.toString(),
+      city: json['city']?.toString(),
+      avatar: (json['avatar']?.toString().isEmpty ?? true) ? null : json['avatar'].toString(),
+      // Older servers don't send these: assume verified / password accounts.
+      emailVerified: json['email_verified'] != false,
+      hasPassword: json['has_password'] != false,
+      socialProviders: [
+        if (json['social_providers'] is List)
+          for (final p in json['social_providers'] as List) p.toString(),
+      ],
+      marketplaceAccess: json['marketplace_access']?.toString() ?? 'none',
     );
   }
 
@@ -68,6 +105,12 @@ class AppUser {
         'role': role.name,
         'organization_name': organizationName,
         'phone_number': phoneNumber,
+        'city': city,
+        'avatar': avatar,
+        'email_verified': emailVerified,
+        'has_password': hasPassword,
+        'social_providers': socialProviders,
+        'marketplace_access': marketplaceAccess,
       };
 
   String toJsonString() => jsonEncode(toJson());

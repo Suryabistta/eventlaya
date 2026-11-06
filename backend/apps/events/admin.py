@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Event, EventTicket, GateScanLog, StaffGateAssignment
+from .models import Event, EventTicket, EventGate, GateScanLog, StaffGateAssignment
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
@@ -13,6 +13,13 @@ class EventTicketAdmin(admin.ModelAdmin):
     search_fields = ('ticket_number', 'qr_token', 'attendee_name', 'attendee_email')
     list_filter = ('status', 'is_attended', 'event')
 
+@admin.register(EventGate)
+class EventGateAdmin(admin.ModelAdmin):
+    list_display = ('name', 'event', 'kind', 'is_vip', 'is_active', 'order')
+    search_fields = ('name', 'event__title')
+    list_filter = ('kind', 'is_vip', 'is_active', 'event')
+
+
 @admin.register(GateScanLog)
 class GateScanLogAdmin(admin.ModelAdmin):
     list_display = ('ticket', 'event', 'scan_type', 'result', 'gate_name', 'scanned_at')
@@ -21,7 +28,7 @@ class GateScanLogAdmin(admin.ModelAdmin):
 
 @admin.register(StaffGateAssignment)
 class StaffGateAssignmentAdmin(admin.ModelAdmin):
-    list_display = ('staff', 'event', 'gate_name', 'is_active', 'created_at')
+    list_display = ('staff', 'event', 'gate', 'gate_name', 'is_active', 'created_at')
     search_fields = ('staff__email', 'event__title', 'gate_name')
     list_filter = ('is_active', 'event')
 
@@ -38,3 +45,24 @@ class EventTaskAdmin(admin.ModelAdmin):
     list_display = ('title', 'event', 'status', 'priority', 'category', 'assigned_name', 'due_time')
     list_filter = ('status', 'priority', 'category', 'event')
     search_fields = ('title', 'description', 'assigned_name', 'event__title')
+
+
+from .models import EventAgendaItem, EventSpeaker, EventFAQ
+
+
+@admin.register(EventAgendaItem)
+class EventAgendaItemAdmin(admin.ModelAdmin):
+    list_display = ('title', 'event', 'day', 'start_time', 'location', 'order')
+    list_filter = ('event',)
+
+
+@admin.register(EventSpeaker)
+class EventSpeakerAdmin(admin.ModelAdmin):
+    list_display = ('name', 'role', 'organization', 'event', 'order')
+    list_filter = ('event',)
+
+
+@admin.register(EventFAQ)
+class EventFAQAdmin(admin.ModelAdmin):
+    list_display = ('question', 'event', 'order')
+    list_filter = ('event',)

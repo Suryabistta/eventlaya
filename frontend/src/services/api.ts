@@ -1,3 +1,8 @@
+import type { PublicTicketType } from '@/lib/tickets'
+import { TENANT_HOST } from '@/lib/tenant-host'
+
+export type EventPhase = 'draft' | 'upcoming' | 'live' | 'ended' | 'cancelled'
+
 const API_BASE = '/api'
 
 export interface Event {
@@ -21,6 +26,22 @@ export interface Event {
   registration_form_title?: string
   registered_count: number
   checked_in_count: number
+  /** Lifecycle, computed by the server from status + dates (Nepal time) */
+  phase?: EventPhase
+  registration_open?: boolean
+  registration_closed_reason?: string | null
+  /** Public event detail only: visible, active ticket types */
+  ticket_types?: PublicTicketType[]
+  /** Public event detail only */
+  has_promo_codes?: boolean
+  /** Most tickets one registration can get (organizer setting, 1–50) */
+  max_tickets_per_order?: number
+  /** Organizer setting: show attendees how many spots/tickets are left */
+  show_spots_left?: boolean
+  /** Public responses: counts are blanked (capacity 0, spots_left null, ticket remaining null) */
+  spots_hidden?: boolean
+  /** Public responses: no spots left (also when counts are hidden) */
+  is_full?: boolean
 }
 
 export interface FormField {
@@ -51,15 +72,47 @@ export interface Ticket {
   attendee_name: string
   attendee_email: string
   attendee_phone?: string
-  status: 'valid' | 'checked_in' | 'checked_out' | 'cancelled'
+  status: 'valid' | 'checked_in' | 'checked_out' | 'cancelled' | 'reserved'
   is_attended: boolean
   first_check_in?: string
   last_activity?: string
   created_at: string
+  ticket_type?: string | null
+  ticket_type_name?: string
+  /** Ticket price after any promo, e.g. "250.00" */
+  price?: string
+  /** How the order is / was paid (online or at the venue); label e.g. "Paid online · Khalti · ref …" */
+  payment?: import('@/lib/payments').PaymentInfo | null
+  promo_code?: string | null
+  /** Note for gate staff, e.g. "Check student ID" */
+  gate_note?: string
+  /** Order this pass was bought in, e.g. "ORD-7K2M9Q" (older passes have none) */
+  order_reference?: string | null
+  /** 0 = the buyer's own pass, 1.. = their guests */
+  guest_number?: number
+}
+
+export interface RegisterItem {
+  ticket_type_id?: string
+  quantity: number
+  /** Names for this item's tickets after the buyer's own (blank → "<Buyer> · Guest N") */
+  guest_names?: string[]
+}
+
+export interface RegisterResult {
+  message?: string
+  /** Absent when payment_required (online checkout: passes come after the payment) */
+  ticket: Ticket
+  tickets?: Ticket[]
+  order?: { id: string; reference: string; ticket_count: number; total: string; payment?: import('@/lib/payments').PaymentInfo }
+  already_registered?: boolean
+  payment_required?: boolean
+  payment?: import('@/lib/payments').PublicIntent
+  checkout?: import('@/lib/payments').Checkout
 }
 
 export interface ScanResult {
-  result: 'success' | 'duplicate' | 'not_in' | 'invalid' | 'cancelled' | 'wrong_event' | 'early_date' | 'expired'
+  result: 'success' | 'duplicate' | 'not_in' | 'invalid' | 'cancelled' | 'wrong_event' | 'early_date' | 'expired' | 'wrong_ticket_gate'
   message: string
   ticket?: Ticket
 }
@@ -115,7 +168,18 @@ export interface Vendor {
   is_verified: boolean
   is_featured: boolean
   rating: string
+  /** Real review average (null when no reviews) and count of visible reviews */
+  review_average?: number | null
+  review_total?: number
+  user?: string
+  /** Marketplace review state; the public directory only returns 'approved'. */
+  listing_status?: ListingStatus
+  review_note?: string
+  /** Owner switch: hidden from the directory and not taking new requests. */
+  is_paused?: boolean
 }
+
+export type ListingStatus = 'pending' | 'approved' | 'rejected'
 
 export interface VendorCategory {
   id: string
@@ -148,7 +212,13 @@ export interface VenueListing {
   is_featured: boolean
   rating: string | number
   review_count: number
+  review_average?: number | null
+  review_total?: number
   inquiries_count?: number
+  listing_status?: ListingStatus
+  review_note?: string
+  /** Owner switch: hidden from the directory and not taking new requests. */
+  is_paused?: boolean
   created_at?: string
 }
 
@@ -184,6 +254,65 @@ export interface TenantBranding {
   footer_text: string
   remove_watermark: boolean
   is_whitelabel?: boolean
+  /** GET/POST /auth/tenant-branding/: whether white-label is approved, and the live domain status */
+  approved?: boolean
+  status?: TenantDomainStatus
+}
+
+export interface TenantDnsRecord {
+  type: 'CNAME' | 'TXT'
+  /** Full record name, e.g. event.dharanfilmfestival.org */
+  name: string
+  /** What most DNS panels want in the Name box, e.g. "event" */
+  host: string
+  value: string
+  purpose: string
+}
+
+/** apps.accounts.domains.domain_status */
+export interface TenantDomainStatus {
+  active: boolean
+  module_enabled: boolean
+  mode: 'cloudflare' | 'manual'
+  subdomain: { host: string | null; url: string | null; available: boolean; live: boolean }
+  custom_domain: null | {
+    host: string
+    url: string
+    /** none → dns → ssl → live */
+    stage: 'none' | 'dns' | 'ssl' | 'live'
+    live: boolean
+    dns_status: 'none' | 'pending' | 'verified' | 'failed'
+    dns_verified: boolean
+    dns_message: string
+    dns_checked_at: string | null
+    verified_at: string | null
+    ssl_active: boolean
+    ssl_provider: string
+    provider_hostname_id: string
+    provider_status: string
+    provider_ssl_status: string
+    provider_message: string
+    provider_synced_at: string | null
+    records: TenantDnsRecord[]
+  }
+  site_url: string | null
+}
+
+export interface DomainCheckResult {
+  message: string
+  is_domain_verified: boolean
+  ssl_active: boolean
+  cname_target: string
+  status: TenantDomainStatus
+}
+
+/** GET /auth/tenant-branding/resolve/ — which white-label site this host is */
+export interface ResolvedTenant extends Partial<TenantBranding> {
+  is_whitelabel: boolean
+  state: 'platform' | 'live' | 'not_set_up' | 'unavailable'
+  host: string
+  organizer_name?: string
+  counts?: { live: number; upcoming: number; past: number }
 }
 
 export interface EventAnalytics {
@@ -195,6 +324,17 @@ export interface EventAnalytics {
     is_paid: boolean
     ticket_price: number
   }
+  ticket_types?: {
+    id: string
+    name: string
+    price: string
+    quantity: number | null
+    sold: number
+    checked_in: number
+    revenue: string
+    availability: string
+    is_hidden: boolean
+  }[]
   attendance: {
     capacity: number
     total_registered: number
@@ -270,33 +410,202 @@ export interface EventTask {
   created_at: string
 }
 
-// Helpers
-async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const token = localStorage.getItem('access_token')
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+export interface AuthUser {
+  id: string
+  username: string
+  email: string
+  phone?: string
+  role: 'superadmin' | 'organizer' | 'staff' | 'attendee' | 'vendor'
+  organization_name?: string
+  avatar?: string | null
+  /** Whether the account may run a marketplace business portal. Vendors are always 'approved'. */
+  marketplace_access?: 'none' | 'pending' | 'approved' | 'rejected'
+  first_name?: string
+  last_name?: string
+  full_name?: string
+  city?: string
+  business_type?: string
+  email_verified?: boolean
+  email_verified_at?: string | null
+  /** False for Google/Facebook accounts that never set a password */
+  has_password?: boolean
+  social_providers?: ('google' | 'facebook')[]
+  date_joined?: string
+}
+
+// Token storage. "Remember me" keeps tokens in localStorage; otherwise in sessionStorage,
+// so closing the browser signs the user out.
+const ACCESS = 'access_token'
+const REFRESH = 'refresh_token'
+
+function safe<T>(fn: () => T, fallback: T): T {
+  try {
+    return fn()
+  } catch {
+    return fallback
   }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
+}
+
+const stores = () => [safe(() => window.sessionStorage, null), safe(() => window.localStorage, null)].filter(Boolean) as Storage[]
+
+export const tokenStore = {
+  get access() {
+    return safe(() => sessionStorage.getItem(ACCESS) ?? localStorage.getItem(ACCESS), null)
+  },
+  get refresh() {
+    return safe(() => sessionStorage.getItem(REFRESH) ?? localStorage.getItem(REFRESH), null)
+  },
+  /** `remember` omitted (e.g. after a token refresh) keeps the tokens where they already are. */
+  set(access: string, refresh?: string, remember?: boolean) {
+    const remembered = remember ?? safe(() => sessionStorage.getItem(ACCESS) === null, true)
+    tokenStore.clear()
+    const target = safe(() => (remembered ? localStorage : sessionStorage), null)
+    safe(() => {
+      target?.setItem(ACCESS, access)
+      if (refresh) target?.setItem(REFRESH, refresh)
+    }, undefined)
+  },
+  clear() {
+    for (const s of stores()) {
+      safe(() => {
+        s.removeItem(ACCESS)
+        s.removeItem(REFRESH)
+      }, undefined)
+    }
+  },
+}
+
+/** Fired when the session can't be refreshed, so the auth layer can sign the user out. */
+export const AUTH_EXPIRED_EVENT = 'eventlaya:auth-expired'
+
+let refreshing: Promise<boolean> | null = null
+
+export async function refreshAccessToken(): Promise<boolean> {
+  const refresh = tokenStore.refresh
+  if (!refresh) return false
+  refreshing ??= fetch(`${API_BASE}/auth/refresh/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh }),
+  })
+    .then(async (res) => {
+      if (!res.ok) return false
+      const data = await res.json()
+      tokenStore.set(data.access, data.refresh ?? refresh)
+      return true
+    })
+    .catch(() => false)
+    .finally(() => {
+      refreshing = null
+    })
+  return refreshing
+}
+
+function errorMessage(data: unknown, status: number): string {
+  if (data && typeof data === 'object') {
+    const d = data as Record<string, unknown>
+    if (typeof d.error === 'string') return d.error
+    if (typeof d.message === 'string') return d.message
+    if (typeof d.detail === 'string') return d.detail
+    // DRF field errors: { field: ["msg"] }
+    const first = Object.entries(d)[0]
+    if (first && Array.isArray(first[1]) && typeof first[1][0] === 'string') return `${first[0]}: ${first[1][0]}`
+  }
+  if (status >= 500) return 'The server hit an error. Try again in a moment.'
+  return `Request failed (${status})`
+}
+
+/** Thrown by request(): the message is user-facing; status/code/data allow branching on specific errors. */
+export class ApiError extends Error {
+  status: number
+  code?: string
+  data: unknown
+  constructor(message: string, status: number, data: unknown) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.data = data
+    const code = data && typeof data === 'object' ? (data as Record<string, unknown>).code : undefined
+    this.code = typeof code === 'string' ? code : undefined
+  }
+}
+
+export const isApiError = (e: unknown, code?: string): e is ApiError => e instanceof ApiError && (!code || e.code === code)
+/** True when the server says the feature (module) is switched off for this account. */
+export const isModuleDisabled = (e: unknown) => isApiError(e, 'module_disabled')
+
+// Helpers
+export async function request<T>(url: string, options: RequestInit = {}, retried = false): Promise<T> {
+  const token = tokenStore.access
+  const res = await fetch(`${API_BASE}${url}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      // White-label site: the API scopes public events to this organization (apps.accounts.tenancy)
+      ...(TENANT_HOST ? { 'X-Tenant-Host': TENANT_HOST } : {}),
+      ...options.headers,
+    },
+  })
+
+  if (res.status === 401 && token && !retried) {
+    if (await refreshAccessToken()) return request<T>(url, options, true)
+    tokenStore.clear()
+    window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT))
   }
 
-  const res = await fetch(`${API_BASE}${url}`, {
-    headers: {
-      ...headers,
-      ...options?.headers,
-    },
-    ...options,
-  })
-  const data = await res.json()
-  if (!res.ok) {
-    throw new Error(data.error || data.message || `Request failed with status ${res.status}`)
+  const text = await res.text()
+  let data: unknown = null
+  if (text) {
+    try {
+      data = JSON.parse(text)
+    } catch {
+      data = text
+    }
   }
-  return data
+  if (!res.ok) throw new ApiError(errorMessage(data, res.status), res.status, data)
+  return data as T
 }
 
 export const api = {
+  // Auth
+  login: (email: string, password: string, remember = true) =>
+    request<{ access: string; refresh: string; user: AuthUser }>('/auth/login/', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, remember }),
+    }),
+  requestPasswordReset: (email: string) =>
+    request<{ message: string }>('/auth/password-reset/', { method: 'POST', body: JSON.stringify({ email }) }),
+  checkPasswordResetLink: (uid: string, token: string) =>
+    request<{ valid: boolean; email: string }>(`/auth/password-reset/confirm/?uid=${encodeURIComponent(uid)}&token=${encodeURIComponent(token)}`),
+  confirmPasswordReset: (uid: string, token: string, new_password: string) =>
+    request<{ message: string }>('/auth/password-reset/confirm/', { method: 'POST', body: JSON.stringify({ uid, token, new_password }) }),
+  register: (body: {
+    email: string
+    password: string
+    organization_name?: string
+    phone?: string
+    account_type?: 'organizer' | 'vendor' | 'attendee'
+    business_type?: string
+    city?: string
+    first_name?: string
+    last_name?: string
+    /** The "I agree to the Terms of service and Privacy policy" box; the server refuses sign-ups without it. */
+    terms: boolean
+  }) =>
+    request<AuthUser>('/auth/register/', { method: 'POST', body: JSON.stringify(body) }),
+  me: () => request<AuthUser>('/auth/me/'),
+
   // Events
   getEvents: () => request<Event[]>('/events/'),
+  getPublicEvents: (params?: { when?: 'upcoming' | 'past' | 'all'; search?: string; city?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.when) q.append('when', params.when)
+    if (params?.search) q.append('search', params.search)
+    if (params?.city) q.append('city', params.city)
+    const str = q.toString()
+    return request<(Event & { organizer_name?: string })[]>(`/events/public/${str ? `?${str}` : ''}`)
+  },
   getPublicEvent: (slug: string) => request<{ event: Event; form: DynamicForm | null }>(`/events/public/${slug}/`),
   createEvent: (body: Partial<Event>) => request<Event>('/events/', { method: 'POST', body: JSON.stringify(body) }),
   updateEvent: (id: string, body: Partial<Event>) => request<Event>(`/events/${id}/`, { method: 'PATCH', body: JSON.stringify(body) }),
@@ -312,8 +621,24 @@ export const api = {
   getForms: () => request<DynamicForm[]>('/forms/'),
   createForm: (body: Partial<DynamicForm>) => request<DynamicForm>('/forms/', { method: 'POST', body: JSON.stringify(body) }),
   createFormField: (body: Partial<FormField>) => request<FormField>('/forms/fields/', { method: 'POST', body: JSON.stringify(body) }),
-  registerForEvent: (slug: string, body: { name: string; email: string; phone?: string; answers?: Record<string, unknown> }) =>
-    request<{ message: string; ticket: Ticket; form_response: unknown }>(`/forms/events/${slug}/register/`, {
+  registerForEvent: (
+    slug: string,
+    body: {
+      name: string
+      email: string
+      phone?: string
+      answers?: Record<string, unknown>
+      ticket_type_id?: string
+      promo_code?: string
+      items?: RegisterItem[]
+      additional?: boolean
+      /** Online: provider + the page to come back to after paying */
+      payment_method?: 'venue' | 'online'
+      provider?: string
+      return_url?: string
+    },
+  ) =>
+    request<RegisterResult>(`/forms/events/${slug}/register/`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
@@ -354,11 +679,8 @@ export const api = {
   getTenantBranding: () => request<TenantBranding>('/auth/tenant-branding/'),
   updateTenantBranding: (body: Partial<TenantBranding>) =>
     request<TenantBranding>('/auth/tenant-branding/', { method: 'POST', body: JSON.stringify(body) }),
-  verifyTenantDomain: () =>
-    request<{ message: string; is_domain_verified: boolean; ssl_active: boolean; cname_target: string }>('/auth/tenant-branding/verify-domain/', {
-      method: 'POST',
-    }),
-  resolveTenant: (host: string) => request<TenantBranding>(`/auth/tenant-branding/resolve/?host=${encodeURIComponent(host)}`),
+  verifyTenantDomain: () => request<DomainCheckResult>('/auth/tenant-branding/verify-domain/', { method: 'POST' }),
+  resolveTenant: (host: string) => request<ResolvedTenant>(`/auth/tenant-branding/resolve/?host=${encodeURIComponent(host)}`),
 
   // Analytics & Financials
   getEventAnalytics: (eventId: string) => request<EventAnalytics>(`/events/${eventId}/analytics/`),
@@ -380,4 +702,53 @@ export const api = {
     request<EventTask>(`/events/tasks/${taskId}/`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteEventTask: (taskId: string) =>
     request<{ message: string }>(`/events/tasks/${taskId}/`, { method: 'DELETE' }),
+}
+
+// ---------------------------------------------------------------------------
+// Marketplace: venue spaces (halls, auditoriums, lawns inside one venue)
+
+export interface VenueSpace {
+  id: string
+  venue?: string
+  name: string
+  space_type: 'hall' | 'auditorium' | 'lawn' | 'rooftop' | 'conference_room' | 'other'
+  space_type_display?: string
+  capacity_seated: number
+  capacity_standing: number | null
+  price_per_day: string | number
+  area_sqft: number | null
+  amenities: string[]
+  images: string[]
+  description: string
+  is_active: boolean
+  order: number
+}
+
+/** Venue as returned by the API, including its active spaces and derived "from" price. */
+export type VenueWithSpaces = VenueListing & {
+  owner?: string
+  spaces?: VenueSpace[]
+  price_from?: string
+}
+
+export type VenueSpaceInput = Omit<VenueSpace, 'id' | 'venue' | 'space_type_display'>
+
+export const marketplaceApi = {
+  getVenueBySlug: async (slug: string) => {
+    const list = await request<VenueWithSpaces[]>(`/marketplace/venues/?slug=${encodeURIComponent(slug)}`)
+    return list.find((v) => v.slug === slug) ?? null
+  },
+  createVenue: (body: Partial<VenueListing>) =>
+    request<VenueWithSpaces>('/marketplace/venues/', { method: 'POST', body: JSON.stringify(body) }),
+  updateVenue: (venueId: string, body: Partial<VenueListing>) =>
+    request<VenueWithSpaces>(`/marketplace/venues/${venueId}/`, { method: 'PATCH', body: JSON.stringify(body) }),
+  getSpaces: (venueId: string) => request<VenueSpace[]>(`/marketplace/venues/${venueId}/spaces/`),
+  createSpace: (venueId: string, body: VenueSpaceInput) =>
+    request<VenueSpace>(`/marketplace/venues/${venueId}/spaces/`, { method: 'POST', body: JSON.stringify(body) }),
+  updateSpace: (venueId: string, spaceId: string, body: Partial<VenueSpaceInput>) =>
+    request<VenueSpace>(`/marketplace/venues/${venueId}/spaces/${spaceId}/`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteSpace: (venueId: string, spaceId: string) =>
+    request<void>(`/marketplace/venues/${venueId}/spaces/${spaceId}/`, { method: 'DELETE' }),
+  sendInquiry: (venueId: string, body: VenueInquiry & { space?: string | null }) =>
+    request<VenueInquiry>(`/marketplace/venues/${venueId}/inquiries/`, { method: 'POST', body: JSON.stringify(body) }),
 }

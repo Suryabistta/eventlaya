@@ -1,0 +1,8 @@
+from django.apps import AppConfig
+
+
+class SiteAnalyticsConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.site_analytics'
+    label = 'site_analytics'
+    verbose_name = 'Site analytics'

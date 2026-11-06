@@ -1,493 +1,428 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useId, useMemo, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Globe, Lock, QrCode } from 'lucide-react'
+import { api, type TenantBranding } from '@/services/api'
+import { Button, Card, CardHeader, ErrorState, ImageUpload, Input, PageHeader, Skeleton, controlClass, useToast } from '@/components/ui'
+import { cn } from '@/lib/utils'
+import { whiteLabelApi, type WhiteLabelRequest } from '@/pages/admin/api'
+import { ColorField, HEX, LogoThumb, Switch } from '@/pages/branding/parts'
+import { DomainStatusPanel } from '@/pages/branding/DomainStatus'
 import {
-  Globe,
-  Palette,
-  ShieldCheck,
-  CheckCircle2,
-  AlertCircle,
-  Copy,
-  ExternalLink,
-  Sparkles,
-  Save,
-  QrCode,
-  Layers,
-  ArrowRight
-} from 'lucide-react'
-import { api, TenantBranding } from '../services/api'
+  ApprovedBanner,
+  MINE_KEY,
+  PendingNotice,
+  RejectedNotice,
+  RequestForm,
+  RequestSummary,
+  WhatYouGet,
+} from '@/pages/branding/WhiteLabelRequest'
 
+const PAGE = 'w-full space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 2xl:px-10'
+
+/**
+ * Branding and domain. White-label is requested here and approved by a platform admin:
+ * none → request form, pending → summary, rejected → reason + request again, approved → live settings.
+ */
 export default function WhiteLabelPage() {
-  const [branding, setBranding] = useState<TenantBranding>({
-    subdomain: 'eastern-summit',
-    custom_domain: 'events.easternsummit.org.np',
-    cname_target: 'cname.eventlaya.com',
-    is_domain_verified: false,
-    ssl_active: false,
-    brand_name: 'Eastern Youth Summit',
-    brand_logo: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=300',
-    primary_color: '#4F46E5',
-    accent_color: '#06B6D4',
-    support_email: 'support@easternsummit.org.np',
-    footer_text: 'Organized by Eastern Youth Summit • Dharan, Nepal',
-    remove_watermark: true,
-  })
+  const { data: requests, isLoading, isError, error, refetch } = useQuery({ queryKey: MINE_KEY, queryFn: whiteLabelApi.mine })
+  const [requesting, setRequesting] = useState(false)
 
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [verifying, setVerifying] = useState(false)
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [copied, setCopied] = useState(false)
+  const latest = requests?.[0]
+  const approved = requests?.find((r) => r.status === 'approved')
 
+  // Close the form once a new request has been sent
   useEffect(() => {
-    loadBranding()
-  }, [])
+    if (latest?.status === 'pending') setRequesting(false)
+  }, [latest?.id, latest?.status])
 
-  const loadBranding = async () => {
-    try {
-      const data = await api.getTenantBranding()
-      if (data) {
-        setBranding(data)
-      }
-    } catch (err) {
-      console.error('Failed to load branding:', err)
-    } finally {
-      setLoading(false)
-    }
+  if (isError) {
+    return (
+      <div className={PAGE}>
+        <PageHeader title="Branding and domain" />
+        <ErrorState message={(error as Error)?.message} onRetry={() => void refetch()} />
+      </div>
+    )
   }
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault()
+  if (isLoading || !requests) {
+    return (
+      <div className={PAGE}>
+        <Skeleton className="h-10 w-72" />
+        <Skeleton className="h-28 rounded-2xl" />
+        <Skeleton className="h-96 rounded-2xl" />
+      </div>
+    )
+  }
+
+  if (approved) {
+    return (
+      <BrandingSettings
+        approved={approved}
+        latest={latest!}
+        requesting={requesting}
+        onRequestChange={() => setRequesting(true)}
+        onCancelRequest={() => setRequesting(false)}
+      />
+    )
+  }
+
+  const prefill = latest
+    ? {
+        brand_name: latest.brand_name,
+        requested_domain: latest.requested_domain,
+        logo_url: latest.logo_url,
+        primary_color: latest.primary_color,
+        accent_color: latest.accent_color,
+        remove_watermark: latest.remove_watermark,
+      }
+    : undefined
+
+  return (
+    <div className={PAGE}>
+      <PageHeader
+        title="Branding and domain"
+        description="Put your own name, logo, colours and domain on registration pages and passes. White-label is approved by the Eventlaya team."
+      />
+
+      {!latest && (
+        <>
+          <WhatYouGet />
+          <RequestForm />
+        </>
+      )}
+
+      {latest?.status === 'pending' && <PendingNotice r={latest} />}
+
+      {latest?.status === 'rejected' && (
+        <>
+          <RejectedNotice r={latest} onRetry={() => setRequesting(true)} retrying={requesting} />
+          {requesting ? (
+            <RequestForm
+              key={latest.id}
+              initial={prefill}
+              title="Request white-label again"
+              description="We’ve filled in your last request. Update it based on the reason above, then send it."
+              onCancel={() => setRequesting(false)}
+            />
+          ) : (
+            <Card>
+              <CardHeader title="What you asked for" />
+              <div className="p-5">
+                <RequestSummary r={latest} />
+              </div>
+            </Card>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* Approved: live settings                                              */
+
+const BrandingSettings: React.FC<{
+  approved: WhiteLabelRequest
+  latest: WhiteLabelRequest
+  requesting: boolean
+  onRequestChange: () => void
+  onCancelRequest: () => void
+}> = ({ approved, latest, requesting, onRequestChange, onCancelRequest }) => {
+  const toast = useToast()
+  const queryClient = useQueryClient()
+  const formId = useId()
+
+  const { data, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ['tenantBranding'],
+    queryFn: api.getTenantBranding,
+  })
+
+  const [branding, setBranding] = useState<TenantBranding | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [verifying, setVerifying] = useState(false)
+
+  useEffect(() => {
+    if (data) setBranding(data)
+  }, [data])
+
+  useEffect(() => {
+    if (isError) toast.error('Couldn’t load your branding', error?.message || 'Check your connection and try again.')
+  }, [isError, error, toast])
+
+  const dirty = useMemo(() => Boolean(data && branding && JSON.stringify(data) !== JSON.stringify(branding)), [data, branding])
+
+  if (isError) {
+    return (
+      <div className={PAGE}>
+        <ErrorState message={error?.message} onRetry={refetch} />
+      </div>
+    )
+  }
+
+  if (isLoading || !branding || !data) {
+    return (
+      <div className={PAGE}>
+        <Skeleton className="h-10 w-72" />
+        <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+          <div className="space-y-6">
+            <Skeleton className="h-96 rounded-2xl" />
+            <Skeleton className="h-80 rounded-2xl" />
+          </div>
+          <Skeleton className="h-[480px] rounded-2xl" />
+        </div>
+      </div>
+    )
+  }
+
+  const set = <K extends keyof TenantBranding>(key: K, value: TenantBranding[K]) => setBranding((b) => (b ? { ...b, [key]: value } : b))
+
+  const save = async (): Promise<boolean> => {
+    if (!HEX.test(branding.primary_color) || !HEX.test(branding.accent_color)) {
+      toast.error('Check your colours', 'Use a 6-digit hex code like #C2215A.')
+      return false
+    }
     setSaving(true)
-    setMessage(null)
     try {
       const updated = await api.updateTenantBranding(branding)
+      queryClient.setQueryData(['tenantBranding'], updated)
       setBranding(updated)
-      setMessage({ type: 'success', text: 'White-label SaaS branding saved successfully!' })
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.message || 'Failed to save branding settings' })
+      return true
+    } catch (err) {
+      toast.error('Couldn’t save your branding', err instanceof Error ? err.message : 'Try again in a moment.')
+      return false
     } finally {
       setSaving(false)
     }
   }
 
-  const handleVerifyDomain = async () => {
+  const handleSave = async (e?: React.FormEvent) => {
+    e?.preventDefault()
+    if (await save()) toast.success('Branding saved')
+  }
+
+  const handleVerify = async () => {
+    if (dirty && !(await save())) return
     setVerifying(true)
-    setMessage(null)
     try {
       const res = await api.verifyTenantDomain()
-      setBranding(prev => ({
-        ...prev,
-        is_domain_verified: res.is_domain_verified,
-        ssl_active: res.ssl_active,
-      }))
-      setMessage({ type: 'success', text: res.message })
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.message || 'Domain DNS verification failed' })
+      const next = { ...branding, is_domain_verified: res.is_domain_verified, ssl_active: res.ssl_active, cname_target: res.cname_target, status: res.status }
+      queryClient.setQueryData(['tenantBranding'], next)
+      setBranding(next)
+      if (res.status.custom_domain?.live) toast.success('Your domain is live', res.message)
+      else if (res.is_domain_verified) toast.info('DNS verified', res.message)
+      else toast.info('Not verified yet', res.message)
+    } catch (err) {
+      toast.error('Couldn’t check the domain', err instanceof Error ? err.message : 'Try again in a moment.')
     } finally {
       setVerifying(false)
     }
   }
 
-  const copyCNAME = () => {
-    navigator.clipboard.writeText(branding.cname_target || 'cname.eventlaya.com')
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-      </div>
-    )
-  }
+  const customDomain = data.custom_domain?.trim() || ''
+  const status = data.status
+  // Clients use their own domain; the free *.eventlaya.com address only shows when the platform turns it on
+  const subdomainsOn = status?.subdomain.available ?? false
+  const siteHost = customDomain || (status?.site_url ? new URL(status.site_url).host : subdomainsOn ? `${branding.subdomain || 'your-org'}.eventlaya.com` : 'events.your-domain.com')
+  const pendingChange = latest.status === 'pending' && latest.id !== approved.id ? latest : null
+  const rejectedChange = latest.status === 'rejected' && latest.id !== approved.id ? latest : null
 
   return (
-    <div className="space-y-8 pb-16">
-      {/* Header */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cyan-100 text-cyan-800 flex items-center gap-1">
-              <Sparkles className="w-3 h-3" />
-              Enterprise Multi-Tenant SaaS
-            </span>
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900">
-            White-Label & Custom Domain Engine
-          </h1>
-          <p className="text-sm text-slate-500">
-            Host events on your own domain with full branding isolation, custom color schemes, and zero watermark.
-          </p>
-        </div>
+    <div className={PAGE}>
+      <PageHeader
+        title="Branding and domain"
+        description="Show your own logo, colours and domain on registration pages and passes."
+        actions={
+          <Button type="submit" form={formId} loading={saving} disabled={!dirty}>
+            Save changes
+          </Button>
+        }
+      />
 
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl transition shadow-sm disabled:opacity-50 text-sm"
-        >
-          <Save className="w-4 h-4" />
-          <span>{saving ? 'Saving Changes...' : 'Save Settings'}</span>
-        </button>
-      </div>
-
-      {message && (
-        <div
-          className={`p-4 rounded-xl text-sm flex items-center gap-3 border ${
-            message.type === 'success'
-              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-              : 'bg-red-50 text-red-800 border-red-200'
-          }`}
-        >
-          {message.type === 'success' ? (
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-          ) : (
-            <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
-          )}
-          <span>{message.text}</span>
-        </div>
+      <ApprovedBanner r={approved} />
+      {pendingChange && <PendingNotice r={pendingChange} changeRequest />}
+      {rejectedChange && !requesting && <RejectedNotice r={rejectedChange} onRetry={onRequestChange} retrying={false} />}
+      {requesting && (
+        <RequestForm
+          initial={{
+            brand_name: branding.brand_name,
+            requested_domain: customDomain,
+            logo_url: branding.brand_logo,
+            primary_color: branding.primary_color,
+            accent_color: branding.accent_color,
+            remove_watermark: approved.remove_watermark,
+          }}
+          title="Request a change"
+          description="Changing your domain or footer needs a new review. Your current settings stay live until it’s approved."
+          onCancel={onCancelRequest}
+        />
       )}
 
-      {/* Main Grid: Settings & Live Preview */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Form: Configuration */}
-        <div className="lg:col-span-7 space-y-6">
-          {/* Section 1: Domain Routing */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
-            <div className="flex items-center gap-2 text-base font-bold text-slate-900 border-b border-slate-100 pb-3">
-              <Globe className="w-5 h-5 text-indigo-600" />
-              <span>Domain & Hostname Settings</span>
-            </div>
-
-            {/* Subdomain */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Platform Subdomain
-              </label>
-              <div className="flex rounded-xl shadow-sm">
-                <input
-                  type="text"
-                  value={branding.subdomain}
-                  onChange={(e) => setBranding({ ...branding, subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
-                  className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-l-xl text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="your-org"
-                />
-                <span className="inline-flex items-center px-4 rounded-r-xl border border-l-0 border-slate-300 bg-slate-100 text-slate-500 text-sm font-mono">
-                  .eventlaya.com
-                </span>
-              </div>
-            </div>
-
-            {/* Custom Domain */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-semibold text-slate-700">
-                  Custom Enterprise Domain (FQDN)
-                </label>
-                {branding.is_domain_verified ? (
-                  <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    Verified & SSL Active
-                  </span>
-                ) : (
-                  <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                    DNS Pending Verification
-                  </span>
-                )}
-              </div>
-              <input
-                type="text"
-                value={branding.custom_domain || ''}
-                onChange={(e) => setBranding({ ...branding, custom_domain: e.target.value.toLowerCase() })}
-                placeholder="events.yourorganization.com"
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-
-            {/* DNS Instructions Box */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs space-y-2">
-              <span className="font-bold text-slate-700 flex items-center gap-1">
-                DNS Configuration Instructions
-              </span>
-              <p className="text-slate-500">
-                To route your custom domain to Eventlaya, add a CNAME DNS record in your DNS provider (Cloudflare, GoDaddy, Route53):
-              </p>
-              <div className="bg-white p-2.5 rounded-lg border border-slate-200 font-mono text-slate-800 flex items-center justify-between">
-                <div>
-                  <span className="text-slate-400">CNAME → </span>
-                  <span className="font-semibold text-indigo-600">{branding.cname_target || 'cname.eventlaya.com'}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={copyCNAME}
-                  className="text-slate-500 hover:text-indigo-600 transition flex items-center gap-1"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                  <span>{copied ? 'Copied' : 'Copy'}</span>
-                </button>
-              </div>
-
-              <div className="pt-2 flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleVerifyDomain}
-                  disabled={verifying || !branding.custom_domain}
-                  className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg font-semibold text-xs transition disabled:opacity-50"
-                >
-                  {verifying ? 'Verifying DNS...' : 'Verify DNS & SSL'}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Section 2: Visual Branding & Theming */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
-            <div className="flex items-center gap-2 text-base font-bold text-slate-900 border-b border-slate-100 pb-3">
-              <Palette className="w-5 h-5 text-indigo-600" />
-              <span>Theme, Logo & White-Label Customization</span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Brand / Organization Name
-                </label>
-                <input
-                  type="text"
-                  value={branding.brand_name}
-                  onChange={(e) => setBranding({ ...branding, brand_name: e.target.value })}
-                  placeholder="e.g. Eastern Youth Summit"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Support Email
-                </label>
-                <input
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <form id={formId} onSubmit={handleSave} className="min-w-0 space-y-6">
+          <Card>
+            <CardHeader title="Your brand" description="Used on your event pages, emails and passes." />
+            <div className="space-y-5 p-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Input label="Organization name" required value={branding.brand_name} onChange={(e) => set('brand_name', e.target.value)} placeholder="Eastern Youth Summit" />
+                <Input
+                  label="Support email"
                   type="email"
                   value={branding.support_email}
-                  onChange={(e) => setBranding({ ...branding, support_email: e.target.value })}
+                  onChange={(e) => set('support_email', e.target.value)}
                   placeholder="support@yourdomain.com"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm"
                 />
               </div>
-            </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Brand Logo URL
-              </label>
-              <input
-                type="url"
-                value={branding.brand_logo}
-                onChange={(e) => setBranding({ ...branding, brand_logo: e.target.value })}
-                placeholder="https://yourdomain.com/logo.png"
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm"
-              />
-            </div>
-
-            {/* Color Pickers */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Primary Theme Color
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={branding.primary_color}
-                    onChange={(e) => setBranding({ ...branding, primary_color: e.target.value })}
-                    className="w-10 h-10 rounded-xl border border-slate-300 cursor-pointer p-0.5 bg-white"
-                  />
-                  <input
-                    type="text"
-                    value={branding.primary_color}
-                    onChange={(e) => setBranding({ ...branding, primary_color: e.target.value })}
-                    className="flex-1 px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm font-mono"
+              <div className="grid gap-5 sm:grid-cols-[200px_minmax(0,1fr)]">
+                <ImageUpload
+                  label="Logo"
+                  kind="logo"
+                  shape="square"
+                  value={branding.brand_logo || null}
+                  onChange={(url) => set('brand_logo', url ?? '')}
+                  hint="Square PNG or JPG"
+                />
+                <div className="space-y-5">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <ColorField label="Primary colour" hint="Buttons and headers" value={branding.primary_color} onChange={(v) => set('primary_color', v)} />
+                    <ColorField label="Accent colour" hint="Badges and highlights" value={branding.accent_color} onChange={(v) => set('accent_color', v)} />
+                  </div>
+                  <Input
+                    label="Footer text"
+                    value={branding.footer_text}
+                    onChange={(e) => set('footer_text', e.target.value)}
+                    placeholder="Organized by Eastern Youth Summit, Dharan"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Secondary / Accent Color
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={branding.accent_color}
-                    onChange={(e) => setBranding({ ...branding, accent_color: e.target.value })}
-                    className="w-10 h-10 rounded-xl border border-slate-300 cursor-pointer p-0.5 bg-white"
-                  />
-                  <input
-                    type="text"
-                    value={branding.accent_color}
-                    onChange={(e) => setBranding({ ...branding, accent_color: e.target.value })}
-                    className="flex-1 px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm font-mono"
-                  />
+              <div className="flex items-start justify-between gap-4 border-t border-ink-100 pt-5">
+                <div>
+                  <p id="watermark-label" className="text-sm font-medium text-ink-900">
+                    Hide “Powered by Eventlaya”
+                  </p>
+                  <p className="mt-0.5 text-sm text-ink-500">
+                    {approved.remove_watermark
+                      ? 'Show only your own branding in the page footer.'
+                      : 'Not part of your approved white-label. Request a change to add it.'}
+                  </p>
                 </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Custom Footer Notice
-              </label>
-              <input
-                type="text"
-                value={branding.footer_text}
-                onChange={(e) => setBranding({ ...branding, footer_text: e.target.value })}
-                placeholder="e.g. Powered by Eastern Youth Summit • Dharan, Nepal"
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm"
-              />
-            </div>
-
-            {/* Remove Watermark Toggle */}
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-              <div>
-                <span className="text-sm font-bold text-slate-900 block">
-                  Remove "Powered by Eventlaya" Watermark
-                </span>
-                <span className="text-xs text-slate-500">
-                  Completely replace platform badges with your exclusive organizational branding.
-                </span>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
+                <Switch
                   checked={branding.remove_watermark}
-                  onChange={(e) => setBranding({ ...branding, remove_watermark: e.target.checked })}
-                  className="sr-only peer"
+                  onChange={(v) => set('remove_watermark', v)}
+                  labelledBy="watermark-label"
+                  disabled={!approved.remove_watermark}
                 />
-                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-              </label>
+              </div>
             </div>
+          </Card>
+
+          <Card>
+            <CardHeader
+              title="Domain"
+              description="Where attendees open your registration pages."
+              actions={
+                !requesting &&
+                !pendingChange && (
+                  <Button variant="secondary" size="sm" onClick={onRequestChange}>
+                    Request a change
+                  </Button>
+                )
+              }
+            />
+            <div className="space-y-5 p-5">
+              {subdomainsOn && (
+                <div className="space-y-1.5">
+                  <label htmlFor="subdomain" className="block text-sm font-medium text-ink-800">
+                    Eventlaya address
+                  </label>
+                  <div className="flex">
+                    <input
+                      id="subdomain"
+                      value={branding.subdomain}
+                      onChange={(e) => set('subdomain', e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                      placeholder="your-org"
+                      className={cn(controlClass, 'min-w-0 rounded-r-none font-mono')}
+                    />
+                    <span className="inline-flex shrink-0 items-center rounded-r-[10px] border border-l-0 border-ink-200 bg-ink-50 px-3 font-mono text-sm text-ink-500">
+                      .eventlaya.com
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {status ? (
+                <DomainStatusPanel status={status} onCheck={customDomain ? handleVerify : undefined} checking={verifying} />
+              ) : (
+                <p className="text-sm text-ink-500">Custom domain: {customDomain || 'none approved'}</p>
+              )}
+              <p className="text-xs text-ink-500">Your custom domain is approved by the Eventlaya team. To use a different one, request a change.</p>
+            </div>
+          </Card>
+        </form>
+
+        <aside aria-label="Preview" className="min-w-0">
+          <div className="space-y-3 lg:sticky lg:top-6">
+            <p className="text-sm font-medium text-ink-500">Preview</p>
+            <Preview branding={branding} host={siteHost} secure={Boolean(status?.site_url)} />
+          </div>
+        </aside>
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+
+const Preview: React.FC<{ branding: TenantBranding; host: string; secure: boolean }> = ({ branding, host, secure }) => {
+  const primary = HEX.test(branding.primary_color) ? branding.primary_color : '#C2215A'
+  const accent = HEX.test(branding.accent_color) ? branding.accent_color : '#E39400'
+  return (
+    <div className="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-sm">
+      <div className="flex items-center gap-2 border-b border-ink-200 bg-ink-50 px-3 py-2">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md border border-ink-200 bg-white px-2.5 py-1 font-mono text-xs text-ink-600">
+          {secure ? <Lock className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden /> : <Globe className="h-3.5 w-3.5 shrink-0 text-ink-400" aria-hidden />}
+          <span className="truncate">{host}</span>
+        </div>
+      </div>
+
+      <div className="space-y-4 bg-ink-50/60 p-4">
+        <div className="flex items-center justify-between gap-3 rounded-xl bg-white p-3 shadow-2xs">
+          <div className="flex min-w-0 items-center gap-2">
+            <LogoThumb src={branding.brand_logo} name={branding.brand_name} color={primary} className="h-7 w-7 text-xs" />
+            <span className="truncate text-sm font-bold text-ink-900">{branding.brand_name || 'Your organization'}</span>
+          </div>
+          <span className="shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold text-white" style={{ backgroundColor: primary }}>
+            Register
+          </span>
+        </div>
+
+        <div className="rounded-xl p-4 text-white" style={{ backgroundColor: primary }}>
+          <p className="font-display text-base font-bold leading-snug">Annual Technology and Innovation Summit</p>
+          <p className="mt-1 text-xs text-white/85">Dharan Chamber of Commerce Auditorium, 28 March</p>
+          <span className="mt-3 inline-block rounded-lg bg-white px-3 py-1 text-xs font-semibold text-ink-900">Get your pass</span>
+        </div>
+
+        <div className="rounded-xl border border-ink-200 bg-white p-3.5">
+          <div className="flex items-start justify-between gap-3 border-b border-dashed border-ink-200 pb-2.5">
+            <div>
+              <p className="text-xs text-ink-500">Attendee pass</p>
+              <p className="text-sm font-bold text-ink-900">Subash Dahal</p>
+            </div>
+            <span className="rounded-full px-2 py-0.5 text-xs font-semibold text-white" style={{ backgroundColor: accent }}>
+              VIP
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-3 pt-2.5">
+            <p className="font-mono text-xs text-ink-700">TKT-EAST-0042</p>
+            <QrCode className="h-10 w-10 text-ink-900" aria-hidden />
           </div>
         </div>
 
-        {/* Right Column: Live Mockup Canvas */}
-        <div className="lg:col-span-5 space-y-6">
-          <div className="sticky top-6">
-            <div className="flex items-center justify-between mb-3 px-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-indigo-600" />
-                Live White-Label Preview
-              </span>
-              <span className="text-[11px] font-mono text-slate-500">
-                {branding.custom_domain || `${branding.subdomain}.eventlaya.com`}
-              </span>
-            </div>
-
-            {/* Simulated Browser Frame */}
-            <div className="bg-slate-900 rounded-2xl shadow-xl overflow-hidden border border-slate-800">
-              {/* Browser Address Bar */}
-              <div className="bg-slate-800 px-4 py-2.5 flex items-center gap-2 border-b border-slate-700/60">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-red-500/80"></span>
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80"></span>
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
-                </div>
-                <div className="flex-1 bg-slate-900/90 rounded-lg px-3 py-1 text-[11px] font-mono text-slate-300 flex items-center gap-2 border border-slate-700/50">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="truncate">
-                    https://{branding.custom_domain || `${branding.subdomain}.eventlaya.com`}
-                  </span>
-                </div>
-              </div>
-
-              {/* Mockup Body with Dynamic Branding */}
-              <div className="bg-slate-50 p-5 space-y-4 text-slate-800">
-                {/* Header Navbar */}
-                <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    {branding.brand_logo ? (
-                      <img
-                        src={branding.brand_logo}
-                        alt="Logo"
-                        className="w-7 h-7 rounded-lg object-cover"
-                      />
-                    ) : (
-                      <div
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold"
-                        style={{ backgroundColor: branding.primary_color }}
-                      >
-                        {branding.brand_name.charAt(0)}
-                      </div>
-                    )}
-                    <span className="font-bold text-sm text-slate-900">{branding.brand_name}</span>
-                  </div>
-
-                  <span
-                    className="text-xs font-semibold px-2.5 py-1 rounded-lg text-white"
-                    style={{ backgroundColor: branding.primary_color }}
-                  >
-                    Register Now
-                  </span>
-                </div>
-
-                {/* Hero Banner Mockup */}
-                <div
-                  className="rounded-xl p-5 text-white shadow-sm relative overflow-hidden"
-                  style={{
-                    background: `linear-gradient(135deg, ${branding.primary_color} 0%, ${branding.accent_color} 100%)`,
-                  }}
-                >
-                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/20 backdrop-blur-sm inline-block mb-2">
-                    Official Event Portal
-                  </span>
-                  <h4 className="text-base font-extrabold mb-1">
-                    Annual Technology & Innovation Summit 2026
-                  </h4>
-                  <p className="text-xs opacity-90 mb-3">
-                    Dharan Chamber of Commerce Auditorium • March 28
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold px-3 py-1 rounded-lg bg-white text-slate-900 shadow-sm">
-                      Get Pass
-                    </span>
-                    <span className="text-xs text-white/90">500 Seats Available</span>
-                  </div>
-                </div>
-
-                {/* Branded Ticket Pass Mockup */}
-                <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm space-y-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-dashed border-slate-200">
-                    <div>
-                      <span className="text-[10px] uppercase text-slate-400 font-bold block">
-                        Verified Attendee Pass
-                      </span>
-                      <span className="text-xs font-extrabold text-slate-900">Subash Dahal</span>
-                    </div>
-                    <span
-                      className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white"
-                      style={{ backgroundColor: branding.primary_color }}
-                    >
-                      VIP Delegate
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="text-[11px] text-slate-600 space-y-0.5">
-                      <div>Pass ID: <span className="font-mono font-bold text-slate-800">TKT-EAST-0042</span></div>
-                      <div>Gate Access: <span className="font-medium">North & VIP Lounge</span></div>
-                    </div>
-                    <div className="p-1.5 bg-slate-50 border border-slate-200 rounded-lg">
-                      <QrCode className="w-10 h-10 text-slate-900" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer Watermark Simulation */}
-                <div className="pt-2 text-center text-[10px] text-slate-400">
-                  {branding.footer_text && <p className="mb-0.5">{branding.footer_text}</p>}
-                  {!branding.remove_watermark && (
-                    <p className="text-slate-400">Powered by Eventlaya Platform</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+        <div className="space-y-0.5 text-center text-xs text-ink-500">
+          {branding.footer_text && <p>{branding.footer_text}</p>}
+          {!branding.remove_watermark && <p>Powered by Eventlaya</p>}
+          {branding.support_email && <p>{branding.support_email}</p>}
         </div>
       </div>
     </div>

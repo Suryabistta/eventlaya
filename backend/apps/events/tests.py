@@ -179,7 +179,7 @@ class EventlayaCoreTests(APITestCase):
 
     def test_gate_scan_flow_and_reentry(self):
         """Tests Gate In, duplicate rejection, Gate Out, and Re-entry pass-back flow."""
-        self.client.logout()
+        self.client.force_authenticate(user=self.organizer)  # scanning needs event access
         ticket = EventTicket.generate_ticket(self.event, 'Bikash Rai', 'bikash@test.com')
 
         # 1. Gate In Scan
@@ -225,7 +225,7 @@ class EventlayaCoreTests(APITestCase):
 
     def test_gate_scan_cross_event_wrong_checkpoint(self):
         """Scanning a ticket belonging to another event indicates wrong event checkpoint."""
-        self.client.logout()
+        self.client.force_authenticate(user=self.organizer)  # scanning needs event access
         other_event = Event.objects.create(
             organizer=self.organizer,
             title='Biratnagar Music Festival',
@@ -248,7 +248,7 @@ class EventlayaCoreTests(APITestCase):
 
     def test_gate_scan_token_normalization_json(self):
         """Scanners encoding QR payload as JSON are normalized and validated."""
-        self.client.logout()
+        self.client.force_authenticate(user=self.organizer)  # scanning needs event access
         ticket = EventTicket.generate_ticket(self.event, 'Anil Thapa', 'anil@test.com')
         json_payload = json.dumps({'qr_token': ticket.qr_token, 'ticket_number': ticket.ticket_number})
 
@@ -263,7 +263,7 @@ class EventlayaCoreTests(APITestCase):
 
     def test_gate_scan_cancelled_event_rejected(self):
         """Cancelled events reject gate scans."""
-        self.client.logout()
+        self.client.force_authenticate(user=self.organizer)  # scanning needs event access
         ticket = EventTicket.generate_ticket(self.event, 'Karan Rai', 'karan@test.com')
         self.event.status = Event.Status.CANCELLED
         self.event.save()
@@ -278,7 +278,7 @@ class EventlayaCoreTests(APITestCase):
 
     def test_gate_scan_cancelled_ticket_rejected(self):
         """Revoked or cancelled tickets are rejected."""
-        self.client.logout()
+        self.client.force_authenticate(user=self.organizer)  # scanning needs event access
         ticket = EventTicket.generate_ticket(self.event, 'Deepak KC', 'deepak@test.com')
         ticket.status = EventTicket.Status.CANCELLED
         ticket.save()
@@ -293,7 +293,7 @@ class EventlayaCoreTests(APITestCase):
 
     def test_gate_scan_expired_event_rejected(self):
         """Scanning tickets for events that ended in the past is rejected."""
-        self.client.logout()
+        self.client.force_authenticate(user=self.organizer)  # scanning needs event access
         past_event = Event.objects.create(
             organizer=self.organizer,
             title='Old Meetup 2024',
@@ -312,3 +312,119 @@ class EventlayaCoreTests(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(res.data['result'], 'expired')
         self.assertIn('Concluded', res.data['message'])
+
+
+class PublicEventListTests(APITestCase):
+    def setUp(self):
+        today = date.today()
+        self.org_a = User.objects.create_user(username='a', email='a@x.com', password='password123', organization_name='Dharan Club')
+        self.org_b = User.objects.create_user(username='b', email='b@x.com', password='password123', organization_name='Itahari College')
+        Event.objects.create(organizer=self.org_a, title='A Upcoming', slug='a-up', location='Dharan', start_date=today + timedelta(days=3), status=Event.Status.PUBLISHED)
+        Event.objects.create(organizer=self.org_b, title='B Upcoming', slug='b-up', location='Itahari', start_date=today + timedelta(days=1), status=Event.Status.PUBLISHED)
+        Event.objects.create(organizer=self.org_b, title='B Draft', slug='b-draft', location='Itahari', start_date=today + timedelta(days=2), status=Event.Status.DRAFT)
+        Event.objects.create(organizer=self.org_a, title='A Past', slug='a-past', location='Dharan', start_date=today - timedelta(days=5), end_date=today - timedelta(days=4), status=Event.Status.PUBLISHED)
+
+    def titles(self, res):
+        return [e['title'] for e in res.data]
+
+    def test_lists_upcoming_published_events_from_all_organizers_soonest_first(self):
+        res = self.client.get('/api/events/public/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(self.titles(res), ['B Upcoming', 'A Upcoming'])
+
+    def test_signed_in_organizer_still_sees_other_organizers_events(self):
+        self.client.force_authenticate(user=self.org_a)
+        res = self.client.get('/api/events/public/')
+        self.assertIn('B Upcoming', self.titles(res))
+
+    def test_past_and_filters(self):
+        self.assertEqual(self.titles(self.client.get('/api/events/public/?when=past')), ['A Past'])
+        self.assertEqual(self.titles(self.client.get('/api/events/public/?city=itahari')), ['B Upcoming'])
+        self.assertEqual(self.titles(self.client.get('/api/events/public/?search=dharan club')), ['A Upcoming'])
+
+
+class EventTaskScopingTests(APITestCase):
+    """Crew tasks: owner scoping, optional event link, filters."""
+
+    def setUp(self):
+        from apps.events.models import EventTask
+        self.EventTask = EventTask
+        today = date.today()
+        self.org_a = User.objects.create_user(username='task_a', email='ta@x.com', password='password123', role=User.Role.ORGANIZER)
+        self.org_b = User.objects.create_user(username='task_b', email='tb@x.com', password='password123', role=User.Role.ORGANIZER)
+        self.admin = User.objects.create_user(username='task_admin', email='tadmin@x.com', password='password123', role=User.Role.SUPERADMIN)
+        self.event_a = Event.objects.create(organizer=self.org_a, title='A Fest', slug='a-fest', location='Dharan', start_date=today)
+        self.event_b = Event.objects.create(organizer=self.org_b, title='B Fest', slug='b-fest', location='Itahari', start_date=today)
+        self.task_a_event = EventTask.objects.create(organizer=self.org_a, event=self.event_a, title='Gate setup', status='todo', priority='high')
+        self.task_a_general = EventTask.objects.create(organizer=self.org_a, event=None, title='Renew contract', status='completed', priority='low')
+        self.task_b = EventTask.objects.create(organizer=self.org_b, event=self.event_b, title='B stage', priority='urgent')
+
+    def titles(self, res):
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        return sorted(t['title'] for t in res.data)
+
+    def test_requires_authentication(self):
+        self.assertEqual(self.client.get('/api/events/tasks/').status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_organizer_sees_only_own_tasks(self):
+        self.client.force_authenticate(self.org_a)
+        self.assertEqual(self.titles(self.client.get('/api/events/tasks/')), ['Gate setup', 'Renew contract'])
+
+    def test_superadmin_sees_all_tasks(self):
+        self.client.force_authenticate(self.admin)
+        self.assertEqual(len(self.client.get('/api/events/tasks/').data), 3)
+
+    def test_cannot_read_update_or_delete_other_organizers_task(self):
+        self.client.force_authenticate(self.org_a)
+        url = f'/api/events/tasks/{self.task_b.id}/'
+        self.assertEqual(self.client.get(url).status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(self.client.patch(url, {'status': 'completed'}, format='json').status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(self.client.delete(url).status_code, status.HTTP_404_NOT_FOUND)
+        self.assertTrue(self.EventTask.objects.filter(id=self.task_b.id).exists())
+
+    def test_create_general_task_without_event(self):
+        self.client.force_authenticate(self.org_a)
+        res = self.client.post('/api/events/tasks/', {'title': 'Buy radios', 'due_date': '2026-11-01', 'assignee_email': 'ram@x.com'}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        self.assertIsNone(res.data['event'])
+        self.assertIsNone(res.data['event_title'])
+        self.assertEqual(res.data['due_date'], '2026-11-01')
+        task = self.EventTask.objects.get(id=res.data['id'])
+        self.assertEqual(task.organizer, self.org_a)
+
+    def test_create_event_task_sets_owner_and_rejects_foreign_event(self):
+        self.client.force_authenticate(self.org_a)
+        res = self.client.post('/api/events/tasks/', {'title': 'Sound check', 'event': str(self.event_a.id)}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        self.assertEqual(str(res.data['organizer']), str(self.org_a.id))
+        self.assertEqual(res.data['event_title'], 'A Fest')
+        res = self.client.post('/api/events/tasks/', {'title': 'Sneaky', 'event': str(self.event_b.id)}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_owner_cannot_be_overridden(self):
+        self.client.force_authenticate(self.org_a)
+        res = self.client.post('/api/events/tasks/', {'title': 'Mine', 'organizer': str(self.org_b.id)}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(self.EventTask.objects.get(id=res.data['id']).organizer, self.org_a)
+
+    def test_unlink_event_by_patching_null(self):
+        self.client.force_authenticate(self.org_a)
+        res = self.client.patch(f'/api/events/tasks/{self.task_a_event.id}/', {'event': None}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIsNone(res.data['event'])
+
+    def test_filters(self):
+        self.client.force_authenticate(self.org_a)
+        base = '/api/events/tasks/'
+        self.assertEqual(self.titles(self.client.get(f'{base}?event_id={self.event_a.id}')), ['Gate setup'])
+        self.assertEqual(self.titles(self.client.get(f'{base}?event_id=none')), ['Renew contract'])
+        self.assertEqual(self.titles(self.client.get(f'{base}?status=completed')), ['Renew contract'])
+        self.assertEqual(self.titles(self.client.get(f'{base}?priority=high')), ['Gate setup'])
+        self.assertEqual(self.titles(self.client.get(f'{base}?event_id=not-a-uuid')), [])
+        # Another organizer's event id yields nothing
+        self.assertEqual(self.titles(self.client.get(f'{base}?event_id={self.event_b.id}')), [])
+
+    def test_analytics_task_stats_ignore_general_tasks(self):
+        self.client.force_authenticate(self.org_a)
+        res = self.client.get(f'/api/events/{self.event_a.id}/analytics/')
+        self.assertEqual(res.data['task_stats']['total'], 1)

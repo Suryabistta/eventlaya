@@ -1,505 +1,651 @@
-import React, { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import React, { useEffect, useState } from 'react'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import {
-  QrCode,
-  Users,
-  UserCheck,
-  LogOut,
-  Search,
-  Sparkles,
-  Ticket as TicketIcon,
-  RefreshCw,
-  CheckCircle,
-  AlertCircle,
   Download,
+  LogIn,
+  LogOut,
   Megaphone,
-  UserPlus,
-  X,
+  RefreshCw,
+  Search,
   Send,
-  Radio
+  Ticket as TicketIcon,
+  Users,
+  CalendarPlus,
+  DoorOpen,
+  Settings2,
 } from 'lucide-react'
-import { api, type Ticket } from '@/services/api'
-import { GateScannerComponent } from '@/components/GateScannerComponent'
+import { api, request, type GateStats, type Ticket } from '@/services/api'
+import { useAuth } from '@/lib/auth'
+import { useCurrentEvent } from '@/lib/event-context'
+import { gatesApi, type EventGate } from '@/lib/gates'
+import { GateScannerComponent, describeScan, postScan, type ScanType } from '@/components/GateScannerComponent'
 import { TicketPassModal } from '@/components/TicketPassModal'
+import { PhaseNotice } from '@/components/PhaseBadge'
+import {
+  Badge,
+  Button,
+  ButtonLink,
+  Card,
+  CardHeader,
+  EmptyState,
+  ErrorState,
+  Input,
+  Modal,
+  PageHeader,
+  Skeleton,
+  Textarea,
+  useToast,
+} from '@/components/ui'
 import { cn } from '@/lib/utils'
 
+const ticketStatus: Record<Ticket['status'], { label: string; tone: 'success' | 'warning' | 'neutral' | 'danger' }> = {
+  valid: { label: 'Not arrived', tone: 'neutral' },
+  checked_in: { label: 'Inside', tone: 'success' },
+  checked_out: { label: 'Left', tone: 'warning' },
+  cancelled: { label: 'Cancelled', tone: 'danger' },
+  reserved: { label: 'Awaiting payment', tone: 'warning' },
+}
+
+const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
+const passDate = (d: string, t?: string) => {
+  const date = new Date(`${d}T${t || '00:00:00'}`)
+  const day = date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })
+  return t ? `${day}, ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : day
+}
+
+function useDebounced<T>(value: T, ms = 300) {
+  const [v, setV] = useState(value)
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), ms)
+    return () => clearTimeout(t)
+  }, [value, ms])
+  return v
+}
+
 export const GateScannerPage: React.FC = () => {
-  const queryClient = useQueryClient()
-  const [searchQuery, setSearchQuery] = useState('')
+  const toast = useToast()
+  const { user } = useAuth()
+  const canManage = user?.role === 'organizer' || user?.role === 'superadmin'
+  const { currentEvent, events, setCurrentEventId, isLoading: eventsLoading, isError: eventsError, error, refetch } = useCurrentEvent()
+
+  const [search, setSearch] = useState('')
+  const debouncedSearch = useDebounced(search.trim())
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
-  const [showStaffModal, setShowStaffModal] = useState(false)
   const [showBroadcastModal, setShowBroadcastModal] = useState(false)
+  const [activeGate, setActiveGate] = useState<EventGate | undefined>()
 
-  // Staff Assignment State
-  const [staffEmail, setStaffEmail] = useState('')
-  const [gateName, setGateName] = useState('Main Gate')
-  const [staffMsg, setStaffMsg] = useState('')
+  const eventId = currentEvent?.id
+  const isStaff = !canManage
 
-  // Broadcast Message State
-  const [broadcastTitle, setBroadcastTitle] = useState('')
-  const [broadcastBody, setBroadcastBody] = useState('')
-  const [broadcastSending, setBroadcastSending] = useState(false)
-  const [broadcastSuccess, setBroadcastSuccess] = useState('')
-
-  const { data: events = [] } = useQuery({
-    queryKey: ['events'],
-    queryFn: api.getEvents,
+  // Staff: which gate (if any) the organizer assigned them to at this event
+  const assignmentQuery = useQuery({
+    queryKey: ['myAssignment', eventId],
+    queryFn: () => gatesApi.myAssignment(eventId).catch((e: Error) => (/no active gate/i.test(e.message) ? null : Promise.reject(e))),
+    enabled: Boolean(eventId) && isStaff,
   })
+  const assignment = assignmentQuery.data
+  const otherAssignmentQuery = useQuery({
+    queryKey: ['myAssignment', 'any'],
+    queryFn: () => gatesApi.myAssignment().catch((e: Error) => (/no active gate/i.test(e.message) ? null : Promise.reject(e))),
+    enabled: isStaff && assignment === null,
+  })
+  const hasAccess = canManage || Boolean(assignment)
 
-  const currentEvent = events[0]
+  const gatesQuery = useQuery({
+    queryKey: ['gates', eventId],
+    queryFn: () => gatesApi.list(eventId!),
+    enabled: Boolean(eventId) && hasAccess,
+    refetchInterval: 30000,
+  })
+  const openGates = (gatesQuery.data ?? []).filter((g) => g.is_active)
+  const lockedGate = isStaff && assignment?.gate ? ((gatesQuery.data ?? []).find((g) => g.id === assignment.gate!.id) ?? assignment.gate) : null
 
-  const { data: gateStats, refetch: refetchStats } = useQuery({
-    queryKey: ['gateStats', currentEvent?.id],
-    queryFn: () => (currentEvent ? api.getGateStats(currentEvent.id) : null),
-    enabled: Boolean(currentEvent?.id),
+  const statsQuery = useQuery({
+    queryKey: ['gateStats', eventId],
+    queryFn: () => api.getGateStats(eventId!),
+    enabled: Boolean(eventId) && hasAccess,
     refetchInterval: 4000,
   })
 
-  const { data: tickets = [], refetch: refetchTickets } = useQuery({
-    queryKey: ['tickets', currentEvent?.id, searchQuery],
-    queryFn: () => (currentEvent ? api.getEventTickets(currentEvent.id, searchQuery) : []),
-    enabled: Boolean(currentEvent?.id),
+  const ticketsQuery = useQuery({
+    queryKey: ['tickets', eventId, debouncedSearch],
+    queryFn: () => api.getEventTickets(eventId!, debouncedSearch),
+    enabled: Boolean(eventId) && hasAccess,
   })
 
-  // Staff assignments query
-  const { data: staffAssignments = [], refetch: refetchStaff } = useQuery({
-    queryKey: ['staffAssignments', currentEvent?.id],
-    queryFn: async () => {
-      if (!currentEvent?.id) return []
-      const resp = await fetch(`/api/events/staff-assign/?event_id=${currentEvent.id}`)
-      if (!resp.ok) return []
-      return resp.json()
+  const manualScan = useMutation({
+    mutationFn: ({ ticket, scan_type }: { ticket: Ticket; scan_type: ScanType }) =>
+      postScan(eventId!, {
+        qr_token: ticket.qr_token,
+        scan_type,
+        ...(activeGate ? { gate_id: activeGate.id } : { gate_name: 'Manual Terminal' }),
+      }),
+    onSuccess: (res, { ticket, scan_type }) => {
+      const d = describeScan(res, scan_type)
+      const text = `${ticket.attendee_name}: ${d.title.toLowerCase()}`
+      if (d.tone === 'success')
+        toast.success(
+          scan_type === 'gate_in' ? `${ticket.attendee_name} checked in` : `${ticket.attendee_name} checked out`,
+          [res.ticket?.ticket_type_name, res.ticket?.gate_note].filter(Boolean).join(' · ') || undefined,
+        )
+      else toast.error(`${text}. ${d.detail}`)
+      refreshAll()
     },
-    enabled: Boolean(currentEvent?.id),
+    onError: (err: Error, { ticket }) => toast.error(`Couldn't update ${ticket.attendee_name}. ${err.message}`),
   })
 
-  const manualCheckInMutation = useMutation({
-    mutationFn: ({ qr_token, scan_type }: { qr_token: string; scan_type: 'gate_in' | 'gate_out' }) =>
-      api.scanTicket(currentEvent!.id, { qr_token, scan_type, gate_name: 'Manual Terminal' }),
-    onSuccess: () => {
-      refetchStats()
-      refetchTickets()
-    },
-  })
-
-  const handleRefreshAll = () => {
-    refetchStats()
-    refetchTickets()
-    refetchStaff()
+  const refreshAll = () => {
+    void statsQuery.refetch()
+    void ticketsQuery.refetch()
+    if (canManage) void gatesQuery.refetch()
   }
 
-  const handleAssignStaff = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!staffEmail || !currentEvent) return
-    try {
-      const resp = await fetch('/api/events/staff-assign/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          staff_email: staffEmail,
-          event_id: currentEvent.id,
-          gate_name: gateName,
-        }),
-      })
-      const data = await resp.json()
-      setStaffMsg(data.message || 'Staff assigned!')
-      setStaffEmail('')
-      refetchStaff()
-      setTimeout(() => setStaffMsg(''), 3000)
-    } catch {
-      setStaffMsg('Failed to assign staff')
-    }
+  if (eventsError) {
+    return (
+      <div className="w-full px-4 py-6 sm:px-6 lg:px-8 lg:py-8 2xl:px-10">
+        <ErrorState message={error?.message} onRetry={refetch} />
+      </div>
+    )
   }
 
-  const handleSendBroadcast = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!broadcastBody || !currentEvent) return
-    setBroadcastSending(true)
-    try {
-      const resp = await fetch(`/api/events/${currentEvent.id}/broadcast/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: broadcastTitle || `📢 Alert: ${currentEvent.title}`,
-          message: broadcastBody,
-        }),
-      })
-      const data = await resp.json()
-      setBroadcastSuccess(data.message || 'Notification broadcast sent!')
-      setBroadcastBody('')
-      setBroadcastTitle('')
-      setTimeout(() => {
-        setBroadcastSuccess('')
-        setShowBroadcastModal(false)
-      }, 2000)
-    } catch {
-      setBroadcastSuccess('Broadcast failed')
-    } finally {
-      setBroadcastSending(false)
-    }
+  if (eventsLoading) {
+    return (
+      <div className="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 2xl:px-10">
+        <Skeleton className="h-9 w-56" />
+        <Skeleton className="h-24 rounded-2xl" />
+        <Skeleton className="h-[520px] rounded-2xl" />
+      </div>
+    )
   }
 
-  const handleExportCSV = () => {
-    if (!currentEvent) return
-    window.open(`/api/events/${currentEvent.id}/export-attendees/`, '_blank')
+  if (!currentEvent) {
+    return (
+      <div className="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 2xl:px-10">
+        <PageHeader title="Gate scanner" />
+        <Card>
+          <EmptyState
+            icon={<CalendarPlus className="h-6 w-6" aria-hidden />}
+            title="No event to scan for"
+            description={
+              canManage
+                ? 'Create an event first. Its attendees can then be checked in here.'
+                : "You haven't been assigned to an event yet. Ask your organizer to add you to a gate."
+            }
+            action={canManage ? <ButtonLink to="/app/events">Create an event</ButtonLink> : undefined}
+          />
+        </Card>
+      </div>
+    )
   }
+
+  const shell = (body: React.ReactNode) => (
+    <div className="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 2xl:px-10">
+      <PageHeader title="Gate scanner" description={`${currentEvent.title}, ${currentEvent.location}`} />
+      {body}
+    </div>
+  )
+
+  if ((isStaff && assignmentQuery.isLoading) || (hasAccess && gatesQuery.isLoading)) {
+    return shell(<Skeleton className="h-[520px] rounded-2xl" />)
+  }
+  if (assignmentQuery.isError || gatesQuery.isError) {
+    const err = (assignmentQuery.error || gatesQuery.error) as Error
+    return shell(
+      <ErrorState
+        message={err?.message}
+        onRetry={() => {
+          void assignmentQuery.refetch()
+          void gatesQuery.refetch()
+        }}
+      />,
+    )
+  }
+
+  if (isStaff && (!assignment || !assignment.gate)) {
+    const other = otherAssignmentQuery.data
+    const otherEvent = other && other.event.id !== currentEvent.id ? events.find((e) => e.id === other.event.id) : undefined
+    return shell(
+      <Card>
+        <EmptyState
+          icon={<DoorOpen className="h-6 w-6" aria-hidden />}
+          title={otherEvent ? "You're not scanning at this event" : 'Ask your organizer to assign you a gate'}
+          description={
+            otherEvent
+              ? `Your organizer assigned you to ${other!.gate_name} at ${otherEvent.title}.`
+              : `You need a gate at ${currentEvent.title} before you can scan passes here.`
+          }
+          action={otherEvent ? <Button onClick={() => setCurrentEventId(otherEvent.id)}>Switch to {otherEvent.title}</Button> : undefined}
+        />
+      </Card>,
+    )
+  }
+
+  if (lockedGate && !lockedGate.is_active) {
+    return shell(
+      <Card>
+        <EmptyState
+          icon={<DoorOpen className="h-6 w-6" aria-hidden />}
+          title={`${lockedGate.name} is closed`}
+          description="Your organizer closed this gate. Ask them to reopen it or move you to another gate."
+        />
+      </Card>,
+    )
+  }
+
+  if (canManage && openGates.length === 0) {
+    return shell(
+      <Card>
+        <EmptyState
+          icon={<DoorOpen className="h-6 w-6" aria-hidden />}
+          title="Set up your gates first"
+          description={`Add the entrances and exits at ${currentEvent.location} and choose who scans at each one.`}
+          action={<ButtonLink to="/app/gates">Set up gates</ButtonLink>}
+        />
+      </Card>,
+    )
+  }
+
+  const tickets = ticketsQuery.data ?? []
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-      {/* Top Banner / Event Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 p-5 bg-slate-900 text-white rounded-3xl shadow-xl">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-brand-600 flex items-center justify-center text-white shadow-lg shadow-brand-600/30">
-            <QrCode className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                Gate Scanner Terminal
-              </span>
-              <span className="text-xs text-slate-400">• Online</span>
-            </div>
-            <h1 className="text-xl font-extrabold tracking-tight mt-0.5">
-              {currentEvent?.title || 'Loading Event...'}
-            </h1>
-            <p className="text-xs text-slate-400">{currentEvent?.location}</p>
-          </div>
-        </div>
+    <div className="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 2xl:px-10">
+      <PageHeader
+        title="Gate scanner"
+        description={`${currentEvent.title}, ${currentEvent.location}`}
+        actions={
+          canManage ? (
+            <>
+              <ButtonLink to="/app/gates" variant="secondary" size="sm" icon={<Settings2 className="h-4 w-4" aria-hidden />}>
+                Manage gates and staff
+              </ButtonLink>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<Download className="h-4 w-4" aria-hidden />}
+                onClick={() => window.open(`/api/events/${currentEvent.id}/export-attendees/`, '_blank')}
+              >
+                Export CSV
+              </Button>
+            </>
+          ) : undefined
+        }
+      />
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setShowStaffModal(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600/80 hover:bg-indigo-600 text-white text-xs font-semibold transition"
-          >
-            <UserPlus className="w-3.5 h-3.5" />
-            Gate Staff ({staffAssignments.length})
-          </button>
+      <PhaseNotice event={currentEvent} context="scanner" />
 
-          <button
-            onClick={() => setShowBroadcastModal(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/80 hover:bg-amber-500 text-white text-xs font-semibold transition"
-          >
-            <Megaphone className="w-3.5 h-3.5" />
-            Broadcast Alert
-          </button>
+      <LiveCounts stats={statsQuery.data} isLoading={statsQuery.isLoading} isError={statsQuery.isError} onRetry={refreshAll} />
 
-          <button
-            onClick={handleExportCSV}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition"
-          >
-            <Download className="w-3.5 h-3.5" />
-            Export CSV
-          </button>
-
-          <button
-            onClick={handleRefreshAll}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            Refresh
-          </button>
-        </div>
-      </div>
-
-      {/* Live Metrics Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
-          <p className="text-[10px] uppercase font-bold text-slate-400">Total Registered</p>
-          <p className="text-2xl font-black text-slate-900 mt-0.5">{gateStats?.total_registered ?? 0}</p>
-          <p className="text-[11px] text-slate-500 mt-0.5">Verified participants</p>
-        </div>
-        <div className="p-4 bg-emerald-50/70 rounded-2xl border border-emerald-200 shadow-2xs">
-          <p className="text-[10px] uppercase font-bold text-emerald-800">Currently Inside</p>
-          <p className="text-2xl font-black text-emerald-600 mt-0.5">{gateStats?.currently_inside ?? 0}</p>
-          <p className="text-[11px] text-emerald-700 mt-0.5">Checked in at gate</p>
-        </div>
-        <div className="p-4 bg-amber-50/70 rounded-2xl border border-amber-200 shadow-2xs">
-          <p className="text-[10px] uppercase font-bold text-amber-800">Checked Out</p>
-          <p className="text-2xl font-black text-amber-600 mt-0.5">{gateStats?.total_checked_out ?? 0}</p>
-          <p className="text-[11px] text-amber-700 mt-0.5">Exited through gate</p>
-        </div>
-        <div className="p-4 bg-indigo-50/70 rounded-2xl border border-indigo-200 shadow-2xs">
-          <p className="text-[10px] uppercase font-bold text-indigo-800">Capacity Occupancy</p>
-          <p className="text-2xl font-black text-indigo-600 mt-0.5">
-            {gateStats?.capacity && gateStats.capacity > 0
-              ? `${Math.round(((gateStats.currently_inside || 0) / gateStats.capacity) * 100)}%`
-              : 'N/A'}
-          </p>
-          <p className="text-[11px] text-indigo-700 mt-0.5">Max: {gateStats?.capacity || 'Unlimited'}</p>
-        </div>
-      </div>
-
-      {/* Camera Scanner View */}
-      {currentEvent && (
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <GateScannerComponent
+          key={currentEvent.id}
           eventId={currentEvent.id}
-          onScanComplete={handleRefreshAll}
+          gates={openGates}
+          lockedGate={lockedGate}
+          onGateChange={setActiveGate}
+          onScanComplete={refreshAll}
         />
-      )}
 
-      {/* Manual Search & Attendee Fallback Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="p-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 className="text-base font-bold text-slate-900">Attendee Roster & Manual Gate Override</h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Quickly look up participants by name, email, or ticket code to check them in or view their pass.
-            </p>
+        <aside className="order-3 space-y-6 lg:order-2">
+          <RecentScans stats={statsQuery.data} isLoading={statsQuery.isLoading} />
+          {canManage && (
+            <Card>
+              <CardHeader title="Gates today" description="Successful scans at each open gate." />
+              <ul className="divide-y divide-ink-100">
+                {openGates.map((g) => (
+                  <li key={g.id} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-ink-900">
+                        {g.name}
+                        {g.is_vip && <Badge tone="brand" className="ml-2 align-middle">VIP</Badge>}
+                      </p>
+                      <p className="text-xs text-ink-500">
+                        {(g.staff ?? []).length === 0 ? 'No staff' : `${g.staff!.length} staff`}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-xs text-ink-600 tabular">
+                      {g.scans_in_today} in, {g.scans_out_today} out
+                    </p>
+                  </li>
+                ))}
+              </ul>
+              <div className="grid grid-cols-2 gap-2 border-t border-ink-100 px-5 py-4">
+                <ButtonLink to="/app/gates" variant="secondary" size="sm">
+                  Manage gates
+                </ButtonLink>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={<Megaphone className="h-4 w-4" aria-hidden />}
+                  onClick={() => setShowBroadcastModal(true)}
+                >
+                  Send alert
+                </Button>
+              </div>
+            </Card>
+          )}
+        </aside>
+
+        {/* Attendee lookup: right after the scanner on phones */}
+        <Card className="order-2 lg:order-3 lg:col-span-2">
+          <CardHeader
+            title="Find an attendee"
+            description="Check someone in by hand or show their pass."
+            actions={
+              <Button variant="ghost" size="sm" icon={<RefreshCw className="h-4 w-4" aria-hidden />} onClick={refreshAll}>
+                Refresh
+              </Button>
+            }
+          />
+          <div className="border-b border-ink-100 px-5 py-4">
+            <div className="relative">
+              <Search className="pointer-events-none absolute bottom-3 left-3 h-4 w-4 text-ink-400" aria-hidden />
+              <Input
+                label="Search by name, email or ticket number"
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-10 pl-9"
+              />
+            </div>
           </div>
 
-          <div className="relative w-full sm:w-64">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-            <input
-              type="text"
-              placeholder="Search attendee or ticket..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-            />
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-100">
-              <tr>
-                <th className="px-5 py-3">Attendee</th>
-                <th className="px-4 py-3">Ticket #</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">First Entry</th>
-                <th className="px-5 py-3 text-right">Gate Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 font-medium">
-              {tickets.map((t) => (
-                <tr key={t.id} className="hover:bg-slate-50/70 transition">
-                  <td className="px-5 py-3.5">
-                    <p className="font-bold text-slate-900">{t.attendee_name}</p>
-                    <p className="text-slate-400 text-[11px]">{t.attendee_email}</p>
-                  </td>
-                  <td className="px-4 py-3.5 font-mono text-slate-700 font-semibold">{t.ticket_number}</td>
-                  <td className="px-4 py-3.5">
-                    <span
-                      className={cn(
-                        'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider',
-                        t.status === 'checked_in' && 'bg-emerald-100 text-emerald-800',
-                        t.status === 'checked_out' && 'bg-amber-100 text-amber-800',
-                        t.status === 'valid' && 'bg-indigo-50 text-indigo-700'
-                      )}
-                    >
-                      {t.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3.5 text-slate-500">
-                    {t.first_check_in ? new Date(t.first_check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Not yet'}
-                  </td>
-                  <td className="px-5 py-3.5 text-right space-x-1.5">
-                    {t.status !== 'checked_in' ? (
-                      <button
-                        onClick={() => manualCheckInMutation.mutate({ qr_token: t.qr_token, scan_type: 'gate_in' })}
-                        disabled={manualCheckInMutation.isPending}
-                        className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-xs"
-                      >
-                        Check In
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => manualCheckInMutation.mutate({ qr_token: t.qr_token, scan_type: 'gate_out' })}
-                        disabled={manualCheckInMutation.isPending}
-                        className="px-2.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition shadow-xs"
-                      >
-                        Check Out
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setSelectedTicket(t)}
-                      className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition"
-                    >
-                      Pass
-                    </button>
-                  </td>
-                </tr>
+          {ticketsQuery.isLoading ? (
+            <div className="space-y-3 p-5">
+              {[0, 1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-12" />
               ))}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          ) : ticketsQuery.isError ? (
+            <div className="p-5">
+              <ErrorState message={(ticketsQuery.error as Error).message} onRetry={() => void ticketsQuery.refetch()} />
+            </div>
+          ) : tickets.length === 0 ? (
+            <EmptyState
+              icon={<Users className="h-6 w-6" aria-hidden />}
+              title={debouncedSearch ? `No one matches "${debouncedSearch}"` : 'No attendees yet'}
+              description={
+                debouncedSearch
+                  ? 'Check the spelling, or search by ticket number instead.'
+                  : `People who register at /e/${currentEvent.slug} show up here.`
+              }
+              action={
+                debouncedSearch ? (
+                  <Button variant="secondary" size="sm" onClick={() => setSearch('')}>
+                    Clear search
+                  </Button>
+                ) : undefined
+              }
+            />
+          ) : (
+            <ul className="divide-y divide-ink-100">
+              {tickets.slice(0, 50).map((t) => {
+                const st = ticketStatus[t.status] ?? {
+                  label: t.status,
+                  tone: 'neutral' as const,
+                }
+                const inside = t.status === 'checked_in'
+                const pending = manualScan.isPending && manualScan.variables?.ticket.id === t.id
+                return (
+                  <li key={t.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
+                    <div className="min-w-0 flex-1 basis-48">
+                      <p className="flex min-w-0 items-center gap-2">
+                        <span className="truncate font-medium text-ink-900">{t.attendee_name}</span>
+                        {t.ticket_type_name && <Badge tone="brand">{t.ticket_type_name}</Badge>}
+                        {Boolean(t.guest_number) && <Badge>Guest</Badge>}
+                      </p>
+                      <p className="truncate text-xs text-ink-500">
+                        {t.ticket_number && <span className="font-mono">{t.ticket_number}</span>}
+                        <span className={cn(t.ticket_number && 'hidden sm:inline')}>
+                          {t.ticket_number ? ', ' : ''}
+                          {t.attendee_email}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge tone={st.tone} dot>
+                        {st.label}
+                      </Badge>
+                      {t.first_check_in && (
+                        <span className="hidden text-xs text-ink-500 md:inline">First in {fmtTime(t.first_check_in)}</span>
+                      )}
+                    </div>
+                    <div className="ml-auto flex items-center gap-2">
+                      {t.status !== 'cancelled' && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          loading={pending}
+                          disabled={manualScan.isPending}
+                          icon={
+                            inside ? (
+                              <LogOut className="h-4 w-4 text-marigold-600" aria-hidden />
+                            ) : (
+                              <LogIn className="h-4 w-4 text-emerald-600" aria-hidden />
+                            )
+                          }
+                          onClick={() =>
+                            manualScan.mutate({
+                              ticket: t,
+                              scan_type: inside ? 'gate_out' : 'gate_in',
+                            })
+                          }
+                        >
+                          {inside ? 'Check out' : 'Check in'}
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={<TicketIcon className="h-4 w-4" aria-hidden />}
+                        onClick={() => setSelectedTicket(t)}
+                      >
+                        Pass
+                      </Button>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+          {tickets.length > 50 && (
+            <p className="border-t border-ink-100 px-5 py-3 text-sm text-ink-500">
+              Showing the first 50 of {tickets.length}. Search to narrow it down.
+            </p>
+          )}
+        </Card>
       </div>
 
-      {/* Ticket Pass Modal */}
       {selectedTicket && (
         <TicketPassModal
           ticket={selectedTicket}
-          eventTitle={currentEvent?.title}
-          eventLocation={currentEvent?.location}
+          eventTitle={currentEvent.title}
+          eventLocation={currentEvent.location}
+          eventDate={passDate(currentEvent.start_date, currentEvent.start_time)}
           onClose={() => setSelectedTicket(null)}
         />
       )}
 
-      {/* Staff Gate Assignment Modal */}
-      {showStaffModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-                  <UserPlus className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-extrabold text-slate-900">Gate Staff Assignments</h3>
-                  <p className="text-xs text-slate-500">Authorize staff scanner access for this event</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowStaffModal(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {staffMsg && (
-              <div className="mb-4 p-3 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-semibold">
-                {staffMsg}
-              </div>
-            )}
-
-            <form onSubmit={handleAssignStaff} className="space-y-3 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
-              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Assign New Gate Staff</h4>
-              <div>
-                <label className="text-[11px] font-semibold text-slate-600">Staff Email Address</label>
-                <input
-                  type="email"
-                  required
-                  placeholder="e.g. staff@eventlaya.com"
-                  value={staffEmail}
-                  onChange={(e) => setStaffEmail(e.target.value)}
-                  className="w-full text-xs mt-1 px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-semibold text-slate-600">Station / Gate Name</label>
-                <select
-                  value={gateName}
-                  onChange={(e) => setGateName(e.target.value)}
-                  className="w-full text-xs mt-1 px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 bg-white"
-                >
-                  <option value="Main Gate">Main Gate</option>
-                  <option value="VIP Entrance">VIP Entrance</option>
-                  <option value="North Entrance">North Entrance</option>
-                  <option value="South Gate">South Gate</option>
-                  <option value="Staff Entrance">Staff Entrance</option>
-                </select>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold transition shadow-xs"
-              >
-                Assign Gate Staff Access
-              </button>
-            </form>
-
-            <div>
-              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">Active Gate Crew</h4>
-              {staffAssignments.length === 0 ? (
-                <p className="text-xs text-slate-400 py-3 text-center">No staff assigned yet. Assign staff above.</p>
-              ) : (
-                <div className="space-y-2">
-                  {staffAssignments.map((a: any) => (
-                    <div
-                      key={a.id}
-                      className="p-3 bg-white rounded-xl border border-slate-200/80 flex items-center justify-between text-xs"
-                    >
-                      <div>
-                        <p className="font-bold text-slate-900">{a.staff_name || a.staff_email}</p>
-                        <p className="text-slate-400 text-[11px]">{a.staff_email}</p>
-                      </div>
-                      <span className="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-bold">
-                        📍 {a.gate_name}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Broadcast Alert Modal */}
-      {showBroadcastModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-                  <Megaphone className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-extrabold text-slate-900">Broadcast Alert to Gates</h3>
-                  <p className="text-xs text-slate-500">Pushes immediate notifications to staff mobile devices</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowBroadcastModal(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {broadcastSuccess && (
-              <div className="mb-4 p-3 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-semibold">
-                ✓ {broadcastSuccess}
-              </div>
-            )}
-
-            <form onSubmit={handleSendBroadcast} className="space-y-4">
-              <div>
-                <label className="text-[11px] font-semibold text-slate-600">Alert Title</label>
-                <input
-                  type="text"
-                  placeholder="e.g. 📢 Gate 1 Crowd Control Warning"
-                  value={broadcastTitle}
-                  onChange={(e) => setBroadcastTitle(e.target.value)}
-                  className="w-full text-xs mt-1 px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-semibold text-slate-600">Message Body</label>
-                <textarea
-                  required
-                  rows={3}
-                  placeholder="Type broadcast message for all stationed gate staff..."
-                  value={broadcastBody}
-                  onChange={(e) => setBroadcastBody(e.target.value)}
-                  className="w-full text-xs mt-1 px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowBroadcastModal(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={broadcastSending}
-                  className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition shadow-xs disabled:opacity-50"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  {broadcastSending ? 'Sending...' : 'Dispatch Alert'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {canManage && (
+        <>
+          <BroadcastModal
+            open={showBroadcastModal}
+            eventId={currentEvent.id}
+            eventTitle={currentEvent.title}
+            onClose={() => setShowBroadcastModal(false)}
+          />
+        </>
       )}
     </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+
+const LiveCounts: React.FC<{
+  stats?: GateStats
+  isLoading: boolean
+  isError: boolean
+  onRetry: () => void
+}> = ({ stats, isLoading, isError, onRetry }) => {
+  if (isError && !stats) return <ErrorState message="Live counts aren't updating." onRetry={onRetry} />
+  if (isLoading || !stats) return <Skeleton className="h-[104px] rounded-2xl" />
+
+  const inside = stats.currently_inside ?? 0
+  const cap = stats.capacity ?? 0
+  const pct = cap > 0 ? Math.min(100, Math.round((inside / cap) * 100)) : 0
+  return (
+    <Card className="p-4 sm:p-5" aria-live="polite">
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+        <div>
+          <p className="text-sm font-medium text-ink-500">Inside now</p>
+          <p className="font-display text-4xl font-bold leading-none text-ink-900 tabular">
+            {inside}
+            <span className="text-xl font-medium text-ink-400"> / {cap > 0 ? cap : 'no limit'}</span>
+          </p>
+        </div>
+        <dl className="flex gap-6 text-right sm:gap-8">
+          <div>
+            <dt className="text-sm text-ink-500">Registered</dt>
+            <dd className="text-xl font-bold text-ink-900 tabular">{stats.total_registered}</dd>
+          </div>
+          <div>
+            <dt className="text-sm text-ink-500">Left</dt>
+            <dd className="text-xl font-bold text-ink-900 tabular">{stats.total_checked_out}</dd>
+          </div>
+        </dl>
+      </div>
+      {cap > 0 && (
+        <div className="mt-3">
+          <div
+            className="h-2 overflow-hidden rounded-full bg-ink-100"
+            role="meter"
+            aria-label="Venue capacity used"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={pct}
+          >
+            <div
+              className={cn('h-full rounded-full', pct >= 90 ? 'bg-red-500' : pct >= 75 ? 'bg-marigold-500' : 'bg-emerald-500')}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <p className="mt-1.5 text-xs text-ink-500">
+            {pct}% of capacity{pct >= 90 ? ', nearly full' : ''}
+          </p>
+        </div>
+      )}
+    </Card>
+  )
+}
+
+const RecentScans: React.FC<{ stats?: GateStats; isLoading: boolean }> = ({ stats, isLoading }) => {
+  const scans = stats?.recent_scans?.slice(0, 6) ?? []
+  return (
+    <Card>
+      <CardHeader title="Recent scans" />
+      {isLoading ? (
+        <div className="space-y-2 p-5">
+          <Skeleton className="h-10" />
+          <Skeleton className="h-10" />
+        </div>
+      ) : scans.length === 0 ? (
+        <p className="px-5 py-4 text-sm text-ink-500">No scans yet. Scans from every gate show up here.</p>
+      ) : (
+        <ul className="divide-y divide-ink-100">
+          {scans.map((s) => {
+            const ok = s.result === 'success'
+            const label = ok
+              ? s.scan_type === 'gate_in'
+                ? 'In'
+                : 'Out'
+              : s.result === 'duplicate'
+                ? 'Duplicate'
+                : s.result === 'not_in'
+                  ? 'Not inside'
+                  : 'Denied'
+            const tone = ok ? (s.scan_type === 'gate_in' ? 'success' : 'warning') : s.result === 'not_in' ? 'warning' : 'danger'
+            return (
+              <li key={s.id} className="flex items-center justify-between gap-3 px-5 py-2.5">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-ink-900">{s.attendee_name}</p>
+                  <p className="truncate text-xs text-ink-500">
+                    {s.gate_name}, {fmtTime(s.scanned_at)}
+                  </p>
+                </div>
+                <Badge tone={tone}>{label}</Badge>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </Card>
+  )
+}
+
+const BroadcastModal: React.FC<{
+  open: boolean
+  eventId: string
+  eventTitle: string
+  onClose: () => void
+}> = ({ open, eventId, eventTitle, onClose }) => {
+  const toast = useToast()
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('')
+  const [sending, setSending] = useState(false)
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!body.trim()) return
+    setSending(true)
+    try {
+      const res = await request<{ receivers_notified?: number }>(`/events/${eventId}/broadcast/`, {
+        method: 'POST',
+        body: JSON.stringify({
+          title: title.trim() || `Alert: ${eventTitle}`,
+          message: body.trim(),
+        }),
+      })
+      const n = res.receivers_notified
+      toast.success(typeof n === 'number' ? `Alert sent to ${n} staff ${n === 1 ? 'device' : 'devices'}` : 'Alert sent')
+      setTitle('')
+      setBody('')
+      onClose()
+    } catch (err) {
+      toast.error(`Couldn't send the alert. ${err instanceof Error ? err.message : ''}`)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Send an alert to gate staff"
+      description="Sends a push notification to everyone assigned to this event's gates."
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="broadcast-form" loading={sending} icon={<Send className="h-4 w-4" aria-hidden />}>
+            Send alert
+          </Button>
+        </>
+      }
+    >
+      <form id="broadcast-form" onSubmit={submit} className="space-y-4">
+        <Input label="Title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={`Alert: ${eventTitle}`} />
+        <Textarea
+          label="Message"
+          required
+          rows={3}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder="e.g. Gate 1 is crowded. Send new arrivals to the North entrance."
+        />
+      </form>
+    </Modal>
   )
 }

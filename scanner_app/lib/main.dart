@@ -4,24 +4,29 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'core/offline_queue.dart';
 import 'core/notification_service.dart';
-import 'core/theme.dart';
+import 'screens/common/session_guard.dart';
 import 'screens/splash_screen.dart';
+import 'ui/ui.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Lock to portrait orientations
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+  // Phones stay in portrait; tablets may rotate (the layout adapts).
+  final view = WidgetsBinding.instance.platformDispatcher.views.first;
+  final shortestSide = view.physicalSize.shortestSide / view.devicePixelRatio;
+  if (shortestSide < 600) {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+  }
 
-  // Set system UI overlay style
+  // Set system UI overlay style (light app chrome; the scanner switches to light icons itself)
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light,
-    systemNavigationBarColor: AppColors.background,
-    systemNavigationBarIconBrightness: Brightness.light,
+    statusBarIconBrightness: Brightness.dark,
+    systemNavigationBarColor: AppColors.surface,
+    systemNavigationBarIconBrightness: Brightness.dark,
   ));
 
   // Initialize Hive for offline scan queue
@@ -55,9 +60,11 @@ class EventlayaApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Eventlaya Scanner',
+      title: 'Eventlaya',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark,
+      theme: AppTheme.light,
+      navigatorKey: appNavigatorKey,
+      builder: (context, child) => SessionGuard(child: child ?? const SizedBox()),
       home: const SplashScreen(),
     );
   }

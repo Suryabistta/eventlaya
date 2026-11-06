@@ -4,4 +4,7 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Debug builds only: the payment checkout web view may load a local test server over http
+         (e.g. http://10.0.2.2:8070 from the emulator). Release builds stay https-only. -->
+    <application android:usesCleartextTraffic="true"/>
 </manifest>

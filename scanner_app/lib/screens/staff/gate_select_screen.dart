@@ -1,307 +1,258 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/theme.dart';
+import '../../models/event_model.dart';
+import '../../models/gate_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/event_provider.dart';
-import '../../models/event_model.dart';
-import 'scanner_screen.dart';
-import '../login_screen.dart';
+import '../../ui/ui.dart';
+import '../common/event_phase.dart';
+import '../common/format.dart';
+import '../common/pickers.dart';
+import '../common/session.dart';
+import 'staff_shell.dart';
 
+/// Staff pick (or confirm) their event and gate before scanning.
 class GateSelectScreen extends ConsumerStatefulWidget {
-  const GateSelectScreen({super.key});
+  /// When opened from inside the scanner shell, pop back instead of replacing.
+  final bool returnOnDone;
+  const GateSelectScreen({super.key, this.returnOnDone = false});
 
   @override
   ConsumerState<GateSelectScreen> createState() => _GateSelectScreenState();
 }
 
 class _GateSelectScreenState extends ConsumerState<GateSelectScreen> {
-  final _gateCtrl = TextEditingController();
   EventModel? _selectedEvent;
-  List<EventModel> _events = [];
-  bool _loadingEvents = false;
 
-  static const predefinedGates = [
-    'Main Gate',
-    'VIP Entrance',
-    'North Gate',
-    'South Gate',
-    'Staff Entrance',
-    'Emergency Exit',
-  ];
+  /// Chosen gate. Empty id = free-text gate name (servers without per-event gates).
+  GateModel? _gate;
 
   @override
   void initState() {
     super.initState();
-    final eventState = ref.read(eventProvider);
-    if (eventState.currentEvent != null) {
-      _selectedEvent = eventState.currentEvent;
-      _gateCtrl.text = eventState.selectedGate ?? 'Main Gate';
-    } else {
-      _loadEvents();
-    }
-  }
-
-  Future<void> _loadEvents() async {
-    setState(() => _loadingEvents = true);
-    final events = await ref.read(eventProvider.notifier).fetchAllEvents();
-    if (mounted) {
-      setState(() {
-        _events = events;
-        _loadingEvents = false;
-        if (events.isNotEmpty && _selectedEvent == null) {
-          _selectedEvent = events.first;
-        }
-      });
-      if (_gateCtrl.text.isEmpty) {
-        _gateCtrl.text = 'Main Gate';
-      }
-    }
+    final s = ref.read(eventProvider);
+    _selectedEvent = s.currentEvent;
+    _gate = s.gate ?? (s.selectedGate == null ? null : GateModel(id: '', name: s.selectedGate!));
   }
 
   void _proceed() {
-    final gate = _gateCtrl.text.trim();
-    final event = _selectedEvent ?? ref.read(eventProvider).currentEvent;
+    final s = ref.read(eventProvider);
+    final assigned = widget.returnOnDone ? null : s.currentEvent;
+    final event = assigned ?? _selectedEvent ?? s.currentEvent;
 
     if (event == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select an event'), backgroundColor: AppColors.error),
-      );
-      return;
-    }
-    if (gate.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a gate name'), backgroundColor: AppColors.error),
-      );
+      AppToast.error(context, 'Choose an event first');
       return;
     }
 
-    ref.read(eventProvider.notifier).setCurrentEvent(event);
-    ref.read(eventProvider.notifier).setGate(gate);
-    ref.read(eventProvider.notifier).startPolling();
+    final notifier = ref.read(eventProvider.notifier);
+    if (s.currentEvent != event) notifier.setCurrentEvent(event);
 
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const ScannerScreen()),
-    );
-  }
+    String gateName;
+    if (s.gateLocked && s.gate != null) {
+      gateName = s.gate!.name;
+    } else {
+      final gates = ref.read(gatesProvider(event.id)).valueOrNull;
+      final gate = _gate;
+      final usesGateList = gates != null;
+      if (gate == null || gate.name.trim().isEmpty || (usesGateList && gate.id.isEmpty)) {
+        AppToast.error(context, usesGateList && gates.isEmpty ? 'Ask your organizer to set up gates first' : 'Choose a gate');
+        return;
+      }
+      if (usesGateList && !gates.any((g) => g.id == gate.id)) {
+        AppToast.error(context, 'Choose a gate for this event');
+        return;
+      }
+      notifier.selectGate(gate);
+      gateName = gate.name;
+    }
+    notifier.startPolling();
 
-  @override
-  void dispose() {
-    _gateCtrl.dispose();
-    super.dispose();
+    AppToast.success(context, 'Scanning at $gateName');
+    if (widget.returnOnDone) {
+      Navigator.of(context).pop();
+    } else {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const StaffShell()),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
-    final eventState = ref.watch(eventProvider);
+    final state = ref.watch(eventProvider);
+    final assigned = state.currentEvent;
+    final event = widget.returnOnDone ? (_selectedEvent ?? assigned) : (assigned ?? _selectedEvent);
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Gate Setup'),
-        backgroundColor: AppColors.surface,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout_outlined),
-            onPressed: () async {
-              await ref.read(authProvider.notifier).logout();
-              if (context.mounted) {
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                );
-              }
-            },
-          ),
-        ],
+    return AppScaffold(
+      title: 'Choose your gate',
+      actions: [
+        if (!widget.returnOnDone)
+          NavTextButton(label: 'Sign out', onPressed: () => confirmSignOut(context, ref)),
+      ],
+      bottomBar: PrimaryButton(
+        label: widget.returnOnDone ? 'Save' : 'Start scanning',
+        icon: widget.returnOnDone ? null : Icons.qr_code_scanner_rounded,
+        onPressed: _proceed,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Welcome staff card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.cardBg,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+      onRefresh: () async {
+        ref.invalidate(eventsProvider);
+        if (event != null) ref.invalidate(gatesProvider(event.id));
+      },
+      slivers: [
+        SliverToBoxAdapter(
+          child: GroupedSection(
+            children: [
+              ListRow(
+                leading: InitialsAvatar(name: user?.fullName ?? 'Staff'),
+                title: user?.fullName ?? 'Gate staff',
+                subtitle: user?.email,
+                trailing: const StatusBadge('Gate staff', tone: Tone.brand, dot: false),
               ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.badge_rounded, color: AppColors.primary, size: 26),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
+            ],
+          ),
+        ),
+        SliverToBoxAdapter(child: _eventSection(assigned)),
+        if (event != null)
+          SliverToBoxAdapter(
+            child: state.gateLocked && state.gate != null
+                ? GroupedSection(
+                    header: 'Gate',
+                    footer: 'Assigned by your organizer.',
+                    separatorInset: 58,
+                    children: [
+                      ListRow(
+                        leading: RowIcon(gateIcon(state.gate!), background: AppColors.success),
+                        title: state.gate!.name,
+                        subtitle: state.gate!.kindLabel,
+                        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                          if (state.gate!.isVip) const StatusBadge('VIP', tone: Tone.warning, dot: false),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.lock_outline_rounded, size: 20, color: AppColors.ink400),
+                        ]),
+                      ),
+                    ],
+                  )
+                : Padding(
+                    padding: const EdgeInsets.only(bottom: 24),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(
-                          'Gate Staff: ${user?.fullName ?? "Staff"}',
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
-                          ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                          child: Text('Gate', style: AppType.groupHeader),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          user?.email ?? '',
-                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                        GateList(
+                          eventId: event.id,
+                          selected: _gate,
+                          selectedName: _gate?.name,
+                          onSelected: (g) => setState(() => _gate = g),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                          child: Text('Every scan from this phone is recorded against this gate.',
+                              style: AppType.caption),
                         ),
                       ],
                     ),
                   ),
-                ],
-              ),
-            ),
+          ),
+      ],
+    );
+  }
 
-            const SizedBox(height: 24),
-
-            // Assigned event card
-            if (eventState.currentEvent != null) ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.success.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.success.withOpacity(0.3)),
+  Widget _eventSection(EventModel? assigned) {
+    if (assigned != null && !widget.returnOnDone) {
+      return GroupedSection(
+        header: 'Your event',
+        footer: PhaseCopy.scanNotice(assigned),
+        children: [
+          ListRow(
+            leading: const RowIcon(Icons.event_available_rounded, background: AppColors.success),
+            title: assigned.title,
+            // Badges get their own line so they don't squeeze the title and venue.
+            subtitleWidget: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  [assigned.venue, if (assigned.date != null) Fmt.date(assigned.date)].join(' · '),
+                  style: AppType.rowSubtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.check_circle_outline, color: AppColors.success, size: 22),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Active Event Assignment',
-                            style: TextStyle(
-                              color: AppColors.success,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            eventState.currentEvent!.title,
-                            style: const TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            eventState.currentEvent!.venue,
-                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-            ] else ...[
-              Text('Select Event', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 10),
-              if (_loadingEvents)
-                const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
-              else if (_events.isEmpty)
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.cardBg,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Text('No active events found. Contact your organizer.', style: TextStyle(color: AppColors.textSecondary)),
-                )
-              else
-                DropdownButtonFormField<EventModel>(
-                  value: _selectedEvent,
-                  dropdownColor: AppColors.cardBg,
-                  style: const TextStyle(color: AppColors.textPrimary),
-                  decoration: const InputDecoration(
-                    hintText: 'Choose an event',
-                    prefixIcon: Icon(Icons.event_outlined, color: AppColors.textSecondary),
-                  ),
-                  items: _events.map((e) => DropdownMenuItem(
-                    value: e,
-                    child: Text(e.title, overflow: TextOverflow.ellipsis),
-                  )).toList(),
-                  onChanged: (e) => setState(() => _selectedEvent = e),
-                ),
-              const SizedBox(height: 24),
-            ],
-
-            // Gate name field
-            Text('Gate / Station Name', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 10),
-            TextFormField(
-              controller: _gateCtrl,
-              style: const TextStyle(color: AppColors.textPrimary),
-              decoration: const InputDecoration(
-                hintText: 'e.g. Main Gate, North Entrance',
-                prefixIcon: Icon(Icons.meeting_room_outlined, color: AppColors.textSecondary),
-              ),
+                const SizedBox(height: 8),
+                Wrap(spacing: 6, runSpacing: 6, children: [
+                  PhaseBadge(assigned),
+                  const StatusBadge('Assigned', tone: Tone.success),
+                ]),
+              ],
             ),
+          ),
+        ],
+      );
+    }
 
-            const SizedBox(height: 12),
-
-            // Predefined gate chips
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: predefinedGates.map((gate) {
-                final isSelected = _gateCtrl.text == gate;
-                return GestureDetector(
-                  onTap: () => setState(() => _gateCtrl.text = gate),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? AppColors.primary.withOpacity(0.25)
-                          : AppColors.surface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isSelected ? AppColors.primary : AppColors.divider,
-                      ),
-                    ),
-                    child: Text(
-                      gate,
-                      style: TextStyle(
-                        color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
-                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-
-            const SizedBox(height: 36),
-
-            ElevatedButton.icon(
-              onPressed: _proceed,
-              icon: const Icon(Icons.qr_code_scanner_rounded),
-              label: const Text('Open Gate Scanner'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                backgroundColor: AppColors.primary,
-              ),
-            ),
-          ],
+    final events = ref.watch(eventsProvider);
+    return events.when(
+      loading: () => const LoadingList(rows: 3, avatar: false),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.only(bottom: 24),
+        child: GroupedSurface(
+          child: ErrorState(
+            title: "Couldn't load events",
+            message: e.toString(),
+            onRetry: () => ref.invalidate(eventsProvider),
+          ),
         ),
       ),
+      data: (list) {
+        if (list.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 24),
+            child: GroupedSurface(
+              child: EmptyState(
+                icon: Icons.event_busy_outlined,
+                title: 'No events to scan for',
+                message: 'Ask your organizer to assign you to an event, then pull down to refresh.',
+                actionLabel: 'Refresh',
+                actionIcon: Icons.refresh_rounded,
+                onAction: () => ref.invalidate(eventsProvider),
+              ),
+            ),
+          );
+        }
+        final fallback = defaultEvent(list)!;
+        if (_selectedEvent == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _selectedEvent == null) setState(() => _selectedEvent = fallback);
+          });
+        }
+        final selected = _selectedEvent ?? fallback;
+        return GroupedSection(
+          header: 'Event',
+          footer: PhaseCopy.scanNotice(selected),
+          children: [
+            for (final e in sortEventsByPhase(list))
+              ListRow(
+                title: e.title,
+                subtitle: [e.venue, if (e.date != null) Fmt.date(e.date)].join(' · '),
+                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                  PhaseBadge(e),
+                  if (e == selected) ...[
+                    const SizedBox(width: 8),
+                    const Icon(Icons.check_rounded, color: AppColors.brand),
+                  ],
+                ]),
+                onTap: () => setState(() {
+                  if (_selectedEvent != e) _gate = null; // gates belong to an event
+                  _selectedEvent = e;
+                }),
+              ),
+          ],
+        );
+      },
     );
   }
 }

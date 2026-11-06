@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 import '../../core/api_client.dart';
-import '../../core/theme.dart';
 import '../../providers/event_provider.dart';
+import '../../ui/ui.dart';
+import '../common/format.dart';
 
 class ScanLogsScreen extends ConsumerStatefulWidget {
   const ScanLogsScreen({super.key});
@@ -14,7 +16,8 @@ class ScanLogsScreen extends ConsumerStatefulWidget {
 class _ScanLogsScreenState extends ConsumerState<ScanLogsScreen> {
   final _api = ApiClient();
   List<Map<String, dynamic>> _logs = [];
-  bool _loading = false;
+  bool _loading = true;
+  String? _error;
   String _filter = 'all'; // 'all', 'gate_in', 'gate_out'
 
   @override
@@ -25,181 +28,134 @@ class _ScanLogsScreenState extends ConsumerState<ScanLogsScreen> {
 
   Future<void> _load() async {
     final event = ref.read(eventProvider).currentEvent;
-    if (event == null) return;
-    setState(() => _loading = true);
+    if (event == null) {
+      setState(() => _loading = false);
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final resp = await _api.get('/api/events/${event.id}/gate/stats/');
       final data = resp.data as Map<String, dynamic>;
       final scans = (data['recent_scans'] as List? ?? [])
           .map((s) => Map<String, dynamic>.from(s as Map))
           .toList();
-      setState(() => _logs = scans);
-    } catch (_) {} finally {
+      if (mounted) setState(() => _logs = scans);
+    } on DioException catch (e) {
+      if (mounted) setState(() => _error = _api.errorMessage(e));
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Something went wrong: $e');
+    } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _filter == 'all'
-        ? _logs
-        : _logs.where((l) => l['scan_type'] == _filter).toList();
+    final event = ref.watch(eventProvider).currentEvent;
+    final filtered = _filter == 'all' ? _logs : _logs.where((l) => l['scan_type'] == _filter).toList();
 
-    return Column(
-      children: [
-        // Filter chips bar
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: Row(
-            children: [
-              for (final f in [
-                ('all', 'All Scans', AppColors.primary),
-                ('gate_in', 'Gate In', AppColors.success),
-                ('gate_out', 'Gate Out', AppColors.warning)
-              ])
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(f.$2),
-                    selected: _filter == f.$1,
-                    selectedColor: f.$3.withOpacity(0.2),
-                    labelStyle: TextStyle(
-                      color: _filter == f.$1 ? f.$3 : AppColors.textSecondary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
-                    backgroundColor: AppColors.cardBg,
-                    side: BorderSide(color: _filter == f.$1 ? f.$3 : AppColors.divider),
-                    onSelected: (s) {
-                      if (s) setState(() => _filter = f.$1);
-                    },
-                  ),
-                ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.refresh, color: AppColors.textSecondary, size: 20),
-                onPressed: _load,
-              ),
-            ],
+    return AppScaffold(
+      title: 'Scan logs',
+      onRefresh: _load,
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: FilterPills<String>(
+              selected: _filter,
+              onChanged: (v) => setState(() => _filter = v),
+              segments: [
+                Segment('all', 'All', count: _logs.length),
+                Segment('gate_in', 'Gate in', count: _logs.where((l) => l['scan_type'] == 'gate_in').length),
+                Segment('gate_out', 'Gate out', count: _logs.where((l) => l['scan_type'] == 'gate_out').length),
+              ],
+            ),
           ),
         ),
-
-        Expanded(
-          child: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : filtered.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.history_toggle_off, size: 48, color: AppColors.textSecondary),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'No scan activity recorded yet',
-                            style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
-                          ),
-                        ],
-                      ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _load,
-                      child: ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
-                        itemBuilder: (_, i) {
-                          final log = filtered[i];
-                          final isIn = log['scan_type'] == 'gate_in';
-                          final timeStr = (log['scanned_at']?.toString() ?? '').replaceAll('T', ' ');
-                          final result = log['result']?.toString() ?? 'success';
-
-                          return Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: AppColors.cardBg,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: AppColors.divider, width: 0.5),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 36,
-                                  height: 36,
-                                  decoration: BoxDecoration(
-                                    color: (isIn ? AppColors.success : AppColors.warning)
-                                        .withOpacity(0.12),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Icon(
-                                    isIn ? Icons.login_outlined : Icons.logout_outlined,
-                                    size: 18,
-                                    color: isIn ? AppColors.success : AppColors.warning,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        log['attendee_name']?.toString() ?? 'Attendee',
-                                        style: const TextStyle(
-                                          color: AppColors.textPrimary,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '${log['gate_name'] ?? "Main Gate"} • ${timeStr.length > 16 ? timeStr.substring(0, 16) : timeStr}',
-                                        style: const TextStyle(
-                                          color: AppColors.textSecondary,
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: (isIn ? AppColors.success : AppColors.warning)
-                                            .withOpacity(0.12),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(
-                                        isIn ? 'IN' : 'OUT',
-                                        style: TextStyle(
-                                          color: isIn ? AppColors.success : AppColors.warning,
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
-                                    ),
-                                    if (result == 'duplicate') ...[
-                                      const SizedBox(height: 3),
-                                      const Text(
-                                        'DUPLICATE',
-                                        style: TextStyle(
-                                          color: AppColors.warning,
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-        ),
+        if (event == null)
+          const SliverFillRemaining(
+            hasScrollBody: false,
+            child: EmptyState(
+              icon: Icons.event_outlined,
+              title: 'No event selected',
+              message: 'Pick an event on the Home tab first.',
+            ),
+          )
+        else if (_error != null && _logs.isEmpty)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: ErrorState(title: "Couldn't load scan logs", message: _error!, onRetry: _load),
+          )
+        else if (_loading && _logs.isEmpty)
+          const SliverToBoxAdapter(child: LoadingList())
+        else if (filtered.isEmpty)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: EmptyState(
+              icon: Icons.history_toggle_off_rounded,
+              title: 'No scans yet',
+              message: 'Every gate in and gate out is listed here as it happens.',
+              actionLabel: 'Refresh',
+              actionIcon: Icons.refresh_rounded,
+              onAction: _load,
+            ),
+          )
+        else
+          SliverToBoxAdapter(
+            child: GroupedSection(
+              header: 'Latest ${Fmt.plural(filtered.length, 'scan')}',
+              separatorInset: 68,
+              children: [for (final log in filtered) _LogRow(log: log)],
+            ),
+          ),
       ],
+    );
+  }
+}
+
+class _LogRow extends StatelessWidget {
+  final Map<String, dynamic> log;
+  const _LogRow({required this.log});
+
+  @override
+  Widget build(BuildContext context) {
+    final isIn = log['scan_type'] == 'gate_in';
+    final result = log['result']?.toString() ?? 'success';
+    final tone = isIn ? Tone.success : Tone.warning;
+    final ok = result == 'success' || result == 'gate_in' || result == 'gate_out' || result == 're_entry';
+    final code = log['ticket_number']?.toString();
+
+    return ListRow(
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(color: tone.tint, shape: BoxShape.circle),
+        child: Icon(isIn ? Icons.login_rounded : Icons.logout_rounded, size: 20, color: tone.strong),
+      ),
+      title: log['attendee_name']?.toString() ?? 'Attendee',
+      subtitleWidget: Text.rich(
+        TextSpan(children: [
+          if (code != null && code.isNotEmpty) ...[
+            TextSpan(text: code, style: AppType.mono(12, color: AppColors.ink600)),
+            const TextSpan(text: '  ·  '),
+          ],
+          TextSpan(
+            text: [
+              if ((log['gate_name']?.toString() ?? '').isNotEmpty) log['gate_name'].toString(),
+              Fmt.timeIso(log['scanned_at']?.toString()),
+            ].join(' · '),
+          ),
+        ]),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: AppType.rowSubtitle,
+      ),
+      trailing: ok
+          ? StatusBadge(isIn ? 'In' : 'Out', tone: tone)
+          : StatusBadge(result == 'duplicate' ? 'Duplicate' : TicketStatus.sentence(result), tone: Tone.danger),
     );
   }
 }

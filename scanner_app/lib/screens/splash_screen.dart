@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../core/theme.dart';
+import '../attendee/screens/link_screens.dart';
+import '../core/deep_links.dart';
+import '../core/storage.dart';
 import '../providers/auth_provider.dart';
-import 'login_screen.dart';
+import '../providers/view_mode_provider.dart';
+import '../ui/ui.dart';
+import 'common/session_guard.dart' show appNavigatorKey;
 import 'role_router.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -12,105 +16,62 @@ class SplashScreen extends ConsumerStatefulWidget {
   ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends ConsumerState<SplashScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-  late Animation<double> _fadeAnim;
-  late Animation<double> _scaleAnim;
-
+class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1000));
-    _fadeAnim = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _ctrl, curve: const Interval(0, 0.6, curve: Curves.easeIn)),
-    );
-    _scaleAnim = Tween<double>(begin: 0.7, end: 1).animate(
-      CurvedAnimation(parent: _ctrl, curve: const Interval(0, 0.6, curve: Curves.easeOutBack)),
-    );
-    _ctrl.forward();
     _init();
   }
 
   Future<void> _init() async {
-    await Future.delayed(const Duration(milliseconds: 1400));
     final auth = ref.read(authProvider.notifier);
+    await AppStorage.getServerUrl(); // warms the cache used for media URLs
     await auth.loadFromStorage();
+    final attendeeView = await AppStorage.getPreferAttendeeView();
     if (!mounted) return;
-    final user = ref.read(authProvider).user;
+    ref.read(preferAttendeeViewProvider.notifier).state = attendeeView;
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => user != null ? const RoleRouter() : const LoginScreen(),
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 250),
+        pageBuilder: (_, __, ___) => const RoleRouter(),
+        transitionsBuilder: (_, a, __, child) => FadeTransition(opacity: a, child: child),
       ),
     );
+    await _startDeepLinks();
   }
 
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
+  /// App Links (eventlaya.com/e/…, /ticket/…, payment returns): the one the app was opened with,
+  /// then any that arrive while it runs, open on top of the user's app.
+  static Future<void> _startDeepLinks() async {
+    final initial = await DeepLinks.instance.start();
+    DeepLinks.instance.links.listen((link) {
+      final nav = appNavigatorKey.currentState;
+      if (nav != null) openDeepLink(nav, link);
+    });
+    if (initial != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final nav = appNavigatorKey.currentState;
+        if (nav != null) openDeepLink(nav, initial);
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return const Scaffold(
       backgroundColor: AppColors.background,
       body: Center(
-        child: FadeTransition(
-          opacity: _fadeAnim,
-          child: ScaleTransition(
-            scale: _scaleAnim,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 96,
-                  height: 96,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppColors.primary, Color(0xFF7C3AED)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(26),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.4),
-                        blurRadius: 28,
-                        spreadRadius: 4,
-                      ),
-                    ],
-                  ),
-                  child: const Icon(Icons.qr_code_scanner_rounded, size: 52, color: Colors.white),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'Eventlaya',
-                  style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Gate Scanner & Organizer Terminal',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textSecondary,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-                const SizedBox(height: 44),
-                SizedBox(
-                  width: 26,
-                  height: 26,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    valueColor: AlwaysStoppedAnimation(AppColors.primary.withOpacity(0.8)),
-                  ),
-                ),
-              ],
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Wordmark(size: 96, tagline: true),
+            SizedBox(height: 28),
+            SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2.4, color: AppColors.brand),
             ),
-          ),
+          ],
         ),
       ),
     );

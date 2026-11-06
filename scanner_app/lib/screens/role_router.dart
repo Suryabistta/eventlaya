@@ -1,20 +1,55 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../attendee/attendee_shell.dart';
 import '../models/app_user.dart';
 import '../providers/auth_provider.dart';
 import '../providers/event_provider.dart';
-import 'admin/admin_home_screen.dart';
+import '../providers/view_mode_provider.dart';
+import '../vendor/vendor_shell.dart';
+import 'admin/admin_shell.dart';
 import 'staff/gate_select_screen.dart';
-import 'login_screen.dart';
 
-class RoleRouter extends ConsumerStatefulWidget {
+/// Picks the app for the current user:
+/// - signed out, attendees (and unknown roles) → attendee app (browsing needs no login)
+/// - organizers / superadmins → organizer app
+/// - gate staff → gate selection, then the staff app
+/// - vendors (marketplace businesses) → vendor app
+/// Organizers, staff and vendors who chose "Switch to attendee view" get the attendee app.
+class RoleRouter extends ConsumerWidget {
   const RoleRouter({super.key});
 
   @override
-  ConsumerState<RoleRouter> createState() => _RoleRouterState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authProvider).user;
+    final attendeeView = ref.watch(preferAttendeeViewProvider);
+
+    if (user == null || attendeeView) return const AttendeeShell();
+
+    switch (user.role) {
+      case UserRole.superadmin:
+      case UserRole.organizer:
+        return const _OperatorBootstrap(child: AdminShell());
+      case UserRole.staff:
+        return const _OperatorBootstrap(child: GateSelectScreen());
+      case UserRole.vendor:
+        return const VendorShell();
+      case UserRole.attendee:
+      case UserRole.unknown:
+        return const AttendeeShell();
+    }
+  }
 }
 
-class _RoleRouterState extends ConsumerState<RoleRouter> {
+/// Loads the saved event / gate assignment for organizer and staff apps.
+class _OperatorBootstrap extends ConsumerStatefulWidget {
+  final Widget child;
+  const _OperatorBootstrap({required this.child});
+
+  @override
+  ConsumerState<_OperatorBootstrap> createState() => _OperatorBootstrapState();
+}
+
+class _OperatorBootstrapState extends ConsumerState<_OperatorBootstrap> {
   @override
   void initState() {
     super.initState();
@@ -36,58 +71,5 @@ class _RoleRouterState extends ConsumerState<RoleRouter> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final authState = ref.watch(authProvider);
-    final user = authState.user;
-
-    if (user == null) {
-      return const LoginScreen();
-    }
-
-    switch (user.role) {
-      case UserRole.superadmin:
-      case UserRole.organizer:
-        return const AdminHomeScreen();
-      case UserRole.staff:
-        return const GateSelectScreen();
-      default:
-        return Scaffold(
-          backgroundColor: const Color(0xFF0F0E1A),
-          body: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.block_rounded, color: Color(0xFFEF4444), size: 56),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Access Restricted',
-                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Your account role (${user.role.name}) does not have permission to access the gate scanner.',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
-                  ),
-                  const SizedBox(height: 28),
-                  ElevatedButton(
-                    onPressed: () async {
-                      await ref.read(authProvider.notifier).logout();
-                      if (context.mounted) {
-                        Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(builder: (_) => const LoginScreen()),
-                        );
-                      }
-                    },
-                    child: const Text('Sign Out'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-    }
-  }
+  Widget build(BuildContext context) => widget.child;
 }

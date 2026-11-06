@@ -1,238 +1,210 @@
-import React, { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import {
-  Calendar,
-  Plus,
-  MapPin,
-  Users,
-  QrCode,
-  FileSpreadsheet,
-  ExternalLink,
-  Sparkles,
-  X
-} from 'lucide-react'
+import React, { useMemo } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { CalendarDays, Check, ClipboardList, ExternalLink, Link2, MapPin, Pencil, Plus, LayoutTemplate } from 'lucide-react'
 import { api, type Event } from '@/services/api'
+import { useCurrentEvent } from '@/lib/event-context'
+import { Badge, Button, ButtonLink, Card, EmptyState, ErrorState, IconButton, PageHeader, Skeleton, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
+import { taskApi } from './tasks/api'
+import { PhaseBadge } from '@/components/PhaseBadge'
+import { eventPhase, sortByPhase } from '@/lib/phase'
+
+const fmtDate = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+
+function dateRange(ev: Event) {
+  const start = fmtDate(ev.start_date)
+  if (!ev.end_date || ev.end_date === ev.start_date) return ev.start_time ? `${start}, ${ev.start_time.slice(0, 5)}` : start
+  return `${start} to ${fmtDate(ev.end_date)}`
+}
 
 export const EventsPage: React.FC = () => {
-  const queryClient = useQueryClient()
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [formData, setFormData] = useState({
-    title: '',
-    slug: '',
-    description: '',
-    location: '',
-    start_date: '',
-    end_date: '',
-    capacity: 200,
-    status: 'published' as const,
-    allow_registration: true,
-  })
+  const toast = useToast()
+  const navigate = useNavigate()
+  const { events, currentEvent, setCurrentEventId, isLoading, isError, error, refetch } = useCurrentEvent()
 
-  const { data: events = [], isLoading } = useQuery({
-    queryKey: ['events'],
-    queryFn: api.getEvents,
-  })
+  // Live first, then upcoming (soonest at the top), drafts, then ended and cancelled (most recent first)
+  const sorted = useMemo(() => sortByPhase(events), [events])
 
-  const createMutation = useMutation({
-    mutationFn: api.createEvent,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['events'] })
-      setShowCreateModal(false)
-      setFormData({
-        title: '',
-        slug: '',
-        description: '',
-        location: '',
-        start_date: '',
-        end_date: '',
-        capacity: 200,
-        status: 'published',
-        allow_registration: true,
-      })
-    },
-  })
+  // Open crew tasks per event, shown on each row
+  const { data: tasks } = useQuery({ queryKey: ['tasks', 'all'], queryFn: taskApi.list })
+  const openTasks = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const t of tasks ?? []) if (t.event && t.status !== 'completed') counts[t.event] = (counts[t.event] ?? 0) + 1
+    return counts
+  }, [tasks])
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    const slug = formData.slug || formData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-    createMutation.mutate({
-      ...formData,
-      slug,
-    })
+  const openEvent = (ev: Event) => {
+    setCurrentEventId(ev.id)
+    navigate('/app')
+  }
+
+  const copyLink = async (ev: Event) => {
+    const url = `${window.location.origin}/e/${ev.slug}`
+    try {
+      await navigator.clipboard.writeText(url)
+      toast.success('Registration link copied', url)
+    } catch {
+      toast.error('Couldn’t copy the link', url)
+    }
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Event Directory</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Manage your symposiums, tech festivals, conferences, and club gatherings.
-          </p>
-        </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold shadow-md shadow-brand-600/25 transition"
-        >
-          <Plus className="w-4 h-4" />
-          Create New Event
-        </button>
-      </div>
+    <div className="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 2xl:px-10">
+      <PageHeader
+        title="Events"
+        description="Everything you’re running. Open an event to manage registrations, the gate and voting."
+        actions={
+          <ButtonLink to="/app/events/new" icon={<Plus className="h-4 w-4" />}>
+            Create event
+          </ButtonLink>
+        }
+      />
 
-      {/* Events Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {events.map((ev) => (
-          <div
-            key={ev.id}
-            className="bg-white rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition overflow-hidden flex flex-col"
-          >
-            {/* Top gradient / banner */}
-            <div className="h-32 bg-gradient-to-tr from-brand-600 via-indigo-700 to-slate-900 p-5 flex flex-col justify-between text-white relative">
-              <span className="self-start text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-xs">
-                {ev.status.toUpperCase()}
-              </span>
-              <div>
-                <h3 className="font-extrabold text-lg leading-snug line-clamp-1">{ev.title}</h3>
-                <p className="text-xs text-brand-100 flex items-center gap-1 mt-0.5">
-                  <MapPin className="w-3 h-3 shrink-0" />
-                  <span className="truncate">{ev.location}</span>
-                </p>
+      {isError ? (
+        <ErrorState message={error?.message} onRetry={refetch} />
+      ) : isLoading ? (
+        <Card className="divide-y divide-ink-100">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex items-center gap-4 px-5 py-4">
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-5 w-64 max-w-full" />
+                <Skeleton className="h-4 w-48 max-w-full" />
               </div>
+              <Skeleton className="hidden h-8 w-40 sm:block" />
             </div>
-
-            {/* Event Body */}
-            <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
-              <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
-                {ev.description || 'No description provided.'}
-              </p>
-
-              <div className="grid grid-cols-2 gap-3 py-3 border-y border-slate-100 text-xs">
-                <div>
-                  <span className="text-slate-400 text-[10px] uppercase font-bold">Registered</span>
-                  <p className="font-extrabold text-slate-900 text-base">{ev.registered_count}</p>
-                </div>
-                <div>
-                  <span className="text-slate-400 text-[10px] uppercase font-bold">Checked In</span>
-                  <p className="font-extrabold text-emerald-600 text-base">{ev.checked_in_count}</p>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center gap-2 pt-1">
-                <Link
-                  to="/scanner"
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition"
-                >
-                  <QrCode className="w-3.5 h-3.5" />
-                  Gate Scanner
-                </Link>
-                <Link
-                  to={`/e/${ev.slug}`}
-                  target="_blank"
-                  className="inline-flex items-center justify-center p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 transition"
-                  title="Open Public Event Landing Page"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                </Link>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Create Event Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 relative">
-            <button
-              onClick={() => setShowCreateModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <h2 className="text-lg font-bold text-slate-900 mb-4">Create New Event</h2>
-
-            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Event Title *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Koshi Coding Championship 2026"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Venue / Location *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Itahari City Hall, Sunsari"
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Start Date *</label>
-                  <input
-                    type="date"
-                    required
-                    value={formData.start_date}
-                    onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Capacity Limit</label>
-                  <input
-                    type="number"
-                    value={formData.capacity}
-                    onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Description</label>
-                <textarea
-                  rows={3}
-                  placeholder="Describe your event agenda, rules, and speaker schedule..."
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                />
-              </div>
-
-              <div className="pt-2 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={createMutation.isPending}
-                  className="px-5 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold transition shadow-md shadow-brand-600/25"
-                >
-                  {createMutation.isPending ? 'Creating...' : 'Create Event'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+          ))}
+        </Card>
+      ) : sorted.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon={<CalendarDays className="h-6 w-6" />}
+            title="No events yet"
+            description="Create an event to get a registration link, QR passes and a gate scanner."
+            action={
+              <ButtonLink to="/app/events/new" icon={<Plus className="h-4 w-4" />}>
+                Create event
+              </ButtonLink>
+            }
+          />
+        </Card>
+      ) : (
+        <Card>
+          <ul className="divide-y divide-ink-100">
+            {sorted.map((ev) => (
+              <EventRow
+                key={ev.id}
+                event={ev}
+                isCurrent={ev.id === currentEvent?.id}
+                openTasks={tasks ? (openTasks[ev.id] ?? 0) : undefined}
+                onOpen={() => openEvent(ev)}
+                onCopy={() => copyLink(ev)}
+                onEdit={() => navigate(`/app/events/${ev.id}/edit`)}
+                onEditPage={() => navigate(`/app/events/${ev.id}/edit?step=page`)}
+              />
+            ))}
+          </ul>
+        </Card>
       )}
     </div>
+  )
+}
+
+const EventRow: React.FC<{
+  event: Event
+  isCurrent: boolean
+  openTasks?: number
+  onOpen: () => void
+  onCopy: () => void
+  onEdit: () => void
+  onEditPage: () => void
+}> = ({ event: ev, isCurrent, openTasks, onOpen, onCopy, onEdit, onEditPage }) => {
+  const over = ['ended', 'cancelled'].includes(eventPhase(ev))
+  const pct = ev.capacity ? Math.min(100, Math.round((ev.registered_count / ev.capacity) * 100)) : 0
+  const full = ev.capacity > 0 && ev.registered_count >= ev.capacity
+
+  return (
+    <li className={cn('flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center', over && 'bg-ink-50/60', isCurrent && 'bg-brand-50/40')}>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="min-w-0 text-base font-bold text-ink-900 sm:truncate">{ev.title}</h3>
+          <PhaseBadge event={ev} />
+          {isCurrent && (
+            <Badge tone="brand">
+              <Check className="h-3 w-3" aria-hidden />
+              Current
+            </Badge>
+          )}
+        </div>
+        <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-500">
+          <span className="inline-flex items-center gap-1.5">
+            <CalendarDays className="h-4 w-4 text-ink-400" aria-hidden />
+            {dateRange(ev)}
+          </span>
+          <span className="inline-flex min-w-0 items-center gap-1.5">
+            <MapPin className="h-4 w-4 shrink-0 text-ink-400" aria-hidden />
+            <span className="truncate">{ev.location}</span>
+          </span>
+          {openTasks !== undefined && (
+            <Link
+              to={`/app/tasks?event=${ev.id}`}
+              className="inline-flex items-center gap-1.5 font-medium text-ink-600 hover:text-brand-700 hover:underline"
+            >
+              <ClipboardList className="h-4 w-4 text-ink-400" aria-hidden />
+              {openTasks === 0 ? 'No open tasks' : `${openTasks} open ${openTasks === 1 ? 'task' : 'tasks'}`}
+            </Link>
+          )}
+        </p>
+      </div>
+
+      <div className="w-full sm:w-44">
+        <p className="flex items-baseline justify-between text-sm">
+          <span className="font-semibold text-ink-900 tabular">
+            {ev.registered_count}
+            <span className="font-normal text-ink-500">{ev.capacity ? ` / ${ev.capacity}` : ''} registered</span>
+          </span>
+          {full && <span className="text-xs font-semibold text-marigold-800">Full</span>}
+        </p>
+        {ev.capacity > 0 ? (
+          <div
+            className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink-100"
+            role="meter"
+            aria-label={`${ev.title} registrations`}
+            aria-valuemin={0}
+            aria-valuemax={ev.capacity}
+            aria-valuenow={ev.registered_count}
+          >
+            <div className={cn('h-full rounded-full', full ? 'bg-marigold-500' : 'bg-brand-600')} style={{ width: `${pct}%` }} />
+          </div>
+        ) : (
+          <p className="mt-0.5 text-xs text-ink-500">No capacity limit</p>
+        )}
+      </div>
+
+      <div className="flex items-center gap-1 sm:justify-end">
+        <Button size="sm" variant="secondary" onClick={onOpen} className="mr-1">
+          Open
+        </Button>
+        <IconButton label={`Edit ${ev.title}`} onClick={onEdit}>
+          <Pencil className="h-4 w-4" aria-hidden />
+        </IconButton>
+        <IconButton label={`Edit event page for ${ev.title}`} onClick={onEditPage}>
+          <LayoutTemplate className="h-4 w-4" aria-hidden />
+        </IconButton>
+        <IconButton label={`Copy registration link for ${ev.title}`} onClick={onCopy}>
+          <Link2 className="h-4 w-4" aria-hidden />
+        </IconButton>
+        <a
+          href={`/e/${ev.slug}`}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`View public page for ${ev.title} (opens in a new tab)`}
+          title="View public page"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900"
+        >
+          <ExternalLink className="h-4 w-4" aria-hidden />
+        </a>
+      </div>
+    </li>
   )
 }

@@ -2,10 +2,90 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+@layer base {
+  /* Brand palettes as RGB channels so white-label sites can recolour them (src/lib/tenant.tsx). */
+  :root {
+    --brand-50: 253 242 246;
+    --brand-100: 252 231 239;
+    --brand-200: 249 207 223;
+    --brand-300: 244 166 195;
+    --brand-400: 236 111 156;
+    --brand-500: 222 63 120;
+    --brand-600: 194 33 90;
+    --brand-700: 163 24 74;
+    --brand-800: 135 23 63;
+    --brand-900: 113 24 56;
+    --brand-950: 66 7 28;
+    --marigold-50: 255 248 230;
+    --marigold-100: 254 239 195;
+    --marigold-200: 253 220 133;
+    --marigold-300: 251 196 67;
+    --marigold-400: 245 171 22;
+    --marigold-500: 227 148 0;
+    --marigold-600: 191 115 0;
+    --marigold-700: 152 86 0;
+    --marigold-800: 122 69 7;
+    --marigold-900: 102 57 11;
+    --marigold-950: 59 30 2;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-ink-50 font-sans text-ink-900 antialiased;
+  }
+
+  h1, h2, h3, .font-display {
+    font-family: theme('fontFamily.display');
+    font-optical-sizing: auto;
+    letter-spacing: -0.02em;
+  }
+
+  code, pre, .font-mono {
+    font-family: theme('fontFamily.mono');
+  }
+
+  ::selection {
+    @apply bg-brand-600 text-white;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-white;
+  }
 }
 
-code, pre, .font-mono {
-  font-family: 'JetBrains Mono', monospace;
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Ticket stub: punched notches on the left and right edges */
+  .ticket-notch {
+    -webkit-mask:
+      radial-gradient(circle 12px at 0 var(--notch-y, 62%), transparent 98%, #000) left / 51% 100% no-repeat,
+      radial-gradient(circle 12px at 100% var(--notch-y, 62%), transparent 98%, #000) right / 51% 100% no-repeat;
+    mask:
+      radial-gradient(circle 12px at 0 var(--notch-y, 62%), transparent 98%, #000) left / 51% 100% no-repeat,
+      radial-gradient(circle 12px at 100% var(--notch-y, 62%), transparent 98%, #000) right / 51% 100% no-repeat;
+  }
+
+  /* Perforation line between ticket body and stub */
+  .perforation {
+    background-image: radial-gradient(circle, theme('colors.ink.300') 1.5px, transparent 1.6px);
+    background-size: 10px 4px;
+    background-repeat: repeat-x;
+    height: 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

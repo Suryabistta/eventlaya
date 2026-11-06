@@ -2,20 +2,26 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#4F46E5" />
+    <meta name="theme-color" content="#C2215A" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Eventlaya" />
-    <meta name="description" content="Nepal's integrated event management SaaS, dynamic registration forms, cryptographic voting, and services marketplace." />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Eventlaya — Event Management SaaS & Marketplace</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- Defaults; each public page replaces the data-seo tags (src/lib/seo.tsx, backend apps/seo). Fonts are self-hosted (src/fonts.css). -->
+    <title>Eventlaya — Event registration & QR check-in in Nepal</title>
+    <meta name="description" content="Event software built in Eastern Nepal: online registration, QR passes, gate check-in, live voting, and venues and vendors across Koshi Province. Start free." data-seo />
+    <meta property="og:type" content="website" data-seo />
+    <meta property="og:site_name" content="Eventlaya" data-seo />
+    <meta property="og:title" content="Eventlaya — Event registration & QR check-in in Nepal" data-seo />
+    <meta property="og:description" content="Event software built in Eastern Nepal: online registration, QR passes, gate check-in, live voting, and venues and vendors across Koshi Province." data-seo />
+    <meta property="og:image" content="https://eventlaya.com/og-default.png" data-seo />
+    <meta name="twitter:card" content="summary_large_image" data-seo />
   </head>
-  <body class="bg-slate-50 text-slate-900 font-sans antialiased selection:bg-brand-500 selection:text-white">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

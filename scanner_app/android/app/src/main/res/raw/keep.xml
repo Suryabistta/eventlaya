@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The backend names the notification small icon by string ("ic_stat_eventlaya" in the FCM payload), so
+     resource shrinking can't see that it is used. Keep it (and the accent colour) in release builds. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_eventlaya,@color/eventlaya_brand" />

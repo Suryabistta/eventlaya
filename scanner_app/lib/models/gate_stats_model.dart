@@ -15,7 +15,7 @@ class RecentScan {
         attendeeName: json['attendee_name']?.toString() ?? 'Unknown Attendee',
         scanType: json['scan_type']?.toString() ?? 'gate_in',
         scannedAt: json['scanned_at']?.toString() ?? '',
-        gateName: json['gate_name']?.toString() ?? 'Main Gate',
+        gateName: json['gate_name']?.toString() ?? '',
       );
 }
 

@@ -1,8 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 import '../../core/api_client.dart';
-import '../../core/theme.dart';
 import '../../providers/event_provider.dart';
+import '../../ui/ui.dart';
+import 'new_task_screen.dart';
+
+/// Task API base path (the events router is mounted under /api/events/).
+const tasksPath = '/api/events/tasks/';
+
+const taskCategories = {
+  'stage': 'Stage and sound',
+  'gate': 'Gate and security',
+  'hospitality': 'Guest hospitality',
+  'tech': 'Tech and registration',
+  'catering': 'Food and drinks',
+  'marketing': 'Media and photos',
+};
+
+const taskPriorities = {'low': 'Low', 'medium': 'Medium', 'high': 'High', 'urgent': 'Urgent'};
+
+Tone priorityTone(String p) => switch (p) {
+      'urgent' => Tone.danger,
+      'high' => Tone.warning,
+      'medium' => Tone.brand,
+      _ => Tone.neutral,
+    };
 
 class EventTasksScreen extends ConsumerStatefulWidget {
   const EventTasksScreen({super.key});
@@ -12,504 +35,353 @@ class EventTasksScreen extends ConsumerStatefulWidget {
 }
 
 class _EventTasksScreenState extends ConsumerState<EventTasksScreen> {
+  final _api = ApiClient();
   List<Map<String, dynamic>> _tasks = [];
   bool _loading = true;
+  String? _error;
   String _filter = 'all';
 
   @override
   void initState() {
     super.initState();
     _fetchTasks();
+    ref.listenManual(eventProvider.select((s) => s.currentEvent?.id), (prev, next) {
+      if (prev != next) _fetchTasks();
+    });
   }
 
   Future<void> _fetchTasks() async {
     final event = ref.read(eventProvider).currentEvent;
-    if (event == null) return;
+    if (event == null) {
+      setState(() => _loading = false);
+      return;
+    }
 
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      final res = await ApiClient().get(
-        '/events/tasks/',
-        queryParameters: {'event_id': event.id},
-      );
-      if (res.data is List) {
-        setState(() {
-          _tasks = List<Map<String, dynamic>>.from(res.data);
-          _loading = false;
-        });
-      }
+      final res = await _api.get(tasksPath, queryParameters: {'event_id': event.id});
+      final data = res.data;
+      final list = data is List
+          ? data
+          : (data is Map && data['results'] is List)
+              ? data['results'] as List
+              : <dynamic>[];
+      if (!mounted) return;
+      setState(() => _tasks = list.map((t) => Map<String, dynamic>.from(t as Map)).toList());
+    } on DioException catch (e) {
+      if (mounted) setState(() => _error = _api.errorMessage(e));
     } catch (e) {
-      if (mounted) {
-        setState(() => _loading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load crew tasks: $e')),
-        );
-      }
+      if (mounted) setState(() => _error = 'Something went wrong: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   Future<void> _updateTaskStatus(String taskId, String newStatus) async {
+    final idx = _tasks.indexWhere((t) => t['id'].toString() == taskId);
+    if (idx == -1) return;
+    final previous = _tasks[idx]['status'];
+    setState(() => _tasks[idx]['status'] = newStatus); // optimistic
     try {
-      await ApiClient().patch(
-        '/events/tasks/$taskId/',
-        data: {'status': newStatus},
-      );
-      setState(() {
-        final idx = _tasks.indexWhere((t) => t['id'] == taskId);
-        if (idx != -1) {
-          _tasks[idx]['status'] = newStatus;
-        }
-      });
-    } catch (e) {
+      await _api.patch('$tasksPath$taskId/', data: {'status': newStatus});
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update task: $e')),
+        AppToast.success(
+          context,
+          switch (newStatus) {
+            'completed' => 'Task marked as done',
+            'in_progress' => 'Task moved to in progress',
+            _ => 'Task moved to to do',
+          },
         );
       }
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _tasks[idx]['status'] = previous);
+      AppToast.error(context, "Couldn't update the task. ${_api.errorMessage(e)}");
     }
   }
 
   Future<void> _deleteTask(String taskId) async {
+    final ok = await confirmSheet(
+      context,
+      title: 'Delete this task?',
+      message: 'It will be removed for everyone on the crew.',
+      confirmLabel: 'Delete task',
+    );
+    if (!ok) return;
     try {
-      await ApiClient().delete('/events/tasks/$taskId/');
-      setState(() {
-        _tasks.removeWhere((t) => t['id'] == taskId);
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to delete task: $e')),
-        );
-      }
+      await _api.delete('$tasksPath$taskId/');
+      if (!mounted) return;
+      setState(() => _tasks.removeWhere((t) => t['id'].toString() == taskId));
+      AppToast.success(context, 'Task deleted');
+    } on DioException catch (e) {
+      if (mounted) AppToast.error(context, "Couldn't delete the task. ${_api.errorMessage(e)}");
     }
   }
 
-  void _showAddTaskSheet() {
+  Future<void> _addTask() async {
     final event = ref.read(eventProvider).currentEvent;
-    if (event == null) return;
+    if (event == null) {
+      AppToast.error(context, 'Pick an event first');
+      return;
+    }
+    final created = await Navigator.of(context, rootNavigator: true).push<Map<String, dynamic>>(
+      MaterialPageRoute(fullscreenDialog: true, builder: (_) => NewTaskScreen(event: event)),
+    );
+    if (created != null && mounted) {
+      setState(() => _tasks.insert(0, created));
+      AppToast.success(context, 'Task added');
+    }
+  }
 
-    final titleCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-    final assigneeCtrl = TextEditingController();
-    String category = 'tech';
-    String priority = 'medium';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-            left: 20,
-            right: 20,
-            top: 20,
+  void _openTask(Map<String, dynamic> task) {
+    final id = task['id'].toString();
+    final status = task['status']?.toString() ?? 'todo';
+    showAppSheet<void>(
+      context,
+      builder: (ctx) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SheetHeader(
+            title: task['title']?.toString() ?? 'Task',
+            message: (task['description']?.toString().isNotEmpty ?? false) ? task['description'].toString() : null,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Assign Operations Task',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, size: 20),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: titleCtrl,
-                decoration: InputDecoration(
-                  labelText: 'Task Title *',
-                  hintText: 'e.g., Gate 2 QR Scanner Battery Backup',
-                  filled: true,
-                  fillColor: AppColors.cardBg,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: category,
-                      decoration: InputDecoration(
-                        labelText: 'Department',
-                        filled: true,
-                        fillColor: AppColors.cardBg,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      dropdownColor: AppColors.cardBg,
-                      items: const [
-                        DropdownMenuItem(value: 'stage', child: Text('Stage & Sound')),
-                        DropdownMenuItem(value: 'gate', child: Text('Gate & Security')),
-                        DropdownMenuItem(value: 'hospitality', child: Text('VIP Hospitality')),
-                        DropdownMenuItem(value: 'tech', child: Text('Technical & Web')),
-                        DropdownMenuItem(value: 'catering', child: Text('Food & Catering')),
-                        DropdownMenuItem(value: 'marketing', child: Text('Media & Photo')),
-                      ],
-                      onChanged: (val) => setModalState(() => category = val!),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: priority,
-                      decoration: InputDecoration(
-                        labelText: 'Priority',
-                        filled: true,
-                        fillColor: AppColors.cardBg,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      dropdownColor: AppColors.cardBg,
-                      items: const [
-                        DropdownMenuItem(value: 'low', child: Text('Low')),
-                        DropdownMenuItem(value: 'medium', child: Text('Medium')),
-                        DropdownMenuItem(value: 'high', child: Text('High')),
-                        DropdownMenuItem(value: 'urgent', child: Text('Urgent')),
-                      ],
-                      onChanged: (val) => setModalState(() => priority = val!),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: assigneeCtrl,
-                decoration: InputDecoration(
-                  labelText: 'Assignee Name / Role',
-                  hintText: 'e.g. Ramesh Adhikari (Gate Lead)',
-                  filled: true,
-                  fillColor: AppColors.cardBg,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: descCtrl,
-                maxLines: 2,
-                decoration: InputDecoration(
-                  labelText: 'Instructions & Notes',
-                  hintText: 'Details, deliverables, or checklist items...',
-                  filled: true,
-                  fillColor: AppColors.cardBg,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () async {
-                  if (titleCtrl.text.trim().isEmpty) return;
-                  Navigator.pop(ctx);
-                  try {
-                    final res = await ApiClient().post('/events/tasks/', data: {
-                      'event': event.id,
-                      'title': titleCtrl.text.trim(),
-                      'description': descCtrl.text.trim(),
-                      'category': category,
-                      'priority': priority,
-                      'assigned_name': assigneeCtrl.text.trim(),
-                    });
-                    if (res.data is Map) {
-                      setState(() {
-                        _tasks.insert(0, Map<String, dynamic>.from(res.data));
-                      });
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Failed to assign task: $e')),
-                      );
-                    }
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                child: const Text('Assign Operations Duty', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ],
+          for (final s in const [
+            ('todo', 'To do', Icons.radio_button_unchecked_rounded),
+            ('in_progress', 'In progress', Icons.timelapse_rounded),
+            ('completed', 'Done', Icons.check_circle_outline_rounded),
+          ])
+            SheetAction(
+              icon: s.$3,
+              label: s.$2,
+              selected: status == s.$1,
+              onTap: () {
+                Navigator.pop(ctx);
+                if (status != s.$1) _updateTaskStatus(id, s.$1);
+              },
+            ),
+          const Divider(height: 16),
+          SheetAction(
+            icon: Icons.delete_outline_rounded,
+            label: 'Delete task',
+            destructive: true,
+            onTap: () {
+              Navigator.pop(ctx);
+              _deleteTask(id);
+            },
           ),
-        ),
+        ],
       ),
     );
   }
 
+  int _count(String s) => _tasks.where((t) => t['status'] == s).length;
+
   @override
   Widget build(BuildContext context) {
-    final filtered = _tasks.where((t) {
-      if (_filter == 'all') return true;
-      return t['status'] == _filter;
-    }).toList();
+    final event = ref.watch(eventProvider).currentEvent;
+    final filtered = _tasks.where((t) => _filter == 'all' || t['status'] == _filter).toList();
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Work Distribution & Crew Tasks'),
-        backgroundColor: AppColors.surface,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _fetchTasks,
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddTaskSheet,
-        backgroundColor: AppColors.primary,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text('Assign Task', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-      ),
-      body: Column(
-        children: [
-          // Filter Tabs Bar
-          Container(
-            color: AppColors.surface,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _FilterChip(
-                    label: 'All (${_tasks.length})',
-                    selected: _filter == 'all',
-                    onTap: () => setState(() => _filter = 'all'),
-                  ),
-                  const SizedBox(width: 8),
-                  _FilterChip(
-                    label: 'To Do (${_tasks.where((t) => t['status'] == 'todo').length})',
-                    selected: _filter == 'todo',
-                    onTap: () => setState(() => _filter = 'todo'),
-                  ),
-                  const SizedBox(width: 8),
-                  _FilterChip(
-                    label: 'In Progress (${_tasks.where((t) => t['status'] == 'in_progress').length})',
-                    selected: _filter == 'in_progress',
-                    onTap: () => setState(() => _filter = 'in_progress'),
-                  ),
-                  const SizedBox(width: 8),
-                  _FilterChip(
-                    label: 'Completed (${_tasks.where((t) => t['status'] == 'completed').length})',
-                    selected: _filter == 'completed',
-                    onTap: () => setState(() => _filter = 'completed'),
-                  ),
+    return AppScaffold(
+      title: 'Tasks',
+      onRefresh: event == null ? null : _fetchTasks,
+      actions: [
+        if (event != null) AppIconButton(icon: Icons.add_rounded, tooltip: 'Add task', onPressed: _addTask),
+      ],
+      slivers: [
+        if (event == null)
+          const SliverFillRemaining(
+            hasScrollBody: false,
+            child: EmptyState(
+              icon: Icons.event_outlined,
+              title: 'No event selected',
+              message: 'Pick an event on the Home tab to plan its tasks.',
+            ),
+          )
+        else if (_error != null && _tasks.isEmpty)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: ErrorState(title: "Couldn't load tasks", message: _error!, onRetry: _fetchTasks),
+          )
+        else if (_loading && _tasks.isEmpty)
+          const SliverToBoxAdapter(child: LoadingList(rows: 4, avatar: false))
+        else if (_tasks.isEmpty)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: EmptyState(
+              icon: Icons.task_alt_rounded,
+              title: 'No tasks yet',
+              message: 'Add tasks to split the work across your crew — stage, gates, food and more.',
+              actionLabel: 'Add a task',
+              actionIcon: Icons.add_rounded,
+              onAction: _addTask,
+            ),
+          )
+        else ...[
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: FilterPills<String>(
+                selected: _filter,
+                onChanged: (v) => setState(() => _filter = v),
+                segments: [
+                  Segment('all', 'All', count: _tasks.length),
+                  Segment('todo', 'To do', count: _count('todo')),
+                  Segment('in_progress', 'In progress', count: _count('in_progress')),
+                  Segment('completed', 'Done', count: _count('completed')),
                 ],
               ),
             ),
           ),
-
-          // Tasks List
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : filtered.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.task_alt_outlined, size: 56, color: AppColors.textSecondary),
-                            const SizedBox(height: 12),
-                            Text(
-                              'No ${_filter == "all" ? "" : _filter.replaceAll("_", " ")} tasks found',
-                              style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
-                            ),
-                          ],
-                        ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: _fetchTasks,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: filtered.length,
-                          itemBuilder: (ctx, idx) {
-                            final task = filtered[idx];
-                            return _TaskItemCard(
-                              task: task,
-                              onStatusChange: (newStatus) => _updateTaskStatus(task['id'], newStatus),
-                              onDelete: () => _deleteTask(task['id']),
-                            );
-                          },
-                        ),
+          if (filtered.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: EmptyState(
+                icon: Icons.filter_list_rounded,
+                title: 'Nothing here',
+                message: 'No tasks with this status.',
+                actionLabel: 'Show all tasks',
+                onAction: () => setState(() => _filter = 'all'),
+              ),
+            )
+          else
+            SliverToBoxAdapter(
+              child: LayoutBuilder(builder: (context, c) {
+                final cards = [
+                  for (final t in filtered)
+                    _TaskCard(
+                      task: t,
+                      onTap: () => _openTask(t),
+                      onToggleDone: () => _updateTaskStatus(
+                        t['id'].toString(),
+                        t['status'] == 'completed' ? 'todo' : 'completed',
                       ),
-          ),
+                    ),
+                ];
+                if (c.maxWidth < 640) {
+                  return Column(children: [
+                    for (final card in cards) Padding(padding: const EdgeInsets.only(bottom: 12), child: card),
+                  ]);
+                }
+                // Two columns on tablets.
+                final left = <Widget>[], right = <Widget>[];
+                for (var i = 0; i < cards.length; i++) {
+                  (i.isEven ? left : right).add(Padding(padding: const EdgeInsets.only(bottom: 12), child: cards[i]));
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: Column(children: left)),
+                    const SizedBox(width: 12),
+                    Expanded(child: Column(children: right)),
+                  ],
+                );
+              }),
+            ),
         ],
-      ),
+      ],
     );
   }
 }
 
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _FilterChip({required this.label, required this.selected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primary : AppColors.cardBg,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? AppColors.primary : AppColors.divider),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? Colors.white : AppColors.textSecondary,
-            fontSize: 12,
-            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TaskItemCard extends StatelessWidget {
+class _TaskCard extends StatelessWidget {
   final Map<String, dynamic> task;
-  final Function(String) onStatusChange;
-  final VoidCallback onDelete;
+  final VoidCallback onTap;
+  final VoidCallback onToggleDone;
 
-  const _TaskItemCard({
-    required this.task,
-    required this.onStatusChange,
-    required this.onDelete,
-  });
+  const _TaskCard({required this.task, required this.onTap, required this.onToggleDone});
 
   @override
   Widget build(BuildContext context) {
-    final status = task['status'] ?? 'todo';
-    final priority = task['priority'] ?? 'medium';
-    final category = task['category'] ?? 'tech';
-    final title = task['title'] ?? 'Operations Task';
-    final desc = task['description'] ?? '';
-    final assignedName = task['assigned_name'] ?? '';
+    final status = task['status']?.toString() ?? 'todo';
+    final priority = task['priority']?.toString() ?? 'medium';
+    final category = task['category']?.toString() ?? 'tech';
+    final title = task['title']?.toString() ?? 'Task';
+    final desc = task['description']?.toString() ?? '';
+    final assignedName = task['assigned_name']?.toString() ?? '';
+    final done = status == 'completed';
 
-    Color priorityColor = Colors.grey;
-    if (priority == 'urgent') priorityColor = Colors.redAccent;
-    if (priority == 'high') priorityColor = Colors.orangeAccent;
-    if (priority == 'medium') priorityColor = Colors.blueAccent;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: status == 'completed' ? AppColors.success.withOpacity(0.3) : AppColors.divider,
+    return GroupedSurface(
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(4, 8, 14, 14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Semantics(
+                label: done ? 'Mark as not done' : 'Mark as done',
+                button: true,
+                child: InkResponse(
+                  onTap: onToggleDone,
+                  radius: 22,
+                  child: SizedBox(
+                    width: AppSpace.tap,
+                    height: AppSpace.tap,
+                    child: Icon(
+                      done
+                          ? Icons.check_circle_rounded
+                          : status == 'in_progress'
+                              ? Icons.timelapse_rounded
+                              : Icons.radio_button_unchecked_rounded,
+                      color: done
+                          ? AppColors.success
+                          : status == 'in_progress'
+                              ? AppColors.brand
+                              : AppColors.ink300,
+                      size: 26,
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: AppType.body(16, weight: FontWeight.w600).copyWith(
+                          color: done ? AppColors.ink400 : AppColors.textPrimary,
+                          decoration: done ? TextDecoration.lineThrough : null,
+                          decorationColor: AppColors.ink400,
+                        ),
+                      ),
+                      if (desc.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(desc, maxLines: 3, overflow: TextOverflow.ellipsis, style: AppType.rowSubtitle),
+                      ],
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          StatusBadge(taskPriorities[priority] ?? priority, tone: priorityTone(priority)),
+                          StatusBadge(taskCategories[category] ?? category, dot: false),
+                          if (assignedName.isNotEmpty)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.person_outline_rounded, size: 16, color: AppColors.ink400),
+                                const SizedBox(width: 3),
+                                Text(assignedName, style: AppType.caption),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  category.toString().toUpperCase(),
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 10, fontWeight: FontWeight.bold),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: priorityColor.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: priorityColor.withOpacity(0.4)),
-                ),
-                child: Text(
-                  priority.toString().toUpperCase(),
-                  style: TextStyle(color: priorityColor, fontSize: 10, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            style: TextStyle(
-              color: status == 'completed' ? AppColors.textSecondary : AppColors.textPrimary,
-              fontWeight: FontWeight.w700,
-              fontSize: 14,
-              decoration: status == 'completed' ? TextDecoration.lineThrough : null,
-            ),
-          ),
-          if (desc.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(desc, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-          ],
-          if (assignedName.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Icon(Icons.person_outline, size: 14, color: AppColors.secondary),
-                const SizedBox(width: 4),
-                Text(
-                  assignedName,
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500),
-                ),
-              ],
-            ),
-          ],
-          const SizedBox(height: 10),
-          const Divider(height: 1),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  if (status != 'todo')
-                    TextButton(
-                      onPressed: () => onStatusChange('todo'),
-                      child: const Text('To Do', style: TextStyle(fontSize: 11)),
-                    ),
-                  if (status != 'in_progress')
-                    TextButton(
-                      onPressed: () => onStatusChange('in_progress'),
-                      child: const Text('In Progress', style: TextStyle(fontSize: 11, color: Colors.blueAccent)),
-                    ),
-                  if (status != 'completed')
-                    TextButton(
-                      onPressed: () => onStatusChange('completed'),
-                      child: const Text('Complete', style: TextStyle(fontSize: 11, color: AppColors.success)),
-                    ),
-                ],
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
-                onPressed: onDelete,
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

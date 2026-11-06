@@ -52,3 +52,20 @@ dist-ssr/
 # OS
 .DS_Store
 Thumbs.db
+
+# Firebase / Google service-account keys: never commit (the real one lives in ~/.eventlaya-deploy/)
+*firebase-adminsdk*.json
+firebase-service-account*.json
+
+# TLS certificates and private keys (Cloudflare origin cert etc. live in ~/.eventlaya-deploy/)
+*.pem
+*.key
+cloudflare.env
+
+# Build artifacts / local
+*.tsbuildinfo
+scanner_app/build/
+scanner_app/.dart_tool/
+# Firebase client config (per-environment; see scanner_app/FIREBASE_SETUP.md)
+google-services.json
+GoogleService-Info.plist

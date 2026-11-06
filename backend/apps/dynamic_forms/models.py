@@ -60,6 +60,8 @@ class FormField(models.Model):
     order = models.PositiveIntegerField(default=0)
     options = models.JSONField(default=list, blank=True) # for select/radio/checkbox
     validation_rules = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['order', 'id']
@@ -97,6 +99,7 @@ class FormResponse(models.Model):
     review_status = models.CharField(max_length=20, choices=ReviewStatus.choices, default=ReviewStatus.ACCEPTED)
     rejection_note = models.TextField(blank=True)
     submitted_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['-submitted_at']

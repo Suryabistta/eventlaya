@@ -1,201 +1,290 @@
-import React, { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import {
-  Vote as VoteIcon,
-  Award,
-  Sparkles,
-  CheckCircle,
-  AlertTriangle,
-  Users,
-  Flame
-} from 'lucide-react'
-import { api, type Poll } from '@/services/api'
-import { cn } from '@/lib/utils'
+import React from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { BarChart3, CalendarDays, Copy, Crown, Lock, MonitorPlay, Pencil, Play, Plus, Trash2, Trophy, Vote as VoteIcon } from 'lucide-react'
+import { useCurrentEvent } from '@/lib/event-context'
+import { Button, ButtonLink, Card, EmptyState, ErrorState, IconButton, PageHeader, Skeleton, useToast } from '@/components/ui'
+import { useModuleEnabled } from '@/lib/modules'
+import { votingApi, type VotingPoll } from './voting/api'
+import { PollStatusBadge, scheduleText, voteModeLabel } from './voting/shared'
+
+const wrapClass = 'w-full space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 2xl:px-10'
 
 export const VotingPage: React.FC = () => {
-  const queryClient = useQueryClient()
-  const [voterIdentity, setVoterIdentity] = useState('')
-  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null)
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const contestsOn = useModuleEnabled('contests')
+  const { currentEvent, isLoading: eventsLoading, isError: eventsError, error: eventsErr, refetch: refetchEvents } = useCurrentEvent()
 
-  const { data: polls = [], isLoading } = useQuery({
-    queryKey: ['polls'],
-    queryFn: () => api.getPolls(),
+  const { data: polls = [], isLoading, isError, error, refetch } = useQuery({
+    queryKey: ['voting-polls', currentEvent?.id],
+    queryFn: () => votingApi.list(currentEvent!.id),
+    enabled: Boolean(currentEvent?.id),
+    refetchInterval: 10000,
   })
 
-  const currentPoll = polls[0]
-
-  const voteMutation = useMutation({
-    mutationFn: ({ pollId, candidateId, voterId }: { pollId: string; candidateId: string; voterId: string }) =>
-      api.castVote(pollId, {
-        candidate_id: candidateId,
-        voter_identifier: voterId,
-      }),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['polls'] })
-      setFeedback({
-        type: 'success',
-        message: data.message,
-      })
-      setSelectedCandidateId(null)
-    },
-    onError: (err: Error) => {
-      setFeedback({
-        type: 'error',
-        message: err.message,
-      })
-    },
-  })
-
-  const handleCastVote = (candidateId: string) => {
-    if (!voterIdentity.trim()) {
-      setFeedback({
-        type: 'error',
-        message: 'Please enter your phone number or email first to verify your single vote.',
-      })
-      return
-    }
-    setFeedback(null)
-    voteMutation.mutate({
-      pollId: currentPoll.id,
-      candidateId,
-      voterId: voterIdentity.trim(),
-    })
+  if (eventsError) {
+    return (
+      <div className={wrapClass}>
+        <ErrorState message={eventsErr?.message} onRetry={refetchEvents} />
+      </div>
+    )
   }
 
-  // Calculate highest vote for leader highlight
-  const highestVotes = Math.max(...(currentPoll?.candidates?.map((c) => c.vote_count) || [0]))
+  if (!eventsLoading && !currentEvent) {
+    return (
+      <div className={wrapClass}>
+        <Card>
+          <EmptyState
+            icon={<CalendarDays className="h-6 w-6" />}
+            title="Create an event first"
+            description="Polls belong to an event. Once you have one, you can run live votes for it here."
+            action={<ButtonLink to="/app/events/new">Create event</ButtonLink>}
+          />
+        </Card>
+      </div>
+    )
+  }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-      {/* Header */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-amber-600 via-rose-600 to-indigo-800 text-white p-6 sm:p-8 shadow-xl">
-        <div className="relative z-10 max-w-2xl space-y-2">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-semibold backdrop-blur-xs">
-            <Award className="w-3.5 h-3.5 text-amber-300" />
-            Live Event Voting & Awards
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-            {currentPoll?.title || 'Live Polls & Competitions'}
-          </h1>
-          <p className="text-white/80 text-sm leading-relaxed">
-            {currentPoll?.description || 'Audience voting powered by single-vote cryptographic verification.'}
-          </p>
-        </div>
-      </div>
+    <div className={wrapClass}>
+      <PageHeader
+        title="Live voting"
+        description={currentEvent ? `Audience polls and contests for ${currentEvent.title}. Counts refresh on their own.` : 'Audience polls and contests for your event.'}
+        actions={
+          <>
+            {contestsOn && (
+              <ButtonLink to="/app/voting/contests/new" variant="secondary" icon={<Crown className="h-4 w-4" />}>
+                New contest
+              </ButtonLink>
+            )}
+            <ButtonLink to="/app/voting/new" icon={<Plus className="h-4 w-4" />}>
+              New poll
+            </ButtonLink>
+          </>
+        }
+      />
 
-      {/* Voter Identification Bar */}
-      <div className="p-5 bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h3 className="font-bold text-sm text-slate-900">Voter Verification</h3>
-          <p className="text-xs text-slate-500">
-            Enter your mobile number or attendee email. Eventlaya ensures 1 person = 1 vote strictly.
-          </p>
+      {isError ? (
+        <ErrorState message={error?.message} onRetry={refetch} />
+      ) : eventsLoading || isLoading ? (
+        <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+          {[0, 1].map((i) => (
+            <Skeleton key={i} className="h-64 rounded-2xl" />
+          ))}
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
-          <input
-            type="text"
-            placeholder="Mobile number (+977-98...)"
-            value={voterIdentity}
-            onChange={(e) => setVoterIdentity(e.target.value)}
-            className="text-xs px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 w-full sm:w-64"
+      ) : polls.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon={<VoteIcon className="h-6 w-6" />}
+            title="No polls for this event yet"
+            description="Run a quick audience question, or a full contest: pageants, talent shows and awards with rounds, judges and SMS-verified voting."
+            action={
+              <div className="flex flex-wrap justify-center gap-2">
+                <ButtonLink to="/app/voting/new" icon={<Plus className="h-4 w-4" />}>
+                  New poll
+                </ButtonLink>
+                {contestsOn && (
+                  <ButtonLink to="/app/voting/contests/new" variant="secondary" icon={<Crown className="h-4 w-4" />}>
+                    New contest
+                  </ButtonLink>
+                )}
+              </div>
+            }
           />
-        </div>
-      </div>
-
-      {/* Notification / Feedback Banner */}
-      {feedback && (
-        <div
-          className={cn(
-            'p-4 rounded-xl border flex items-center gap-3 text-xs font-semibold animate-in fade-in',
-            feedback.type === 'success' ? 'bg-emerald-50 text-emerald-900 border-emerald-200' : 'bg-rose-50 text-rose-900 border-rose-200'
-          )}
-        >
-          {feedback.type === 'success' ? (
-            <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
-          ) : (
-            <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
-          )}
-          <span>{feedback.message}</span>
-        </div>
-      )}
-
-      {/* Candidates Cards */}
-      {currentPoll && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between px-1">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Candidates / Projects ({currentPoll.candidates?.length || 0})
-            </span>
-            <span className="text-xs font-extrabold text-slate-700">
-              Total Votes Cast: {currentPoll.total_votes}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {currentPoll.candidates?.map((candidate) => {
-              const votePercent =
-                currentPoll.total_votes > 0 ? Math.round((candidate.vote_count / currentPoll.total_votes) * 100) : 0
-              const isLeader = candidate.vote_count === highestVotes && candidate.vote_count > 0
-
-              return (
-                <div
-                  key={candidate.id}
-                  className={cn(
-                    'p-5 bg-white rounded-2xl border transition-all flex flex-col justify-between shadow-xs',
-                    isLeader ? 'border-amber-300 ring-2 ring-amber-100' : 'border-slate-200 hover:border-slate-300'
-                  )}
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h4 className="font-extrabold text-base text-slate-900 flex items-center gap-1.5">
-                          {candidate.name}
-                          {isLeader && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-wider">
-                              <Flame className="w-3 h-3 text-amber-600" /> Leading
-                            </span>
-                          )}
-                        </h4>
-                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">{candidate.bio}</p>
-                      </div>
-                    </div>
-
-                    {/* Progress Bar */}
-                    <div className="pt-2">
-                      <div className="flex justify-between items-center text-xs font-bold mb-1">
-                        <span className="text-slate-600">{candidate.vote_count} votes</span>
-                        <span className="text-slate-900">{votePercent}%</span>
-                      </div>
-                      <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className={cn(
-                            'h-full transition-all duration-500 rounded-full',
-                            isLeader ? 'bg-amber-500' : 'bg-brand-600'
-                          )}
-                          style={{ width: `${votePercent}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
-                    <span className="text-[11px] text-slate-400">Audience Poll</span>
-                    <button
-                      onClick={() => handleCastVote(candidate.id)}
-                      disabled={voteMutation.isPending}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition shadow-xs"
-                    >
-                      <VoteIcon className="w-3.5 h-3.5 text-amber-400" />
-                      Vote for this project
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+        </Card>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+          {polls.filter((p) => contestsOn || p.kind !== 'contest').map((p) => (p.kind === 'contest' ? <ContestCard key={p.id} poll={p} /> : <PollCard key={p.id} poll={p} />))}
         </div>
       )}
     </div>
+  )
+}
+
+/** Contests get their own dashboard; the card links there. */
+const ContestCard: React.FC<{ poll: VotingPoll }> = ({ poll }) => (
+  <Card className="flex flex-col">
+    <div className="space-y-1 border-b border-ink-100 px-5 py-4">
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="min-w-0 text-base font-bold text-ink-900">
+          <Link to={`/app/voting/contests/${poll.id}`} className="hover:underline">
+            {poll.title}
+          </Link>
+        </h2>
+        <PollStatusBadge status={poll.status} className="shrink-0" />
+      </div>
+      <p className="flex items-center gap-1.5 text-sm text-ink-500">
+        <Crown className="h-3.5 w-3.5 text-marigold-600" aria-hidden /> Contest · {poll.candidates.length} contestants
+      </p>
+    </div>
+    <dl className="grid flex-1 grid-cols-2 divide-x divide-ink-100 border-b border-ink-100">
+      <div className="px-4 py-3 sm:px-5">
+        <dt className="text-xs text-ink-500">Votes</dt>
+        <dd className="mt-0.5 font-display text-xl font-bold text-ink-900 tabular">{poll.total_votes.toLocaleString()}</dd>
+      </div>
+      <div className="px-4 py-3 sm:px-5">
+        <dt className="text-xs text-ink-500">Voters</dt>
+        <dd className="mt-0.5 font-display text-xl font-bold text-ink-900 tabular">{poll.voters.toLocaleString()}</dd>
+      </div>
+    </dl>
+    <div className="flex flex-wrap items-center gap-2 px-5 py-3">
+      <ButtonLink to={`/app/voting/contests/${poll.id}`} size="sm" icon={<BarChart3 className="h-4 w-4" />}>
+        Dashboard
+      </ButtonLink>
+      <ButtonLink to={`/app/voting/contests/${poll.id}/edit`} size="sm" variant="secondary" icon={<Pencil className="h-4 w-4" />}>
+        Set up
+      </ButtonLink>
+      <ButtonLink to={`/app/voting/contests/${poll.id}/present`} size="sm" variant="secondary" icon={<MonitorPlay className="h-4 w-4" />}>
+        Present
+      </ButtonLink>
+    </div>
+  </Card>
+)
+
+const PollCard: React.FC<{ poll: VotingPoll }> = ({ poll }) => {
+  const toast = useToast()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['voting-polls'] })
+
+  const sorted = [...poll.candidates].sort((a, b) => (b.votes ?? 0) - (a.votes ?? 0))
+  const top = sorted[0]?.votes ?? 0
+  const leaders = top > 0 ? sorted.filter((c) => c.votes === top) : []
+  const turnout = poll.registered ? Math.round((poll.voters / poll.registered) * 100) : 0
+
+  const toggle = useMutation({
+    mutationFn: () => (poll.status === 'open' ? votingApi.close(poll.id) : votingApi.open(poll.id)),
+    onSuccess: (p) => {
+      refresh()
+      toast.success(p.status === 'open' ? 'Voting is open' : 'Voting closed', p.status === 'open' ? 'Share the link or QR code so people can vote.' : `${poll.title} no longer accepts votes.`)
+    },
+    onError: (e: Error) => toast.error(poll.status === 'open' ? 'Couldn’t close voting' : 'Couldn’t open voting', e.message),
+  })
+
+  const duplicate = useMutation({
+    mutationFn: () => votingApi.duplicate(poll.id),
+    onSuccess: (p) => {
+      refresh()
+      toast.success('Poll duplicated', `“${p.title}” was saved as a draft with the same candidates.`)
+    },
+    onError: (e: Error) => toast.error('Couldn’t duplicate the poll', e.message),
+  })
+
+  const remove = useMutation({
+    mutationFn: () => votingApi.remove(poll.id),
+    onSuccess: () => {
+      refresh()
+      toast.success('Poll deleted', poll.title)
+    },
+    onError: (e: Error) => toast.error('Couldn’t delete the poll', e.message),
+  })
+
+  const confirmDelete = async () => {
+    const ok = await toast.confirm({
+      title: `Delete “${poll.title}”?`,
+      description:
+        poll.total_votes > 0
+          ? `Its ${poll.total_votes.toLocaleString()} votes will be deleted too. This can’t be undone.`
+          : 'The poll and its candidates will be deleted. This can’t be undone.',
+      confirmLabel: 'Delete poll',
+      danger: true,
+    })
+    if (ok) remove.mutate()
+  }
+
+  const confirmToggle = async () => {
+    if (poll.status === 'open') {
+      const ok = await toast.confirm({
+        title: 'Close voting now?',
+        description: 'People won’t be able to vote any more. You can open it again later.',
+        confirmLabel: 'Close voting',
+      })
+      if (!ok) return
+    }
+    toggle.mutate()
+  }
+
+  return (
+    <Card className="flex flex-col">
+      <div className="space-y-1 border-b border-ink-100 px-5 py-4">
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="min-w-0 text-base font-bold text-ink-900">
+            <Link to={`/app/voting/${poll.id}`} className="hover:underline">
+              {poll.title}
+            </Link>
+          </h2>
+          <PollStatusBadge status={poll.status} className="shrink-0" />
+        </div>
+        <p className="text-sm text-ink-500">{scheduleText(poll)}</p>
+      </div>
+
+      <dl className="grid grid-cols-3 divide-x divide-ink-100 border-b border-ink-100">
+        <div className="px-4 py-3 sm:px-5">
+          <dt className="text-xs text-ink-500">Votes</dt>
+          <dd className="mt-0.5 font-display text-xl font-bold text-ink-900 tabular">{poll.total_votes.toLocaleString()}</dd>
+        </div>
+        {poll.vote_mode === 'ticket' ? (
+          <div className="px-4 py-3 sm:px-5">
+            <dt className="text-xs text-ink-500">Turnout</dt>
+            <dd className="mt-0.5 font-display text-xl font-bold text-ink-900 tabular">{turnout}%</dd>
+            <dd className="text-xs text-ink-500 tabular">
+              {poll.voters} of {poll.registered} tickets
+            </dd>
+          </div>
+        ) : (
+          <div className="px-4 py-3 sm:px-5">
+            <dt className="text-xs text-ink-500">Voters</dt>
+            <dd className="mt-0.5 font-display text-xl font-bold text-ink-900 tabular">{poll.voters.toLocaleString()}</dd>
+            <dd className="text-xs text-ink-500">Anyone with the link</dd>
+          </div>
+        )}
+        <div className="min-w-0 px-4 py-3 sm:px-5">
+          <dt className="text-xs text-ink-500">{leaders.length > 1 ? 'Tied for lead' : 'Leading'}</dt>
+          <dd className="mt-1 flex min-w-0 items-center gap-1.5 text-sm font-semibold text-ink-900">
+            {leaders.length ? (
+              <>
+                <Trophy className="h-4 w-4 shrink-0 text-marigold-600" aria-hidden />
+                <span className="truncate">{leaders.map((l) => l.name).join(', ')}</span>
+              </>
+            ) : (
+              <span className="font-normal text-ink-500">No votes yet</span>
+            )}
+          </dd>
+        </div>
+      </dl>
+
+      <p className="flex-1 px-5 py-3 text-sm text-ink-600">
+        {poll.candidates.length} candidates. {voteModeLabel[poll.vote_mode]}
+        {poll.allow_multiple ? `, pick up to ${poll.max_choices}` : ''}.
+      </p>
+
+      <div className="flex flex-wrap items-center gap-2 border-t border-ink-100 px-5 py-3">
+        <Button
+          size="sm"
+          variant={poll.status === 'open' ? 'secondary' : 'primary'}
+          icon={poll.status === 'open' ? <Lock className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          loading={toggle.isPending}
+          onClick={confirmToggle}
+        >
+          {poll.status === 'open' ? 'Close voting' : poll.status === 'closed' ? 'Reopen' : 'Open voting'}
+        </Button>
+        <ButtonLink to={`/app/voting/${poll.id}`} size="sm" variant="secondary" icon={<BarChart3 className="h-4 w-4" />}>
+          Results
+        </ButtonLink>
+        <ButtonLink to={`/app/voting/${poll.id}/present`} size="sm" variant="secondary" icon={<MonitorPlay className="h-4 w-4" />}>
+          Present
+        </ButtonLink>
+        <div className="ml-auto flex items-center">
+          <IconButton label={`Edit ${poll.title}`} onClick={() => navigate(`/app/voting/${poll.id}/edit`)}>
+            <Pencil className="h-4 w-4" aria-hidden />
+          </IconButton>
+          <IconButton label={`Duplicate ${poll.title}`} onClick={() => duplicate.mutate()} disabled={duplicate.isPending}>
+            <Copy className="h-4 w-4" aria-hidden />
+          </IconButton>
+          <IconButton label={`Delete ${poll.title}`} onClick={confirmDelete} disabled={remove.isPending} className="hover:bg-red-50 hover:text-red-600">
+            <Trash2 className="h-4 w-4" aria-hidden />
+          </IconButton>
+        </div>
+      </div>
+    </Card>
   )
 }

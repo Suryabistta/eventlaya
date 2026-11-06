@@ -1,0 +1,2668 @@
+{
+ "contest": {
+  "id": "c4e2427d-2d2a-41a8-a38c-47ea57f3efc4",
+  "kind": "contest",
+  "slug": "miss-biratnagar-2026",
+  "title": "Miss Biratnagar 2026",
+  "description": "The city's pageant is back. Vote for your favourite in the online audition \u2014 the top 10 go to the stage finale on 2 November, where judges and the public decide the crown.",
+  "cover_url": "",
+  "status": "open",
+  "opens_at": "2026-10-27T07:07:43.737701Z",
+  "closes_at": "2026-10-31T07:07:43.737701Z",
+  "event": {
+   "title": "Biratnagar Youth Music & Culture Fest 2026",
+   "slug": "biratnagar-music-awards-2026"
+  },
+  "vote_mode": "sms_otp",
+  "require_checked_in": false,
+  "verification": {
+   "method": "sms_otp",
+   "channel": "sms",
+   "captcha_site_key": null
+  },
+  "rules": {
+   "free_votes_enabled": true,
+   "votes_per_voter": null,
+   "votes_per_day": 5,
+   "votes_per_round": null,
+   "votes_per_contestant": 3,
+   "contestant_cap_period": "day",
+   "allow_split": true,
+   "max_votes_per_submit": 5,
+   "main_vote_enabled": true
+  },
+  "paid": {
+   "enabled": true,
+   "payments_available": true,
+   "unavailable_reason": null,
+   "unavailable_message": null,
+   "providers": [
+    {
+     "id": "khalti",
+     "name": "Khalti",
+     "sandbox": true
+    },
+    {
+     "id": "esewa",
+     "name": "eSewa",
+     "sandbox": true
+    },
+    {
+     "id": "test",
+     "name": "Test payment",
+     "sandbox": true
+    }
+   ],
+   "currency": "NPR",
+   "price_per_vote": "5.00",
+   "custom_votes": true,
+   "max_custom_votes": 1000,
+   "max_packs_per_day": 10,
+   "buy_and_vote": false,
+   "packs": [
+    {
+     "id": "6470bc3a-a165-44f9-9b9c-d7279cf2f03a",
+     "label": "Starter pack",
+     "votes": 10,
+     "bonus_votes": 0,
+     "total_votes": 10,
+     "price": "50.00",
+     "currency": "NPR",
+     "khalti_ok": true
+    },
+    {
+     "id": "fa989080-35a7-45f6-bbd5-acb72fddf192",
+     "label": "Fan pack",
+     "votes": 50,
+     "bonus_votes": 10,
+     "total_votes": 60,
+     "price": "200.00",
+     "currency": "NPR",
+     "khalti_ok": true
+    }
+   ]
+  },
+  "number_prefix": "#",
+  "number_padding": 2,
+  "profile_fields": [
+   {
+    "key": "age",
+    "label": "Age",
+    "field_type": "text",
+    "options": []
+   },
+   {
+    "key": "district",
+    "label": "District",
+    "field_type": "text",
+    "options": []
+   },
+   {
+    "key": "height",
+    "label": "Height",
+    "field_type": "text",
+    "options": []
+   },
+   {
+    "key": "hobbies",
+    "label": "Hobbies",
+    "field_type": "text",
+    "options": []
+   }
+  ],
+  "rounds": [
+   {
+    "id": "b5f28286-2364-44f0-8b44-71962d44dbe3",
+    "name": "Online audition",
+    "order": 1,
+    "status": "open",
+    "opens_at": "2026-10-27T07:07:43.737701Z",
+    "closes_at": "2026-10-30T12:07:43.737701Z",
+    "public_vote_enabled": true,
+    "judging_enabled": false,
+    "advance_count": 10,
+    "advance_mode": "auto",
+    "finalized_at": null
+   },
+   {
+    "id": "d1a7101e-e843-45cf-bca1-ce4145baab94",
+    "name": "Top 10",
+    "order": 2,
+    "status": "upcoming",
+    "opens_at": "2026-10-31T07:07:43.737701Z",
+    "closes_at": null,
+    "public_vote_enabled": true,
+    "judging_enabled": true,
+    "advance_count": null,
+    "advance_mode": "auto",
+    "finalized_at": null
+   },
+   {
+    "id": "eb5c5756-c84c-4005-8a53-7056367e5adb",
+    "name": "Finale",
+    "order": 3,
+    "status": "upcoming",
+    "opens_at": null,
+    "closes_at": null,
+    "public_vote_enabled": false,
+    "judging_enabled": true,
+    "advance_count": null,
+    "advance_mode": "auto",
+    "finalized_at": null
+   }
+  ],
+  "current_round": {
+   "id": "b5f28286-2364-44f0-8b44-71962d44dbe3",
+   "name": "Online audition",
+   "order": 1,
+   "status": "open",
+   "opens_at": "2026-10-27T07:07:43.737701Z",
+   "closes_at": "2026-10-30T12:07:43.737701Z",
+   "public_vote_enabled": true,
+   "judging_enabled": false,
+   "advance_count": 10,
+   "advance_mode": "auto",
+   "finalized_at": null
+  },
+  "display_round": {
+   "id": "b5f28286-2364-44f0-8b44-71962d44dbe3",
+   "name": "Online audition",
+   "order": 1,
+   "status": "open",
+   "opens_at": "2026-10-27T07:07:43.737701Z",
+   "closes_at": "2026-10-30T12:07:43.737701Z",
+   "public_vote_enabled": true,
+   "judging_enabled": false,
+   "advance_count": 10,
+   "advance_mode": "auto",
+   "finalized_at": null
+  },
+  "voting_open": true,
+  "categories": [
+   {
+    "id": "9ff5d36a-f915-41ae-8047-1d7b8a09a596",
+    "slug": "miss-photogenic",
+    "name": "Miss Photogenic",
+    "description": "",
+    "selection": "manual",
+    "nominees": [],
+    "voting_open": false,
+    "votes_per_voter": null,
+    "votes_per_day": 5,
+    "standings": {
+     "level": "ranks",
+     "top_n": null,
+     "rows": [
+      {
+       "contestant_id": "275bf8f4-b50d-4b25-93f2-04d70a30642d",
+       "name": "Asha Rai",
+       "display_number": "#01",
+       "number": 1,
+       "slug": "asha-rai",
+       "photo_url": "",
+       "rank": null,
+       "tied": false,
+       "status": "active"
+      },
+      {
+       "contestant_id": "2221fe3d-6191-4546-a1b5-c2e65a4052ef",
+       "name": "Bimala Limbu",
+       "display_number": "#02",
+       "number": 2,
+       "slug": "bimala-limbu",
+       "photo_url": "",
+       "rank": null,
+       "tied": false,
+       "status": "active"
+      },
+      {
+       "contestant_id": "1eb37b17-a3c5-435c-9dbe-f4880db6b0a2",
+       "name": "Chandani Shrestha",
+       "display_number": "#03",
+       "number": 3,
+       "slug": "chandani-shrestha",
+       "photo_url": "",
+       "rank": null,
+       "tied": false,
+       "status": "active"
+      },
+      {
+       "contestant_id": "d8325843-74db-4f15-abc2-1ccd6d365a68",
+       "name": "Dipika Tamang",
+       "display_number": "#04",
+       "number": 4,
+       "slug": "dipika-tamang",
+       "photo_url": "",
+       "rank": null,
+       "tied": false,
+       "status": "active"
+      },
+      {
+       "contestant_id": "97a76d45-763c-4ab0-8bf9-7a01008d477f",
+       "name": "Elina Karki",
+       "display_number": "#05",
+       "number": 5,
+       "slug": "elina-karki",
+       "photo_url": "",
+       "rank": null,
+       "tied": false,
+       "status": "active"
+      },
+      {
+       "contestant_id": "f7364003-e22b-4a37-8450-812ac90a667d",
+       "name": "Fulmaya Gurung",
+       "display_number": "#06",
+       "number": 6,
+       "slug": "fulmaya-gurung",
+       "photo_url": "",
+       "rank": null,
+       "tied": false,
+       "status": "active"
+      },
+      {
+       "contestant_id": "a8e1eba4-208c-4570-96f6-410b88c2375a",
+       "name": "Gita Thapa",
+       "display_number": "#07",
+       "number": 7,
+       "slug": "gita-thapa",
+       "photo_url": "",
+       "rank": null,
+       "tied": false,
+       "status": "active"
+      }
+     ],
+     "total_votes": null,
+     "weights": null
+    },
+    "winner": null
+   },
+   {
+    "id": "8d8b5e1e-79cc-4e53-b381-334569ccf4a9",
+    "slug": "peoples-choice",
+    "name": "People's Choice",
+    "description": "One vote a day for the crowd favourite.",
+    "selection": "public_vote",
+    "nominees": [],
+    "voting_open": true,
+    "votes_per_voter": null,
+    "votes_per_day": 1,
+    "standings": {
+     "level": "ranks",
+     "top_n": null,
+     "rows": [
+      {
+       "contestant_id": "2221fe3d-6191-4546-a1b5-c2e65a4052ef",
+       "name": "Bimala Limbu",
+       "display_number": "#02",
+       "number": 2,
+       "slug": "bimala-limbu",
+       "photo_url": "",
+       "rank": 1,
+       "tied": false,
+       "status": "active"
+      },
+      {
+       "contestant_id": "275bf8f4-b50d-4b25-93f2-04d70a30642d",
+       "name": "Asha Rai",
+       "display_number": "#01",
+       "number": 1,
+       "slug": "asha-rai",
+       "photo_url": "",
+       "rank": 2,
+       "tied": false,
+       "status": "active"
+      },
+      {
+       "contestant_id": "1eb37b17-a3c5-435c-9dbe-f4880db6b0a2",
+       "name": "Chandani Shrestha",
+       "display_number": "#03",
+       "number": 3,
+       "slug": "chandani-shrestha",
+       "photo_url": "",
+       "rank": 3,
+       "tied": false,
+       "status": "active"
+      },
+      {
+       "contestant_id": "d8325843-74db-4f15-abc2-1ccd6d365a68",
+       "name": "Dipika Tamang",
+       "display_number": "#04",
+       "number": 4,
+       "slug": "dipika-tamang",
+       "photo_url": "",
+       "rank": 4,
+       "tied": false,
+       "status": "active"
+      },
+      {
+       "contestant_id": "97a76d45-763c-4ab0-8bf9-7a01008d477f",
+       "name": "Elina Karki",
+       "display_number": "#05",
+       "number": 5,
+       "slug": "elina-karki",
+       "photo_url": "",
+       "rank": 5,
+       "tied": true,
+       "status": "active"
+      },
+      {
+       "contestant_id": "f7364003-e22b-4a37-8450-812ac90a667d",
+       "name": "Fulmaya Gurung",
+       "display_number": "#06",
+       "number": 6,
+       "slug": "fulmaya-gurung",
+       "photo_url": "",
+       "rank": 5,
+       "tied": true,
+       "status": "active"
+      },
+      {
+       "contestant_id": "a8e1eba4-208c-4570-96f6-410b88c2375a",
+       "name": "Gita Thapa",
+       "display_number": "#07",
+       "number": 7,
+       "slug": "gita-thapa",
+       "photo_url": "",
+       "rank": 5,
+       "tied": true,
+       "status": "active"
+      }
+     ],
+     "total_votes": null,
+     "weights": null
+    },
+    "winner": null
+   }
+  ],
+  "standings": {
+   "level": "ranks",
+   "top_n": null,
+   "rows": [
+    {
+     "contestant_id": "1eb37b17-a3c5-435c-9dbe-f4880db6b0a2",
+     "name": "Chandani Shrestha",
+     "display_number": "#03",
+     "number": 3,
+     "slug": "chandani-shrestha",
+     "photo_url": "",
+     "rank": 1,
+     "tied": false,
+     "status": "active"
+    },
+    {
+     "contestant_id": "275bf8f4-b50d-4b25-93f2-04d70a30642d",
+     "name": "Asha Rai",
+     "display_number": "#01",
+     "number": 1,
+     "slug": "asha-rai",
+     "photo_url": "",
+     "rank": 2,
+     "tied": false,
+     "status": "active"
+    },
+    {
+     "contestant_id": "2221fe3d-6191-4546-a1b5-c2e65a4052ef",
+     "name": "Bimala Limbu",
+     "display_number": "#02",
+     "number": 2,
+     "slug": "bimala-limbu",
+     "photo_url": "",
+     "rank": 3,
+     "tied": false,
+     "status": "active"
+    },
+    {
+     "contestant_id": "a8e1eba4-208c-4570-96f6-410b88c2375a",
+     "name": "Gita Thapa",
+     "display_number": "#07",
+     "number": 7,
+     "slug": "gita-thapa",
+     "photo_url": "",
+     "rank": 4,
+     "tied": false,
+     "status": "active"
+    },
+    {
+     "contestant_id": "97a76d45-763c-4ab0-8bf9-7a01008d477f",
+     "name": "Elina Karki",
+     "display_number": "#05",
+     "number": 5,
+     "slug": "elina-karki",
+     "photo_url": "",
+     "rank": 5,
+     "tied": false,
+     "status": "active"
+    },
+    {
+     "contestant_id": "d8325843-74db-4f15-abc2-1ccd6d365a68",
+     "name": "Dipika Tamang",
+     "display_number": "#04",
+     "number": 4,
+     "slug": "dipika-tamang",
+     "photo_url": "",
+     "rank": 6,
+     "tied": false,
+     "status": "active"
+    },
+    {
+     "contestant_id": "f7364003-e22b-4a37-8450-812ac90a667d",
+     "name": "Fulmaya Gurung",
+     "display_number": "#06",
+     "number": 6,
+     "slug": "fulmaya-gurung",
+     "photo_url": "",
+     "rank": 7,
+     "tied": false,
+     "status": "active"
+    },
+    {
+     "contestant_id": "e8eda998-0e8e-4411-8de1-32076afbeb70",
+     "name": "Hema Yadav",
+     "display_number": "#08",
+     "number": 8,
+     "slug": "hema-yadav",
+     "photo_url": "",
+     "rank": 8,
+     "tied": false,
+     "status": "withdrawn"
+    }
+   ],
+   "total_votes": null,
+   "weights": null
+  },
+  "placement_titles": [
+   "Miss Biratnagar 2026",
+   "1st runner-up",
+   "2nd runner-up"
+  ],
+  "transparency_note": "Votes are checked for bots every evening. Removed votes are listed on the results day.",
+  "contestants": [
+   {
+    "id": "275bf8f4-b50d-4b25-93f2-04d70a30642d",
+    "number": 1,
+    "display_number": "#01",
+    "slug": "asha-rai",
+    "name": "Asha Rai",
+    "subtitle": "Dharan",
+    "photo_url": "",
+    "status": "active",
+    "categories": [],
+    "in_current_round": true,
+    "profile": [
+     {
+      "key": "age",
+      "label": "Age",
+      "value": "19"
+     },
+     {
+      "key": "district",
+      "label": "District",
+      "value": "Dharan"
+     },
+     {
+      "key": "height",
+      "label": "Height",
+      "value": "5'4\""
+     },
+     {
+      "key": "hobbies",
+      "label": "Hobbies",
+      "value": "Dance, reading"
+     }
+    ]
+   },
+   {
+    "id": "2221fe3d-6191-4546-a1b5-c2e65a4052ef",
+    "number": 2,
+    "display_number": "#02",
+    "slug": "bimala-limbu",
+    "name": "Bimala Limbu",
+    "subtitle": "Itahari",
+    "photo_url": "",
+    "status": "active",
+    "categories": [],
+    "in_current_round": true,
+    "profile": [
+     {
+      "key": "age",
+      "label": "Age",
+      "value": "20"
+     },
+     {
+      "key": "district",
+      "label": "District",
+      "value": "Itahari"
+     },
+     {
+      "key": "height",
+      "label": "Height",
+      "value": "5'5\""
+     },
+     {
+      "key": "hobbies",
+      "label": "Hobbies",
+      "value": "Dance, reading"
+     }
+    ]
+   },
+   {
+    "id": "1eb37b17-a3c5-435c-9dbe-f4880db6b0a2",
+    "number": 3,
+    "display_number": "#03",
+    "slug": "chandani-shrestha",
+    "name": "Chandani Shrestha",
+    "subtitle": "Biratnagar",
+    "photo_url": "",
+    "status": "active",
+    "categories": [],
+    "in_current_round": true,
+    "profile": [
+     {
+      "key": "age",
+      "label": "Age",
+      "value": "21"
+     },
+     {
+      "key": "district",
+      "label": "District",
+      "value": "Biratnagar"
+     },
+     {
+      "key": "height",
+      "label": "Height",
+      "value": "5'6\""
+     },
+     {
+      "key": "hobbies",
+      "label": "Hobbies",
+      "value": "Dance, reading"
+     }
+    ]
+   },
+   {
+    "id": "d8325843-74db-4f15-abc2-1ccd6d365a68",
+    "number": 4,
+    "display_number": "#04",
+    "slug": "dipika-tamang",
+    "name": "Dipika Tamang",
+    "subtitle": "Damak",
+    "photo_url": "",
+    "status": "active",
+    "categories": [],
+    "in_current_round": true,
+    "profile": [
+     {
+      "key": "age",
+      "label": "Age",
+      "value": "22"
+     },
+     {
+      "key": "district",
+      "label": "District",
+      "value": "Damak"
+     },
+     {
+      "key": "height",
+      "label": "Height",
+      "value": "5'7\""
+     },
+     {
+      "key": "hobbies",
+      "label": "Hobbies",
+      "value": "Dance, reading"
+     }
+    ]
+   },
+   {
+    "id": "97a76d45-763c-4ab0-8bf9-7a01008d477f",
+    "number": 5,
+    "display_number": "#05",
+    "slug": "elina-karki",
+    "name": "Elina Karki",
+    "subtitle": "Birtamode",
+    "photo_url": "",
+    "status": "active",
+    "categories": [],
+    "in_current_round": true,
+    "profile": [
+     {
+      "key": "age",
+      "label": "Age",
+      "value": "23"
+     },
+     {
+      "key": "district",
+      "label": "District",
+      "value": "Birtamode"
+     },
+     {
+      "key": "height",
+      "label": "Height",
+      "value": "5'4\""
+     },
+     {
+      "key": "hobbies",
+      "label": "Hobbies",
+      "value": "Dance, reading"
+     }
+    ]
+   },
+   {
+    "id": "f7364003-e22b-4a37-8450-812ac90a667d",
+    "number": 6,
+    "display_number": "#06",
+    "slug": "fulmaya-gurung",
+    "name": "Fulmaya Gurung",
+    "subtitle": "Ilam",
+    "photo_url": "",
+    "status": "active",
+    "categories": [],
+    "in_current_round": true,
+    "profile": [
+     {
+      "key": "age",
+      "label": "Age",
+      "value": "19"
+     },
+     {
+      "key": "district",
+      "label": "District",
+      "value": "Ilam"
+     },
+     {
+      "key": "height",
+      "label": "Height",
+      "value": "5'5\""
+     },
+     {
+      "key": "hobbies",
+      "label": "Hobbies",
+      "value": "Dance, reading"
+     }
+    ]
+   },
+   {
+    "id": "a8e1eba4-208c-4570-96f6-410b88c2375a",
+    "number": 7,
+    "display_number": "#07",
+    "slug": "gita-thapa",
+    "name": "Gita Thapa",
+    "subtitle": "Inaruwa",
+    "photo_url": "",
+    "status": "active",
+    "categories": [],
+    "in_current_round": true,
+    "profile": [
+     {
+      "key": "age",
+      "label": "Age",
+      "value": "20"
+     },
+     {
+      "key": "district",
+      "label": "District",
+      "value": "Inaruwa"
+     },
+     {
+      "key": "height",
+      "label": "Height",
+      "value": "5'6\""
+     },
+     {
+      "key": "hobbies",
+      "label": "Hobbies",
+      "value": "Dance, reading"
+     }
+    ]
+   },
+   {
+    "id": "e8eda998-0e8e-4411-8de1-32076afbeb70",
+    "number": 8,
+    "display_number": "#08",
+    "slug": "hema-yadav",
+    "name": "Hema Yadav",
+    "subtitle": "Rajbiraj",
+    "photo_url": "",
+    "status": "withdrawn",
+    "categories": [],
+    "in_current_round": false,
+    "profile": [
+     {
+      "key": "age",
+      "label": "Age",
+      "value": "21"
+     },
+     {
+      "key": "district",
+      "label": "District",
+      "value": "Rajbiraj"
+     },
+     {
+      "key": "height",
+      "label": "Height",
+      "value": "5'7\""
+     },
+     {
+      "key": "hobbies",
+      "label": "Hobbies",
+      "value": "Dance, reading"
+     }
+    ]
+   }
+  ]
+ },
+ "contestant": {
+  "contest": {
+   "id": "c4e2427d-2d2a-41a8-a38c-47ea57f3efc4",
+   "kind": "contest",
+   "slug": "miss-biratnagar-2026",
+   "title": "Miss Biratnagar 2026",
+   "description": "The city's pageant is back. Vote for your favourite in the online audition \u2014 the top 10 go to the stage finale on 2 November, where judges and the public decide the crown.",
+   "cover_url": "",
+   "status": "open",
+   "opens_at": "2026-10-27T07:07:43.737701Z",
+   "closes_at": "2026-10-31T07:07:43.737701Z",
+   "event": {
+    "title": "Biratnagar Youth Music & Culture Fest 2026",
+    "slug": "biratnagar-music-awards-2026"
+   },
+   "vote_mode": "sms_otp",
+   "require_checked_in": false,
+   "verification": {
+    "method": "sms_otp",
+    "channel": "sms",
+    "captcha_site_key": null
+   },
+   "rules": {
+    "free_votes_enabled": true,
+    "votes_per_voter": null,
+    "votes_per_day": 5,
+    "votes_per_round": null,
+    "votes_per_contestant": 3,
+    "contestant_cap_period": "day",
+    "allow_split": true,
+    "max_votes_per_submit": 5,
+    "main_vote_enabled": true
+   },
+   "paid": {
+    "enabled": true,
+    "payments_available": true,
+    "unavailable_reason": null,
+    "unavailable_message": null,
+    "providers": [
+     {
+      "id": "khalti",
+      "name": "Khalti",
+      "sandbox": true
+     },
+     {
+      "id": "esewa",
+      "name": "eSewa",
+      "sandbox": true
+     },
+     {
+      "id": "test",
+      "name": "Test payment",
+      "sandbox": true
+     }
+    ],
+    "currency": "NPR",
+    "price_per_vote": "5.00",
+    "custom_votes": true,
+    "max_custom_votes": 1000,
+    "max_packs_per_day": 10,
+    "buy_and_vote": false,
+    "packs": [
+     {
+      "id": "6470bc3a-a165-44f9-9b9c-d7279cf2f03a",
+      "label": "Starter pack",
+      "votes": 10,
+      "bonus_votes": 0,
+      "total_votes": 10,
+      "price": "50.00",
+      "currency": "NPR",
+      "khalti_ok": true
+     },
+     {
+      "id": "fa989080-35a7-45f6-bbd5-acb72fddf192",
+      "label": "Fan pack",
+      "votes": 50,
+      "bonus_votes": 10,
+      "total_votes": 60,
+      "price": "200.00",
+      "currency": "NPR",
+      "khalti_ok": true
+     }
+    ]
+   },
+   "number_prefix": "#",
+   "number_padding": 2,
+   "profile_fields": [
+    {
+     "key": "age",
+     "label": "Age",
+     "field_type": "text",
+     "options": []
+    },
+    {
+     "key": "district",
+     "label": "District",
+     "field_type": "text",
+     "options": []
+    },
+    {
+     "key": "height",
+     "label": "Height",
+     "field_type": "text",
+     "options": []
+    },
+    {
+     "key": "hobbies",
+     "label": "Hobbies",
+     "field_type": "text",
+     "options": []
+    }
+   ],
+   "rounds": [
+    {
+     "id": "b5f28286-2364-44f0-8b44-71962d44dbe3",
+     "name": "Online audition",
+     "order": 1,
+     "status": "open",
+     "opens_at": "2026-10-27T07:07:43.737701Z",
+     "closes_at": "2026-10-30T12:07:43.737701Z",
+     "public_vote_enabled": true,
+     "judging_enabled": false,
+     "advance_count": 10,
+     "advance_mode": "auto",
+     "finalized_at": null
+    },
+    {
+     "id": "d1a7101e-e843-45cf-bca1-ce4145baab94",
+     "name": "Top 10",
+     "order": 2,
+     "status": "upcoming",
+     "opens_at": "2026-10-31T07:07:43.737701Z",
+     "closes_at": null,
+     "public_vote_enabled": true,
+     "judging_enabled": true,
+     "advance_count": null,
+     "advance_mode": "auto",
+     "finalized_at": null
+    },
+    {
+     "id": "eb5c5756-c84c-4005-8a53-7056367e5adb",
+     "name": "Finale",
+     "order": 3,
+     "status": "upcoming",
+     "opens_at": null,
+     "closes_at": null,
+     "public_vote_enabled": false,
+     "judging_enabled": true,
+     "advance_count": null,
+     "advance_mode": "auto",
+     "finalized_at": null
+    }
+   ],
+   "current_round": {
+    "id": "b5f28286-2364-44f0-8b44-71962d44dbe3",
+    "name": "Online audition",
+    "order": 1,
+    "status": "open",
+    "opens_at": "2026-10-27T07:07:43.737701Z",
+    "closes_at": "2026-10-30T12:07:43.737701Z",
+    "public_vote_enabled": true,
+    "judging_enabled": false,
+    "advance_count": 10,
+    "advance_mode": "auto",
+    "finalized_at": null
+   },
+   "display_round": {
+    "id": "b5f28286-2364-44f0-8b44-71962d44dbe3",
+    "name": "Online audition",
+    "order": 1,
+    "status": "open",
+    "opens_at": "2026-10-27T07:07:43.737701Z",
+    "closes_at": "2026-10-30T12:07:43.737701Z",
+    "public_vote_enabled": true,
+    "judging_enabled": false,
+    "advance_count": 10,
+    "advance_mode": "auto",
+    "finalized_at": null
+   },
+   "voting_open": true,
+   "categories": [
+    {
+     "id": "9ff5d36a-f915-41ae-8047-1d7b8a09a596",
+     "slug": "miss-photogenic",
+     "name": "Miss Photogenic",
+     "description": "",
+     "selection": "manual",
+     "nominees": [],
+     "voting_open": false,
+     "votes_per_voter": null,
+     "votes_per_day": 5,
+     "standings": {
+      "level": "ranks",
+      "top_n": null,
+      "rows": [
+       {
+        "contestant_id": "275bf8f4-b50d-4b25-93f2-04d70a30642d",
+        "name": "Asha Rai",
+        "display_number": "#01",
+        "number": 1,
+        "slug": "asha-rai",
+        "photo_url": "",
+        "rank": null,
+        "tied": false,
+        "status": "active"
+       },
+       {
+        "contestant_id": "2221fe3d-6191-4546-a1b5-c2e65a4052ef",
+        "name": "Bimala Limbu",
+        "display_number": "#02",
+        "number": 2,
+        "slug": "bimala-limbu",
+        "photo_url": "",
+        "rank": null,
+        "tied": false,
+        "status": "active"
+       },
+       {
+        "contestant_id": "1eb37b17-a3c5-435c-9dbe-f4880db6b0a2",
+        "name": "Chandani Shrestha",
+        "display_number": "#03",
+        "number": 3,
+        "slug": "chandani-shrestha",
+        "photo_url": "",
+        "rank": null,
+        "tied": false,
+        "status": "active"
+       },
+       {
+        "contestant_id": "d8325843-74db-4f15-abc2-1ccd6d365a68",
+        "name": "Dipika Tamang",
+        "display_number": "#04",
+        "number": 4,
+        "slug": "dipika-tamang",
+        "photo_url": "",
+        "rank": null,
+        "tied": false,
+        "status": "active"
+       },
+       {
+        "contestant_id": "97a76d45-763c-4ab0-8bf9-7a01008d477f",
+        "name": "Elina Karki",
+        "display_number": "#05",
+        "number": 5,
+        "slug": "elina-karki",
+        "photo_url": "",
+        "rank": null,
+        "tied": false,
+        "status": "active"
+       },
+       {
+        "contestant_id": "f7364003-e22b-4a37-8450-812ac90a667d",
+        "name": "Fulmaya Gurung",
+        "display_number": "#06",
+        "number": 6,
+        "slug": "fulmaya-gurung",
+        "photo_url": "",
+        "rank": null,
+        "tied": false,
+        "status": "active"
+       },
+       {
+        "contestant_id": "a8e1eba4-208c-4570-96f6-410b88c2375a",
+        "name": "Gita Thapa",
+        "display_number": "#07",
+        "number": 7,
+        "slug": "gita-thapa",
+        "photo_url": "",
+        "rank": null,
+        "tied": false,
+        "status": "active"
+       }
+      ],
+      "total_votes": null,
+      "weights": null
+     },
+     "winner": null
+    },
+    {
+     "id": "8d8b5e1e-79cc-4e53-b381-334569ccf4a9",
+     "slug": "peoples-choice",
+     "name": "People's Choice",
+     "description": "One vote a day for the crowd favourite.",
+     "selection": "public_vote",
+     "nominees": [],
+     "voting_open": true,
+     "votes_per_voter": null,
+     "votes_per_day": 1,
+     "standings": {
+      "level": "ranks",
+      "top_n": null,
+      "rows": [
+       {
+        "contestant_id": "2221fe3d-6191-4546-a1b5-c2e65a4052ef",
+        "name": "Bimala Limbu",
+        "display_number": "#02",
+        "number": 2,
+        "slug": "bimala-limbu",
+        "photo_url": "",
+        "rank": 1,
+        "tied": false,
+        "status": "active"
+       },
+       {
+        "contestant_id": "275bf8f4-b50d-4b25-93f2-04d70a30642d",
+        "name": "Asha Rai",
+        "display_number": "#01",
+        "number": 1,
+        "slug": "asha-rai",
+        "photo_url": "",
+        "rank": 2,
+        "tied": false,
+        "status": "active"
+       },
+       {
+        "contestant_id": "1eb37b17-a3c5-435c-9dbe-f4880db6b0a2",
+        "name": "Chandani Shrestha",
+        "display_number": "#03",
+        "number": 3,
+        "slug": "chandani-shrestha",
+        "photo_url": "",
+        "rank": 3,
+        "tied": false,
+        "status": "active"
+       },
+       {
+        "contestant_id": "d8325843-74db-4f15-abc2-1ccd6d365a68",
+        "name": "Dipika Tamang",
+        "display_number": "#04",
+        "number": 4,
+        "slug": "dipika-tamang",
+        "photo_url": "",
+        "rank": 4,
+        "tied": false,
+        "status": "active"
+       },
+       {
+        "contestant_id": "97a76d45-763c-4ab0-8bf9-7a01008d477f",
+        "name": "Elina Karki",
+        "display_number": "#05",
+        "number": 5,
+        "slug": "elina-karki",
+        "photo_url": "",
+        "rank": 5,
+        "tied": true,
+        "status": "active"
+       },
+       {
+        "contestant_id": "f7364003-e22b-4a37-8450-812ac90a667d",
+        "name": "Fulmaya Gurung",
+        "display_number": "#06",
+        "number": 6,
+        "slug": "fulmaya-gurung",
+        "photo_url": "",
+        "rank": 5,
+        "tied": true,
+        "status": "active"
+       },
+       {
+        "contestant_id": "a8e1eba4-208c-4570-96f6-410b88c2375a",
+        "name": "Gita Thapa",
+        "display_number": "#07",
+        "number": 7,
+        "slug": "gita-thapa",
+        "photo_url": "",
+        "rank": 5,
+        "tied": true,
+        "status": "active"
+       }
+      ],
+      "total_votes": null,
+      "weights": null
+     },
+     "winner": null
+    }
+   ],
+   "standings": {
+    "level": "ranks",
+    "top_n": null,
+    "rows": [
+     {
+      "contestant_id": "1eb37b17-a3c5-435c-9dbe-f4880db6b0a2",
+      "name": "Chandani Shrestha",
+      "display_number": "#03",
+      "number": 3,
+      "slug": "chandani-shrestha",
+      "photo_url": "",
+      "rank": 1,
+      "tied": false,
+      "status": "active"
+     },
+     {
+      "contestant_id": "275bf8f4-b50d-4b25-93f2-04d70a30642d",
+      "name": "Asha Rai",
+      "display_number": "#01",
+      "number": 1,
+      "slug": "asha-rai",
+      "photo_url": "",
+      "rank": 2,
+      "tied": false,
+      "status": "active"
+     },
+     {
+      "contestant_id": "2221fe3d-6191-4546-a1b5-c2e65a4052ef",
+      "name": "Bimala Limbu",
+      "display_number": "#02",
+      "number": 2,
+      "slug": "bimala-limbu",
+      "photo_url": "",
+      "rank": 3,
+      "tied": false,
+      "status": "active"
+     },
+     {
+      "contestant_id": "a8e1eba4-208c-4570-96f6-410b88c2375a",
+      "name": "Gita Thapa",
+      "display_number": "#07",
+      "number": 7,
+      "slug": "gita-thapa",
+      "photo_url": "",
+      "rank": 4,
+      "tied": false,
+      "status": "active"
+     },
+     {
+      "contestant_id": "97a76d45-763c-4ab0-8bf9-7a01008d477f",
+      "name": "Elina Karki",
+      "display_number": "#05",
+      "number": 5,
+      "slug": "elina-karki",
+      "photo_url": "",
+      "rank": 5,
+      "tied": false,
+      "status": "active"
+     },
+     {
+      "contestant_id": "d8325843-74db-4f15-abc2-1ccd6d365a68",
+      "name": "Dipika Tamang",
+      "display_number": "#04",
+      "number": 4,
+      "slug": "dipika-tamang",
+      "photo_url": "",
+      "rank": 6,
+      "tied": false,
+      "status": "active"
+     },
+     {
+      "contestant_id": "f7364003-e22b-4a37-8450-812ac90a667d",
+      "name": "Fulmaya Gurung",
+      "display_number": "#06",
+      "number": 6,
+      "slug": "fulmaya-gurung",
+      "photo_url": "",
+      "rank": 7,
+      "tied": false,
+      "status": "active"
+     },
+     {
+      "contestant_id": "e8eda998-0e8e-4411-8de1-32076afbeb70",
+      "name": "Hema Yadav",
+      "display_number": "#08",
+      "number": 8,
+      "slug": "hema-yadav",
+      "photo_url": "",
+      "rank": 8,
+      "tied": false,
+      "status": "withdrawn"
+     }
+    ],
+    "total_votes": null,
+    "weights": null
+   },
+   "placement_titles": [
+    "Miss Biratnagar 2026",
+    "1st runner-up",
+    "2nd runner-up"
+   ],
+   "transparency_note": "Votes are checked for bots every evening. Removed votes are listed on the results day."
+  },
+  "contestant": {
+   "id": "275bf8f4-b50d-4b25-93f2-04d70a30642d",
+   "number": 1,
+   "display_number": "#01",
+   "slug": "asha-rai",
+   "name": "Asha Rai",
+   "subtitle": "Dharan",
+   "photo_url": "",
+   "status": "active",
+   "categories": [],
+   "in_current_round": true,
+   "profile": [
+    {
+     "key": "age",
+     "label": "Age",
+     "value": "19"
+    },
+    {
+     "key": "district",
+     "label": "District",
+     "value": "Dharan"
+    },
+    {
+     "key": "height",
+     "label": "Height",
+     "value": "5'4\""
+    },
+    {
+     "key": "hobbies",
+     "label": "Hobbies",
+     "value": "Dance, reading"
+    }
+   ],
+   "description": "Asha Rai is from Dharan. Loves music, community work and dancing. Vote to send Asha to the finale!",
+   "gallery": [],
+   "social_links": {
+    "facebook": "https://facebook.com/eventlaya",
+    "instagram": "https://instagram.com/eventlaya"
+   },
+   "standing": {
+    "contestant_id": "275bf8f4-b50d-4b25-93f2-04d70a30642d",
+    "name": "Asha Rai",
+    "display_number": "#01",
+    "number": 1,
+    "slug": "asha-rai",
+    "photo_url": "",
+    "rank": 2,
+    "tied": false,
+    "status": "active"
+   },
+   "standing_level": "ranks",
+   "previous": null,
+   "next": {
+    "id": "2221fe3d-6191-4546-a1b5-c2e65a4052ef",
+    "name": "Bimala Limbu",
+    "display_number": "#02",
+    "slug": "bimala-limbu",
+    "number": 2
+   }
+  }
+ },
+ "closed": {
+  "id": "eebf297b-137b-4be0-bebb-0f3246cb073c",
+  "kind": "contest",
+  "slug": "battle-of-bands-2025",
+  "title": "Battle of the Bands 2025",
+  "description": "",
+  "cover_url": "",
+  "status": "closed",
+  "opens_at": "2026-09-28T07:07:43.737701Z",
+  "closes_at": "2026-10-26T07:07:43.737701Z",
+  "event": {
+   "title": "Biratnagar Youth Music & Culture Fest 2026",
+   "slug": "biratnagar-music-awards-2026"
+  },
+  "vote_mode": "open",
+  "require_checked_in": false,
+  "verification": {
+   "method": "open",
+   "channel": null,
+   "captcha_site_key": null
+  },
+  "rules": {
+   "free_votes_enabled": true,
+   "votes_per_voter": 1,
+   "votes_per_day": null,
+   "votes_per_round": null,
+   "votes_per_contestant": null,
+   "contestant_cap_period": "contest",
+   "allow_split": true,
+   "max_votes_per_submit": 1,
+   "main_vote_enabled": true
+  },
+  "paid": {
+   "enabled": false,
+   "payments_available": false,
+   "unavailable_reason": "off",
+   "unavailable_message": null,
+   "providers": [],
+   "currency": "NPR",
+   "price_per_vote": null,
+   "custom_votes": false,
+   "max_custom_votes": 1000,
+   "max_packs_per_day": 10,
+   "buy_and_vote": false,
+   "packs": []
+  },
+  "number_prefix": "#",
+  "number_padding": 2,
+  "profile_fields": [],
+  "rounds": [
+   {
+    "id": "9266cf51-623c-40a3-a95d-51336a224708",
+    "name": "Final",
+    "order": 1,
+    "status": "closed",
+    "opens_at": "2026-09-28T07:07:43.737701Z",
+    "closes_at": "2026-10-26T07:07:43.737701Z",
+    "public_vote_enabled": true,
+    "judging_enabled": false,
+    "advance_count": null,
+    "advance_mode": "auto",
+    "finalized_at": "2026-10-27T07:07:43.737701Z"
+   }
+  ],
+  "current_round": null,
+  "display_round": {
+   "id": "9266cf51-623c-40a3-a95d-51336a224708",
+   "name": "Final",
+   "order": 1,
+   "status": "closed",
+   "opens_at": "2026-09-28T07:07:43.737701Z",
+   "closes_at": "2026-10-26T07:07:43.737701Z",
+   "public_vote_enabled": true,
+   "judging_enabled": false,
+   "advance_count": null,
+   "advance_mode": "auto",
+   "finalized_at": "2026-10-27T07:07:43.737701Z"
+  },
+  "voting_open": false,
+  "categories": [],
+  "standings": {
+   "level": "full",
+   "top_n": null,
+   "rows": [
+    {
+     "contestant_id": "b5c4d94b-871e-41b2-9491-a7fb6dc97278",
+     "name": "Vintage Nepal",
+     "display_number": "#01",
+     "number": 1,
+     "slug": "vintage-nepal",
+     "photo_url": "",
+     "rank": 1,
+     "tied": false,
+     "status": "winner",
+     "votes": 88,
+     "percentage": 37.6
+    },
+    {
+     "contestant_id": "1942b25f-3f96-4b42-9d4a-9701e63701e7",
+     "name": "Yeti Groove",
+     "display_number": "#02",
+     "number": 2,
+     "slug": "yeti-groove",
+     "photo_url": "",
+     "rank": 2,
+     "tied": false,
+     "status": "active",
+     "votes": 71,
+     "percentage": 30.3
+    },
+    {
+     "contestant_id": "b650bdd8-a03f-443d-b849-092b81ad8f32",
+     "name": "Rhododendron Riot",
+     "display_number": "#03",
+     "number": 3,
+     "slug": "rhododendron-riot",
+     "photo_url": "",
+     "rank": 3,
+     "tied": false,
+     "status": "active",
+     "votes": 45,
+     "percentage": 19.2
+    },
+    {
+     "contestant_id": "902f7112-d91f-458d-b65f-4c5b3429dc08",
+     "name": "Mahabharat Blues",
+     "display_number": "#04",
+     "number": 4,
+     "slug": "mahabharat-blues",
+     "photo_url": "",
+     "rank": 4,
+     "tied": false,
+     "status": "active",
+     "votes": 30,
+     "percentage": 12.8
+    }
+   ],
+   "total_votes": 234,
+   "weights": null
+  },
+  "placement_titles": [
+   "Champion",
+   "Runner-up",
+   "Third place"
+  ],
+  "transparency_note": "",
+  "contestants": [
+   {
+    "id": "b5c4d94b-871e-41b2-9491-a7fb6dc97278",
+    "number": 1,
+    "display_number": "#01",
+    "slug": "vintage-nepal",
+    "name": "Vintage Nepal",
+    "subtitle": "Rock",
+    "photo_url": "",
+    "status": "winner",
+    "categories": [],
+    "in_current_round": null,
+    "profile": []
+   },
+   {
+    "id": "1942b25f-3f96-4b42-9d4a-9701e63701e7",
+    "number": 2,
+    "display_number": "#02",
+    "slug": "yeti-groove",
+    "name": "Yeti Groove",
+    "subtitle": "Funk",
+    "photo_url": "",
+    "status": "active",
+    "categories": [],
+    "in_current_round": null,
+    "profile": []
+   },
+   {
+    "id": "b650bdd8-a03f-443d-b849-092b81ad8f32",
+    "number": 3,
+    "display_number": "#03",
+    "slug": "rhododendron-riot",
+    "name": "Rhododendron Riot",
+    "subtitle": "Punk",
+    "photo_url": "",
+    "status": "active",
+    "categories": [],
+    "in_current_round": null,
+    "profile": []
+   },
+   {
+    "id": "902f7112-d91f-458d-b65f-4c5b3429dc08",
+    "number": 4,
+    "display_number": "#04",
+    "slug": "mahabharat-blues",
+    "name": "Mahabharat Blues",
+    "subtitle": "Blues",
+    "photo_url": "",
+    "status": "active",
+    "categories": [],
+    "in_current_round": null,
+    "profile": []
+   }
+  ]
+ },
+ "event_voting": {
+  "event": {
+   "title": "Biratnagar Youth Music & Culture Fest 2026",
+   "slug": "biratnagar-music-awards-2026"
+  },
+  "polls": [
+   {
+    "id": "68448f52-3d5f-4b83-95c2-0e49fc363942",
+    "kind": "poll",
+    "slug": "",
+    "title": "Best Eastern Emerging Indie Band 2026",
+    "description": "Cast your live vote for the breakthrough band of the year from Eastern Nepal.",
+    "status": "open",
+    "opens_at": null,
+    "closes_at": null,
+    "vote_mode": "contact",
+    "require_checked_in": false,
+    "allow_multiple": false,
+    "max_choices": 1,
+    "results_visible": true,
+    "total_votes": 480,
+    "event": {
+     "title": "Biratnagar Youth Music & Culture Fest 2026",
+     "slug": "biratnagar-music-awards-2026"
+    },
+    "candidates": [
+     {
+      "id": "c07f778b-4632-4c20-9030-6edf22cae587",
+      "name": "Morang Sound System",
+      "subtitle": "",
+      "description": "Experimental indie-pop synthesizers from Biratnagar.",
+      "photo_url": "",
+      "votes": 176,
+      "percentage": 36.7
+     },
+     {
+      "id": "44586ef5-bed8-48cd-8e45-5fd721d31a19",
+      "name": "The Dharan Rhythms",
+      "subtitle": "",
+      "description": "Alternative rock trio from Dharan, blending Eastern blues with rock.",
+      "photo_url": "",
+      "votes": 142,
+      "percentage": 29.6
+     },
+     {
+      "id": "fe48fb50-cf75-4d40-aa55-ef2834ebebb8",
+      "name": "Itahari Folk Collective",
+      "subtitle": "",
+      "description": "Modern Sarangi and acoustic melodies infused with rock beats.",
+      "photo_url": "",
+      "votes": 98,
+      "percentage": 20.4
+     },
+     {
+      "id": "e0b285aa-b01e-4c79-8382-2c8bea89bd6c",
+      "name": "Himalayan Echoes",
+      "subtitle": "",
+      "description": "Progressive fusion ensemble celebrating folk eastern folklore.",
+      "photo_url": "",
+      "votes": 64,
+      "percentage": 13.3
+     }
+    ],
+    "viewer": null
+   },
+   {
+    "id": "c4e2427d-2d2a-41a8-a38c-47ea57f3efc4",
+    "kind": "contest",
+    "slug": "miss-biratnagar-2026",
+    "title": "Miss Biratnagar 2026",
+    "description": "The city's pageant is back. Vote for your favourite in the online audition \u2014 the top 10 go to the stage finale on 2 November, where judges and the public decide the crown.",
+    "cover_url": "",
+    "status": "open",
+    "opens_at": "2026-10-27T07:07:43.737701Z",
+    "closes_at": "2026-10-31T07:07:43.737701Z",
+    "event": {
+     "title": "Biratnagar Youth Music & Culture Fest 2026",
+     "slug": "biratnagar-music-awards-2026"
+    },
+    "vote_mode": "sms_otp",
+    "require_checked_in": false,
+    "verification": {
+     "method": "sms_otp",
+     "channel": "sms",
+     "captcha_site_key": null
+    },
+    "rules": {
+     "free_votes_enabled": true,
+     "votes_per_voter": null,
+     "votes_per_day": 5,
+     "votes_per_round": null,
+     "votes_per_contestant": 3,
+     "contestant_cap_period": "day",
+     "allow_split": true,
+     "max_votes_per_submit": 5,
+     "main_vote_enabled": true
+    },
+    "paid": {
+     "enabled": true,
+     "payments_available": true,
+     "unavailable_reason": null,
+     "unavailable_message": null,
+     "providers": [
+      {
+       "id": "khalti",
+       "name": "Khalti",
+       "sandbox": true
+      },
+      {
+       "id": "esewa",
+       "name": "eSewa",
+       "sandbox": true
+      },
+      {
+       "id": "test",
+       "name": "Test payment",
+       "sandbox": true
+      }
+     ],
+     "currency": "NPR",
+     "price_per_vote": "5.00",
+     "custom_votes": true,
+     "max_custom_votes": 1000,
+     "max_packs_per_day": 10,
+     "buy_and_vote": false,
+     "packs": [
+      {
+       "id": "6470bc3a-a165-44f9-9b9c-d7279cf2f03a",
+       "label": "Starter pack",
+       "votes": 10,
+       "bonus_votes": 0,
+       "total_votes": 10,
+       "price": "50.00",
+       "currency": "NPR",
+       "khalti_ok": true
+      },
+      {
+       "id": "fa989080-35a7-45f6-bbd5-acb72fddf192",
+       "label": "Fan pack",
+       "votes": 50,
+       "bonus_votes": 10,
+       "total_votes": 60,
+       "price": "200.00",
+       "currency": "NPR",
+       "khalti_ok": true
+      }
+     ]
+    },
+    "number_prefix": "#",
+    "number_padding": 2,
+    "profile_fields": [
+     {
+      "key": "age",
+      "label": "Age",
+      "field_type": "text",
+      "options": []
+     },
+     {
+      "key": "district",
+      "label": "District",
+      "field_type": "text",
+      "options": []
+     },
+     {
+      "key": "height",
+      "label": "Height",
+      "field_type": "text",
+      "options": []
+     },
+     {
+      "key": "hobbies",
+      "label": "Hobbies",
+      "field_type": "text",
+      "options": []
+     }
+    ],
+    "rounds": [
+     {
+      "id": "b5f28286-2364-44f0-8b44-71962d44dbe3",
+      "name": "Online audition",
+      "order": 1,
+      "status": "open",
+      "opens_at": "2026-10-27T07:07:43.737701Z",
+      "closes_at": "2026-10-30T12:07:43.737701Z",
+      "public_vote_enabled": true,
+      "judging_enabled": false,
+      "advance_count": 10,
+      "advance_mode": "auto",
+      "finalized_at": null
+     },
+     {
+      "id": "d1a7101e-e843-45cf-bca1-ce4145baab94",
+      "name": "Top 10",
+      "order": 2,
+      "status": "upcoming",
+      "opens_at": "2026-10-31T07:07:43.737701Z",
+      "closes_at": null,
+      "public_vote_enabled": true,
+      "judging_enabled": true,
+      "advance_count": null,
+      "advance_mode": "auto",
+      "finalized_at": null
+     },
+     {
+      "id": "eb5c5756-c84c-4005-8a53-7056367e5adb",
+      "name": "Finale",
+      "order": 3,
+      "status": "upcoming",
+      "opens_at": null,
+      "closes_at": null,
+      "public_vote_enabled": false,
+      "judging_enabled": true,
+      "advance_count": null,
+      "advance_mode": "auto",
+      "finalized_at": null
+     }
+    ],
+    "current_round": {
+     "id": "b5f28286-2364-44f0-8b44-71962d44dbe3",
+     "name": "Online audition",
+     "order": 1,
+     "status": "open",
+     "opens_at": "2026-10-27T07:07:43.737701Z",
+     "closes_at": "2026-10-30T12:07:43.737701Z",
+     "public_vote_enabled": true,
+     "judging_enabled": false,
+     "advance_count": 10,
+     "advance_mode": "auto",
+     "finalized_at": null
+    },
+    "display_round": {
+     "id": "b5f28286-2364-44f0-8b44-71962d44dbe3",
+     "name": "Online audition",
+     "order": 1,
+     "status": "open",
+     "opens_at": "2026-10-27T07:07:43.737701Z",
+     "closes_at": "2026-10-30T12:07:43.737701Z",
+     "public_vote_enabled": true,
+     "judging_enabled": false,
+     "advance_count": 10,
+     "advance_mode": "auto",
+     "finalized_at": null
+    },
+    "voting_open": true,
+    "categories": [
+     {
+      "id": "9ff5d36a-f915-41ae-8047-1d7b8a09a596",
+      "slug": "miss-photogenic",
+      "name": "Miss Photogenic",
+      "description": "",
+      "selection": "manual",
+      "nominees": [],
+      "voting_open": false,
+      "votes_per_voter": null,
+      "votes_per_day": 5,
+      "standings": {
+       "level": "ranks",
+       "top_n": null,
+       "rows": [
+        {
+         "contestant_id": "275bf8f4-b50d-4b25-93f2-04d70a30642d",
+         "name": "Asha Rai",
+         "display_number": "#01",
+         "number": 1,
+         "slug": "asha-rai",
+         "photo_url": "",
+         "rank": null,
+         "tied": false,
+         "status": "active"
+        },
+        {
+         "contestant_id": "2221fe3d-6191-4546-a1b5-c2e65a4052ef",
+         "name": "Bimala Limbu",
+         "display_number": "#02",
+         "number": 2,
+         "slug": "bimala-limbu",
+         "photo_url": "",
+         "rank": null,
+         "tied": false,
+         "status": "active"
+        },
+        {
+         "contestant_id": "1eb37b17-a3c5-435c-9dbe-f4880db6b0a2",
+         "name": "Chandani Shrestha",
+         "display_number": "#03",
+         "number": 3,
+         "slug": "chandani-shrestha",
+         "photo_url": "",
+         "rank": null,
+         "tied": false,
+         "status": "active"
+        },
+        {
+         "contestant_id": "d8325843-74db-4f15-abc2-1ccd6d365a68",
+         "name": "Dipika Tamang",
+         "display_number": "#04",
+         "number": 4,
+         "slug": "dipika-tamang",
+         "photo_url": "",
+         "rank": null,
+         "tied": false,
+         "status": "active"
+        },
+        {
+         "contestant_id": "97a76d45-763c-4ab0-8bf9-7a01008d477f",
+         "name": "Elina Karki",
+         "display_number": "#05",
+         "number": 5,
+         "slug": "elina-karki",
+         "photo_url": "",
+         "rank": null,
+         "tied": false,
+         "status": "active"
+        },
+        {
+         "contestant_id": "f7364003-e22b-4a37-8450-812ac90a667d",
+         "name": "Fulmaya Gurung",
+         "display_number": "#06",
+         "number": 6,
+         "slug": "fulmaya-gurung",
+         "photo_url": "",
+         "rank": null,
+         "tied": false,
+         "status": "active"
+        },
+        {
+         "contestant_id": "a8e1eba4-208c-4570-96f6-410b88c2375a",
+         "name": "Gita Thapa",
+         "display_number": "#07",
+         "number": 7,
+         "slug": "gita-thapa",
+         "photo_url": "",
+         "rank": null,
+         "tied": false,
+         "status": "active"
+        }
+       ],
+       "total_votes": null,
+       "weights": null
+      },
+      "winner": null
+     },
+     {
+      "id": "8d8b5e1e-79cc-4e53-b381-334569ccf4a9",
+      "slug": "peoples-choice",
+      "name": "People's Choice",
+      "description": "One vote a day for the crowd favourite.",
+      "selection": "public_vote",
+      "nominees": [],
+      "voting_open": true,
+      "votes_per_voter": null,
+      "votes_per_day": 1,
+      "standings": {
+       "level": "ranks",
+       "top_n": null,
+       "rows": [
+        {
+         "contestant_id": "2221fe3d-6191-4546-a1b5-c2e65a4052ef",
+         "name": "Bimala Limbu",
+         "display_number": "#02",
+         "number": 2,
+         "slug": "bimala-limbu",
+         "photo_url": "",
+         "rank": 1,
+         "tied": false,
+         "status": "active"
+        },
+        {
+         "contestant_id": "275bf8f4-b50d-4b25-93f2-04d70a30642d",
+         "name": "Asha Rai",
+         "display_number": "#01",
+         "number": 1,
+         "slug": "asha-rai",
+         "photo_url": "",
+         "rank": 2,
+         "tied": false,
+         "status": "active"
+        },
+        {
+         "contestant_id": "1eb37b17-a3c5-435c-9dbe-f4880db6b0a2",
+         "name": "Chandani Shrestha",
+         "display_number": "#03",
+         "number": 3,
+         "slug": "chandani-shrestha",
+         "photo_url": "",
+         "rank": 3,
+         "tied": false,
+         "status": "active"
+        },
+        {
+         "contestant_id": "d8325843-74db-4f15-abc2-1ccd6d365a68",
+         "name": "Dipika Tamang",
+         "display_number": "#04",
+         "number": 4,
+         "slug": "dipika-tamang",
+         "photo_url": "",
+         "rank": 4,
+         "tied": false,
+         "status": "active"
+        },
+        {
+         "contestant_id": "97a76d45-763c-4ab0-8bf9-7a01008d477f",
+         "name": "Elina Karki",
+         "display_number": "#05",
+         "number": 5,
+         "slug": "elina-karki",
+         "photo_url": "",
+         "rank": 5,
+         "tied": true,
+         "status": "active"
+        },
+        {
+         "contestant_id": "f7364003-e22b-4a37-8450-812ac90a667d",
+         "name": "Fulmaya Gurung",
+         "display_number": "#06",
+         "number": 6,
+         "slug": "fulmaya-gurung",
+         "photo_url": "",
+         "rank": 5,
+         "tied": true,
+         "status": "active"
+        },
+        {
+         "contestant_id": "a8e1eba4-208c-4570-96f6-410b88c2375a",
+         "name": "Gita Thapa",
+         "display_number": "#07",
+         "number": 7,
+         "slug": "gita-thapa",
+         "photo_url": "",
+         "rank": 5,
+         "tied": true,
+         "status": "active"
+        }
+       ],
+       "total_votes": null,
+       "weights": null
+      },
+      "winner": null
+     }
+    ],
+    "standings": {
+     "level": "ranks",
+     "top_n": null,
+     "rows": [
+      {
+       "contestant_id": "1eb37b17-a3c5-435c-9dbe-f4880db6b0a2",
+       "name": "Chandani Shrestha",
+       "display_number": "#03",
+       "number": 3,
+       "slug": "chandani-shrestha",
+       "photo_url": "",
+       "rank": 1,
+       "tied": false,
+       "status": "active"
+      },
+      {
+       "contestant_id": "275bf8f4-b50d-4b25-93f2-04d70a30642d",
+       "name": "Asha Rai",
+       "display_number": "#01",
+       "number": 1,
+       "slug": "asha-rai",
+       "photo_url": "",
+       "rank": 2,
+       "tied": false,
+       "status": "active"
+      },
+      {
+       "contestant_id": "2221fe3d-6191-4546-a1b5-c2e65a4052ef",
+       "name": "Bimala Limbu",
+       "display_number": "#02",
+       "number": 2,
+       "slug": "bimala-limbu",
+       "photo_url": "",
+       "rank": 3,
+       "tied": false,
+       "status": "active"
+      },
+      {
+       "contestant_id": "a8e1eba4-208c-4570-96f6-410b88c2375a",
+       "name": "Gita Thapa",
+       "display_number": "#07",
+       "number": 7,
+       "slug": "gita-thapa",
+       "photo_url": "",
+       "rank": 4,
+       "tied": false,
+       "status": "active"
+      },
+      {
+       "contestant_id": "97a76d45-763c-4ab0-8bf9-7a01008d477f",
+       "name": "Elina Karki",
+       "display_number": "#05",
+       "number": 5,
+       "slug": "elina-karki",
+       "photo_url": "",
+       "rank": 5,
+       "tied": false,
+       "status": "active"
+      },
+      {
+       "contestant_id": "d8325843-74db-4f15-abc2-1ccd6d365a68",
+       "name": "Dipika Tamang",
+       "display_number": "#04",
+       "number": 4,
+       "slug": "dipika-tamang",
+       "photo_url": "",
+       "rank": 6,
+       "tied": false,
+       "status": "active"
+      },
+      {
+       "contestant_id": "f7364003-e22b-4a37-8450-812ac90a667d",
+       "name": "Fulmaya Gurung",
+       "display_number": "#06",
+       "number": 6,
+       "slug": "fulmaya-gurung",
+       "photo_url": "",
+       "rank": 7,
+       "tied": false,
+       "status": "active"
+      },
+      {
+       "contestant_id": "e8eda998-0e8e-4411-8de1-32076afbeb70",
+       "name": "Hema Yadav",
+       "display_number": "#08",
+       "number": 8,
+       "slug": "hema-yadav",
+       "photo_url": "",
+       "rank": 8,
+       "tied": false,
+       "status": "withdrawn"
+      }
+     ],
+     "total_votes": null,
+     "weights": null
+    },
+    "placement_titles": [
+     "Miss Biratnagar 2026",
+     "1st runner-up",
+     "2nd runner-up"
+    ],
+    "transparency_note": "Votes are checked for bots every evening. Removed votes are listed on the results day."
+   },
+   {
+    "id": "456dd03b-c9b9-443e-8849-ce3e57e1a2d2",
+    "kind": "contest",
+    "slug": "emerging-band-2026",
+    "title": "Best Emerging Band \u2014 People's Vote",
+    "description": "Six new bands from Province 1. Three votes a day; share them as you like.",
+    "cover_url": "",
+    "status": "open",
+    "opens_at": "2026-10-27T07:07:43.737701Z",
+    "closes_at": "2026-10-31T07:07:43.737701Z",
+    "event": {
+     "title": "Biratnagar Youth Music & Culture Fest 2026",
+     "slug": "biratnagar-music-awards-2026"
+    },
+    "vote_mode": "email_otp",
+    "require_checked_in": false,
+    "verification": {
+     "method": "email_otp",
+     "channel": "email",
+     "captcha_site_key": null
+    },
+    "rules": {
+     "free_votes_enabled": true,
+     "votes_per_voter": null,
+     "votes_per_day": 3,
+     "votes_per_round": null,
+     "votes_per_contestant": null,
+     "contestant_cap_period": "contest",
+     "allow_split": true,
+     "max_votes_per_submit": 3,
+     "main_vote_enabled": true
+    },
+    "paid": {
+     "enabled": false,
+     "payments_available": false,
+     "unavailable_reason": "off",
+     "unavailable_message": null,
+     "providers": [],
+     "currency": "NPR",
+     "price_per_vote": null,
+     "custom_votes": false,
+     "max_custom_votes": 1000,
+     "max_packs_per_day": 10,
+     "buy_and_vote": false,
+     "packs": []
+    },
+    "number_prefix": "#",
+    "number_padding": 2,
+    "profile_fields": [],
+    "rounds": [],
+    "current_round": null,
+    "display_round": null,
+    "voting_open": true,
+    "categories": [],
+    "standings": {
+     "level": "full",
+     "top_n": null,
+     "rows": [
+      {
+       "contestant_id": "f6f9ebca-3dcc-4c48-8964-d22c70079b01",
+       "name": "Sagarmatha Echo",
+       "display_number": "#01",
+       "number": 1,
+       "slug": "sagarmatha-echo",
+       "photo_url": "",
+       "rank": 1,
+       "tied": false,
+       "status": "active",
+       "votes": 64,
+       "percentage": 27.8
+      },
+      {
+       "contestant_id": "d5173c1c-cee4-442a-b7b7-61704a6ef75c",
+       "name": "Kanchan Junction",
+       "display_number": "#05",
+       "number": 5,
+       "slug": "kanchan-junction",
+       "photo_url": "",
+       "rank": 2,
+       "tied": false,
+       "status": "active",
+       "votes": 53,
+       "percentage": 23.0
+      },
+      {
+       "contestant_id": "3c76f69e-5ffa-45e8-934e-dbc3ab2da4d9",
+       "name": "Tamor Strings",
+       "display_number": "#02",
+       "number": 2,
+       "slug": "tamor-strings",
+       "photo_url": "",
+       "rank": 3,
+       "tied": false,
+       "status": "active",
+       "votes": 48,
+       "percentage": 20.9
+      },
+      {
+       "contestant_id": "bc355b86-5644-42c6-954c-74dba4af5e15",
+       "name": "Koshi Kids",
+       "display_number": "#03",
+       "number": 3,
+       "slug": "koshi-kids",
+       "photo_url": "",
+       "rank": 4,
+       "tied": false,
+       "status": "active",
+       "votes": 33,
+       "percentage": 14.3
+      },
+      {
+       "contestant_id": "1212cd25-1c21-4b27-a775-8c799e2b1fd4",
+       "name": "Arun Valley",
+       "display_number": "#04",
+       "number": 4,
+       "slug": "arun-valley",
+       "photo_url": "",
+       "rank": 5,
+       "tied": false,
+       "status": "active",
+       "votes": 20,
+       "percentage": 8.7
+      },
+      {
+       "contestant_id": "2bdd0b1f-4b66-44e0-b68c-9d9338ec266f",
+       "name": "Saptakoshi Soul",
+       "display_number": "#06",
+       "number": 6,
+       "slug": "saptakoshi-soul",
+       "photo_url": "",
+       "rank": 6,
+       "tied": false,
+       "status": "active",
+       "votes": 12,
+       "percentage": 5.2
+      }
+     ],
+     "total_votes": 230,
+     "weights": null
+    },
+    "placement_titles": [
+     "Winner",
+     "1st runner-up",
+     "2nd runner-up"
+    ],
+    "transparency_note": ""
+   },
+   {
+    "id": "ad0137ec-8ea4-41ee-8950-a48f82dd6f0e",
+    "kind": "contest",
+    "slug": "crowd-favourite-singer",
+    "title": "Crowd Favourite Singer",
+    "description": "Two votes per phone. All your votes go to one singer.",
+    "cover_url": "",
+    "status": "open",
+    "opens_at": "2026-10-27T07:07:43.737701Z",
+    "closes_at": "2026-10-31T07:07:43.737701Z",
+    "event": {
+     "title": "Biratnagar Youth Music & Culture Fest 2026",
+     "slug": "biratnagar-music-awards-2026"
+    },
+    "vote_mode": "open",
+    "require_checked_in": false,
+    "verification": {
+     "method": "open",
+     "channel": null,
+     "captcha_site_key": "1x00000000000000000000AA"
+    },
+    "rules": {
+     "free_votes_enabled": true,
+     "votes_per_voter": 5,
+     "votes_per_day": null,
+     "votes_per_round": null,
+     "votes_per_contestant": null,
+     "contestant_cap_period": "contest",
+     "allow_split": true,
+     "max_votes_per_submit": 1,
+     "main_vote_enabled": true
+    },
+    "paid": {
+     "enabled": false,
+     "payments_available": false,
+     "unavailable_reason": "off",
+     "unavailable_message": null,
+     "providers": [],
+     "currency": "NPR",
+     "price_per_vote": null,
+     "custom_votes": false,
+     "max_custom_votes": 1000,
+     "max_packs_per_day": 10,
+     "buy_and_vote": false,
+     "packs": []
+    },
+    "number_prefix": "#",
+    "number_padding": 2,
+    "profile_fields": [],
+    "rounds": [],
+    "current_round": null,
+    "display_round": null,
+    "voting_open": true,
+    "categories": [],
+    "standings": {
+     "level": "top",
+     "top_n": 3,
+     "rows": [
+      {
+       "contestant_id": "72146d09-3aec-44f8-a84e-244c0e3658af",
+       "name": "Sujan Rai",
+       "display_number": "#02",
+       "number": 2,
+       "slug": "sujan-rai",
+       "photo_url": "",
+       "rank": 1,
+       "tied": false,
+       "status": "active"
+      },
+      {
+       "contestant_id": "3a979038-0dac-4b45-8e13-8c18631d6d3c",
+       "name": "Rina Magar",
+       "display_number": "#01",
+       "number": 1,
+       "slug": "rina-magar",
+       "photo_url": "",
+       "rank": 2,
+       "tied": false,
+       "status": "active"
+      },
+      {
+       "contestant_id": "89f44bf9-48b7-4c59-bd24-ec340c4c3d34",
+       "name": "Pema Sherpa",
+       "display_number": "#03",
+       "number": 3,
+       "slug": "pema-sherpa",
+       "photo_url": "",
+       "rank": 3,
+       "tied": false,
+       "status": "active"
+      }
+     ],
+     "total_votes": null,
+     "weights": null
+    },
+    "placement_titles": [
+     "Winner",
+     "1st runner-up",
+     "2nd runner-up"
+    ],
+    "transparency_note": ""
+   },
+   {
+    "id": "26251dd5-84d4-4824-a3e0-c780d1b7fa37",
+    "kind": "contest",
+    "slug": "audience-award",
+    "title": "Audience Award (ticket holders)",
+    "description": "Only people with a pass for the awards night can vote. One vote per ticket.",
+    "cover_url": "",
+    "status": "open",
+    "opens_at": "2026-10-27T07:07:43.737701Z",
+    "closes_at": "2026-10-31T07:07:43.737701Z",
+    "event": {
+     "title": "Biratnagar Youth Music & Culture Fest 2026",
+     "slug": "biratnagar-music-awards-2026"
+    },
+    "vote_mode": "ticket",
+    "require_checked_in": false,
+    "verification": {
+     "method": "ticket",
+     "channel": null,
+     "captcha_site_key": null
+    },
+    "rules": {
+     "free_votes_enabled": true,
+     "votes_per_voter": 1,
+     "votes_per_day": null,
+     "votes_per_round": null,
+     "votes_per_contestant": null,
+     "contestant_cap_period": "contest",
+     "allow_split": true,
+     "max_votes_per_submit": 1,
+     "main_vote_enabled": true
+    },
+    "paid": {
+     "enabled": false,
+     "payments_available": false,
+     "unavailable_reason": "off",
+     "unavailable_message": null,
+     "providers": [],
+     "currency": "NPR",
+     "price_per_vote": null,
+     "custom_votes": false,
+     "max_custom_votes": 1000,
+     "max_packs_per_day": 10,
+     "buy_and_vote": false,
+     "packs": []
+    },
+    "number_prefix": "#",
+    "number_padding": 2,
+    "profile_fields": [],
+    "rounds": [],
+    "current_round": null,
+    "display_round": null,
+    "voting_open": true,
+    "categories": [],
+    "standings": null,
+    "placement_titles": [
+     "Winner",
+     "1st runner-up",
+     "2nd runner-up"
+    ],
+    "transparency_note": ""
+   },
+   {
+    "id": "bc53af7f-505f-4089-b454-3c836dc03ea4",
+    "kind": "contest",
+    "slug": "fan-club-award",
+    "title": "Fan Club Award",
+    "description": "Sign in with your Eventlaya account. One vote per account; winners announced on stage.",
+    "cover_url": "",
+    "status": "open",
+    "opens_at": "2026-10-27T07:07:43.737701Z",
+    "closes_at": "2026-10-31T07:07:43.737701Z",
+    "event": {
+     "title": "Biratnagar Youth Music & Culture Fest 2026",
+     "slug": "biratnagar-music-awards-2026"
+    },
+    "vote_mode": "account",
+    "require_checked_in": false,
+    "verification": {
+     "method": "account",
+     "channel": null,
+     "captcha_site_key": null
+    },
+    "rules": {
+     "free_votes_enabled": true,
+     "votes_per_voter": 1,
+     "votes_per_day": null,
+     "votes_per_round": null,
+     "votes_per_contestant": null,
+     "contestant_cap_period": "contest",
+     "allow_split": true,
+     "max_votes_per_submit": 1,
+     "main_vote_enabled": true
+    },
+    "paid": {
+     "enabled": false,
+     "payments_available": false,
+     "unavailable_reason": "off",
+     "unavailable_message": null,
+     "providers": [],
+     "currency": "NPR",
+     "price_per_vote": null,
+     "custom_votes": false,
+     "max_custom_votes": 1000,
+     "max_packs_per_day": 10,
+     "buy_and_vote": false,
+     "packs": []
+    },
+    "number_prefix": "#",
+    "number_padding": 2,
+    "profile_fields": [],
+    "rounds": [],
+    "current_round": null,
+    "display_round": null,
+    "voting_open": true,
+    "categories": [],
+    "standings": null,
+    "placement_titles": [
+     "Winner",
+     "1st runner-up",
+     "2nd runner-up"
+    ],
+    "transparency_note": ""
+   },
+   {
+    "id": "eebf297b-137b-4be0-bebb-0f3246cb073c",
+    "kind": "contest",
+    "slug": "battle-of-bands-2025",
+    "title": "Battle of the Bands 2025",
+    "description": "",
+    "cover_url": "",
+    "status": "closed",
+    "opens_at": "2026-09-28T07:07:43.737701Z",
+    "closes_at": "2026-10-26T07:07:43.737701Z",
+    "event": {
+     "title": "Biratnagar Youth Music & Culture Fest 2026",
+     "slug": "biratnagar-music-awards-2026"
+    },
+    "vote_mode": "open",
+    "require_checked_in": false,
+    "verification": {
+     "method": "open",
+     "channel": null,
+     "captcha_site_key": null
+    },
+    "rules": {
+     "free_votes_enabled": true,
+     "votes_per_voter": 1,
+     "votes_per_day": null,
+     "votes_per_round": null,
+     "votes_per_contestant": null,
+     "contestant_cap_period": "contest",
+     "allow_split": true,
+     "max_votes_per_submit": 1,
+     "main_vote_enabled": true
+    },
+    "paid": {
+     "enabled": false,
+     "payments_available": false,
+     "unavailable_reason": "off",
+     "unavailable_message": null,
+     "providers": [],
+     "currency": "NPR",
+     "price_per_vote": null,
+     "custom_votes": false,
+     "max_custom_votes": 1000,
+     "max_packs_per_day": 10,
+     "buy_and_vote": false,
+     "packs": []
+    },
+    "number_prefix": "#",
+    "number_padding": 2,
+    "profile_fields": [],
+    "rounds": [
+     {
+      "id": "9266cf51-623c-40a3-a95d-51336a224708",
+      "name": "Final",
+      "order": 1,
+      "status": "closed",
+      "opens_at": "2026-09-28T07:07:43.737701Z",
+      "closes_at": "2026-10-26T07:07:43.737701Z",
+      "public_vote_enabled": true,
+      "judging_enabled": false,
+      "advance_count": null,
+      "advance_mode": "auto",
+      "finalized_at": "2026-10-27T07:07:43.737701Z"
+     }
+    ],
+    "current_round": null,
+    "display_round": {
+     "id": "9266cf51-623c-40a3-a95d-51336a224708",
+     "name": "Final",
+     "order": 1,
+     "status": "closed",
+     "opens_at": "2026-09-28T07:07:43.737701Z",
+     "closes_at": "2026-10-26T07:07:43.737701Z",
+     "public_vote_enabled": true,
+     "judging_enabled": false,
+     "advance_count": null,
+     "advance_mode": "auto",
+     "finalized_at": "2026-10-27T07:07:43.737701Z"
+    },
+    "voting_open": false,
+    "categories": [],
+    "standings": {
+     "level": "full",
+     "top_n": null,
+     "rows": [
+      {
+       "contestant_id": "b5c4d94b-871e-41b2-9491-a7fb6dc97278",
+       "name": "Vintage Nepal",
+       "display_number": "#01",
+       "number": 1,
+       "slug": "vintage-nepal",
+       "photo_url": "",
+       "rank": 1,
+       "tied": false,
+       "status": "winner",
+       "votes": 88,
+       "percentage": 37.6
+      },
+      {
+       "contestant_id": "1942b25f-3f96-4b42-9d4a-9701e63701e7",
+       "name": "Yeti Groove",
+       "display_number": "#02",
+       "number": 2,
+       "slug": "yeti-groove",
+       "photo_url": "",
+       "rank": 2,
+       "tied": false,
+       "status": "active",
+       "votes": 71,
+       "percentage": 30.3
+      },
+      {
+       "contestant_id": "b650bdd8-a03f-443d-b849-092b81ad8f32",
+       "name": "Rhododendron Riot",
+       "display_number": "#03",
+       "number": 3,
+       "slug": "rhododendron-riot",
+       "photo_url": "",
+       "rank": 3,
+       "tied": false,
+       "status": "active",
+       "votes": 45,
+       "percentage": 19.2
+      },
+      {
+       "contestant_id": "902f7112-d91f-458d-b65f-4c5b3429dc08",
+       "name": "Mahabharat Blues",
+       "display_number": "#04",
+       "number": 4,
+       "slug": "mahabharat-blues",
+       "photo_url": "",
+       "rank": 4,
+       "tied": false,
+       "status": "active",
+       "votes": 30,
+       "percentage": 12.8
+      }
+     ],
+     "total_votes": 234,
+     "weights": null
+    },
+    "placement_titles": [
+     "Champion",
+     "Runner-up",
+     "Third place"
+    ],
+    "transparency_note": ""
+   },
+   {
+    "id": "05dfa72c-7dd6-4555-a01e-4fa8f996956b",
+    "kind": "contest",
+    "slug": "mr-biratnagar-2026",
+    "title": "Mr Biratnagar 2026",
+    "description": "Opens soon. Meet the contestants now.",
+    "cover_url": "",
+    "status": "scheduled",
+    "opens_at": "2026-10-29T13:07:43.737701Z",
+    "closes_at": "2026-11-03T07:07:43.737701Z",
+    "event": {
+     "title": "Biratnagar Youth Music & Culture Fest 2026",
+     "slug": "biratnagar-music-awards-2026"
+    },
+    "vote_mode": "sms_otp",
+    "require_checked_in": false,
+    "verification": {
+     "method": "sms_otp",
+     "channel": "sms",
+     "captcha_site_key": null
+    },
+    "rules": {
+     "free_votes_enabled": true,
+     "votes_per_voter": null,
+     "votes_per_day": 5,
+     "votes_per_round": null,
+     "votes_per_contestant": null,
+     "contestant_cap_period": "contest",
+     "allow_split": true,
+     "max_votes_per_submit": 1,
+     "main_vote_enabled": true
+    },
+    "paid": {
+     "enabled": false,
+     "payments_available": false,
+     "unavailable_reason": "off",
+     "unavailable_message": null,
+     "providers": [],
+     "currency": "NPR",
+     "price_per_vote": null,
+     "custom_votes": false,
+     "max_custom_votes": 1000,
+     "max_packs_per_day": 10,
+     "buy_and_vote": false,
+     "packs": []
+    },
+    "number_prefix": "#",
+    "number_padding": 2,
+    "profile_fields": [],
+    "rounds": [],
+    "current_round": null,
+    "display_round": null,
+    "voting_open": false,
+    "categories": [],
+    "standings": {
+     "level": "full",
+     "top_n": null,
+     "rows": [
+      {
+       "contestant_id": "c459d6b8-0696-4bc9-b855-7c1d9b1f4cc3",
+       "name": "Aayush Gurung",
+       "display_number": "#01",
+       "number": 1,
+       "slug": "aayush-gurung",
+       "photo_url": "",
+       "rank": 1,
+       "tied": true,
+       "status": "active",
+       "votes": 0,
+       "percentage": 0
+      },
+      {
+       "contestant_id": "3cd62f19-f58e-4309-95c8-9ec370ed90a6",
+       "name": "Bikash Rai",
+       "display_number": "#02",
+       "number": 2,
+       "slug": "bikash-rai",
+       "photo_url": "",
+       "rank": 1,
+       "tied": true,
+       "status": "active",
+       "votes": 0,
+       "percentage": 0
+      },
+      {
+       "contestant_id": "abb01d0a-c463-49d6-8fe5-0fb723a882fd",
+       "name": "Chiran Limbu",
+       "display_number": "#03",
+       "number": 3,
+       "slug": "chiran-limbu",
+       "photo_url": "",
+       "rank": 1,
+       "tied": true,
+       "status": "active",
+       "votes": 0,
+       "percentage": 0
+      }
+     ],
+     "total_votes": 0,
+     "weights": null
+    },
+    "placement_titles": [
+     "Winner",
+     "1st runner-up",
+     "2nd runner-up"
+    ],
+    "transparency_note": ""
+   }
+  ]
+ }
+}

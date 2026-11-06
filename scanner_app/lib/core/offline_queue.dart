@@ -5,6 +5,9 @@ class OfflineScan {
   final String qrToken;
   final String scanType; // 'gate_in' or 'gate_out'
   final String gateName;
+
+  /// Dynamic gate id (preferred by the server); null for legacy name-only gates.
+  final String? gateId;
   final String scannedAt; // ISO 8601 timestamp
   final String eventId;
 
@@ -12,6 +15,7 @@ class OfflineScan {
     required this.qrToken,
     required this.scanType,
     required this.gateName,
+    this.gateId,
     required this.scannedAt,
     required this.eventId,
   });
@@ -20,6 +24,7 @@ class OfflineScan {
         'qr_token': qrToken,
         'scan_type': scanType,
         'gate_name': gateName,
+        if (gateId != null && gateId!.isNotEmpty) 'gate_id': gateId,
         'scanned_at_client': scannedAt,
         'event_id': eventId,
       };
@@ -27,7 +32,8 @@ class OfflineScan {
   factory OfflineScan.fromMap(Map map) => OfflineScan(
         qrToken: map['qr_token']?.toString() ?? '',
         scanType: map['scan_type']?.toString() ?? 'gate_in',
-        gateName: map['gate_name']?.toString() ?? 'Main Gate',
+        gateName: map['gate_name']?.toString() ?? '',
+        gateId: map['gate_id']?.toString(),
         scannedAt: map['scanned_at_client']?.toString() ?? DateTime.now().toIso8601String(),
         eventId: map['event_id']?.toString() ?? '',
       );

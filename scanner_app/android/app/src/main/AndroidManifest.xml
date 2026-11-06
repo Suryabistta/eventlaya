@@ -9,8 +9,8 @@
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
 
     <application
-        android:label="eventlaya_scanner"
-        android:name="${applicationName}"
+        android:label="Eventlaya"
+        android:name=".EventlayaApplication"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
@@ -33,7 +33,34 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- App Links: event pages, contest / contestant pages, emailed passes and payment returns
+                 (…?payment=<id>&status=…) open in the app (lib/core/deep_links.dart). Verified with
+                 https://eventlaya.com/.well-known/assetlinks.json (package + signing-key SHA-256). -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https"/>
+                <data android:host="eventlaya.com"/>
+                <data android:host="www.eventlaya.com"/>
+                <data android:pathPrefix="/e/"/>
+                <data android:pathPrefix="/ticket/"/>
+            </intent-filter>
+            <!-- Links are handled by MainActivity's channel, not Flutter's route-based deep linking. -->
+            <meta-data android:name="flutter_deeplinking_enabled" android:value="false"/>
         </activity>
+        <!-- Pushes the system shows while the app is in the background or killed (FCM "notification"
+             messages): white "इ" status-bar icon, brand accent, and the app's high-importance channel
+             (created in lib/core/notification_service.dart; backend: apps/core/fcm.py). -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_eventlaya" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/eventlaya_brand" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="eventlaya_alerts" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
@@ -49,6 +76,19 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- url_launcher (Android 11+ package visibility): legal pages open in a browser tab
+             (lib/core/legal.dart), "Contact support" opens an email app. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SENDTO"/>
+            <data android:scheme="mailto"/>
         </intent>
     </queries>
 </manifest>

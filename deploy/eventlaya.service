@@ -1,0 +1,25 @@
+[Unit]
+Description=Eventlaya Django API + team chat websockets (Gunicorn + Uvicorn, ASGI)
+After=network.target postgresql.service redis-server.service
+Wants=redis-server.service
+
+[Service]
+User=eventlaya
+Group=eventlaya
+WorkingDirectory=/srv/eventlaya/backend
+EnvironmentFile=/srv/eventlaya/.env
+# ASGI so /ws/chat/ websockets work: gunicorn supervises Uvicorn worker processes. Each worker is
+# async (many sockets per process) and runs sync Django views in a thread pool, so 2 workers keep the
+# old WSGI capacity at ~100-150 MB RSS each on the 1 GB droplet; use --workers 1 if memory gets tight.
+# Websocket events are shared between workers through Redis (REDIS_URL in .env).
+# --timeout is the worker heartbeat, not a request limit, so long-lived websockets are fine.
+ExecStart=/srv/eventlaya/backend/.venv/bin/gunicorn config.asgi:application \
+    --worker-class uvicorn_worker.UvicornWorker \
+    --bind 127.0.0.1:8000 --workers 2 --timeout 60 --graceful-timeout 20 \
+    --forwarded-allow-ips 127.0.0.1 \
+    --access-logfile - --error-logfile -
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -1,498 +1,495 @@
-import React, { useState } from 'react'
-import {
-  Check,
-  Sparkles,
-  Shield,
-  Zap,
-  Building,
-  Store,
-  HelpCircle,
-  ArrowRight,
-  CreditCard,
-  QrCode,
-  Users
-} from 'lucide-react'
+import React, { useId, useState } from 'react'
+import { useLocation } from 'react-router-dom'
+import { Check, Minus, Store, Users } from 'lucide-react'
+import { useAuth } from '@/lib/auth'
+import { Badge, Button, ButtonLink, Card, PageHeader, useToast } from '@/components/ui'
+import { MyPlanSection, RequestUpgradeDialog, planCodes, useMyBilling } from '@/pages/billing/MyPlan'
+import type { Cycle, PlanCode } from '@/pages/admin/billing/api'
 import { cn } from '@/lib/utils'
+import { usePlans, planCodeByName } from '@/lib/plans'
+
+type Billing = 'monthly' | 'annual'
+type Audience = 'organizers' | 'providers'
+
+interface OrganizerPlan {
+  name: string
+  audience: string
+  priceMonthly: number | null // null = custom quote
+  priceAnnual: number | null
+  description: string
+  features: string[]
+  limitations: string[]
+  cta: string
+  recommended?: boolean
+}
+
+const organizerPlans: OrganizerPlan[] = [
+  {
+    name: 'Free',
+    audience: 'Community and student clubs',
+    priceMonthly: 0,
+    priceAnnual: 0,
+    description: 'For local meetups, college clubs and free community gatherings.',
+    features: [
+      'Online registration form',
+      'QR code passes for every attendee',
+      'Web scanner on any phone camera',
+      'Attendee list and CSV export',
+      'One admin account',
+      'Up to 150 attendees per event',
+    ],
+    limitations: ['Custom form fields', 'Custom domain', 'Live voting'],
+    cta: 'Start free',
+  },
+  {
+    name: 'Event Pro',
+    audience: 'Conferences and festivals',
+    priceMonthly: 1499,
+    priceAnnual: 14390,
+    description: 'For conferences, festivals, sports tournaments and professional summits.',
+    features: [
+      'Everything in Free',
+      'Unlimited attendees',
+      'Registration form builder with 10 field types',
+      'Gate in and gate out analytics',
+      'Gate staff assignments and scanner accounts',
+      'Duplicate pass alerts at the gate',
+      'Your logo and colours on passes',
+    ],
+    limitations: ['Custom domain (eventlaya.com subdomain only)'],
+    cta: 'Choose Event Pro',
+    recommended: true,
+  },
+  {
+    name: 'Business',
+    audience: 'Agencies and institutions',
+    priceMonthly: 3999,
+    priceAnnual: 38390,
+    description: 'For event management companies and academic institutions.',
+    features: [
+      'Everything in Event Pro',
+      'Several events running at once',
+      'Live audience voting and polls',
+      'Budget and expense tracking',
+      'Crew task board',
+      'Push announcements to gate staff',
+      'Priority phone and WhatsApp support in Eastern Nepal',
+    ],
+    limitations: [],
+    cta: 'Choose Business',
+  },
+  {
+    name: 'Enterprise',
+    audience: 'White-label platforms',
+    priceMonthly: null,
+    priceAnnual: null,
+    description: 'Run Eventlaya under your own name and domain.',
+    features: [
+      'Everything in Business',
+      'Custom domain (events.yourdomain.com)',
+      'Remove “Powered by Eventlaya”',
+      'Module permissions for your admins',
+      'Automatic CNAME setup and free SSL',
+      'Android scanner app',
+      'SLA and on-site gate support in Koshi Province',
+    ],
+    limitations: [],
+    cta: 'Contact us',
+  },
+]
+
+interface ProviderPlan {
+  name: string
+  price: number
+  description: string
+  features: string[]
+  cta: string
+  recommended?: boolean
+}
+
+const providerPlans: ProviderPlan[] = [
+  {
+    name: 'Basic listing',
+    price: 0,
+    description: 'Get found in the Eastern Nepal vendor directory.',
+    features: [
+      'Business name, phone and address',
+      'Listed under Itahari, Dharan or Biratnagar',
+      'Standard search visibility',
+      'Direct phone inquiries from customers',
+    ],
+    cta: 'List for free',
+  },
+  {
+    name: 'Verified provider',
+    price: 500,
+    description: 'Build trust with organizers and get structured quote requests.',
+    features: [
+      'Verified badge on your profile',
+      'Photo portfolio, up to 12 images',
+      'Quote requests from organizers',
+      'Organizer ratings and reviews',
+      'WhatsApp inquiry link',
+    ],
+    cta: 'Get verified',
+    recommended: true,
+  },
+  {
+    name: 'Premium partner',
+    price: 1500,
+    description: 'Top placement and lead analytics for busy vendors.',
+    features: [
+      'Featured placement on the marketplace',
+      'Highlighted spot in your category',
+      'Lead views and click analytics',
+      'Unlimited portfolio images and video links',
+      'Zero commission on direct bookings',
+    ],
+    cta: 'Become a premium partner',
+  },
+]
+
+const faqs = [
+  {
+    q: 'How do I pay?',
+    a: 'Checkout with eSewa and Khalti is coming soon. Fonepay QR and bank transfer with a VAT invoice will also be available.',
+  },
+  {
+    q: 'Do colleges and student clubs get a discount?',
+    a: 'Yes. Non-profit clubs and IT student associations in Dharan, Itahari and Biratnagar can apply for a subsidised Event Pro plan.',
+  },
+  {
+    q: 'Do you help at the gate on the day?',
+    a: 'For Enterprise and large events, our crew can set up scanners on site and support your gate supervisors.',
+  },
+  {
+    q: 'Can I switch or cancel my plan?',
+    a: 'Yes. Upgrade, downgrade or pause at the end of any billing cycle with no cancellation fee.',
+  },
+]
+
+
+const rs = (n: number) => `Rs ${n.toLocaleString('en-IN')}`
+
+/* ------------------------------------------------------------------ */
+
+/** Radio-group based segmented control: arrow keys and screen readers work natively. */
+function Segmented<T extends string>({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string
+  value: T
+  onChange: (v: T) => void
+  options: { value: T; label: React.ReactNode }[]
+}) {
+  const name = useId()
+  return (
+    <fieldset className="inline-flex rounded-xl bg-ink-100 p-1">
+      <legend className="sr-only">{label}</legend>
+      {options.map((o) => (
+        <label
+          key={o.value}
+          className={cn(
+            'relative inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg px-3.5 text-sm font-semibold transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-500 sm:px-4',
+            value === o.value ? 'bg-white text-ink-900 shadow-xs' : 'text-ink-600 hover:text-ink-900',
+          )}
+        >
+          <input
+            type="radio"
+            name={name}
+            value={o.value}
+            checked={value === o.value}
+            onChange={() => onChange(o.value)}
+            className="sr-only"
+          />
+          {o.label}
+        </label>
+      ))}
+    </fieldset>
+  )
+}
+
+const FeatureList: React.FC<{ features: string[]; limitations?: string[] }> = ({ features, limitations = [] }) => (
+  <ul className="space-y-2.5 text-sm">
+    {features.map((f) => (
+      <li key={f} className="flex items-start gap-2.5 text-ink-700">
+        <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" aria-hidden />
+        <span>{f}</span>
+      </li>
+    ))}
+    {limitations.map((f) => (
+      <li key={f} className="flex items-start gap-2.5 text-ink-400">
+        <Minus className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+        <span>
+          <span className="sr-only">Not included: </span>
+          {f}
+        </span>
+      </li>
+    ))}
+  </ul>
+)
+
+const PlanCard: React.FC<{
+  name: string
+  audience?: string
+  description: string
+  price: React.ReactNode
+  priceNote?: React.ReactNode
+  recommended?: boolean
+  current?: boolean
+  cta: React.ReactNode
+  children: React.ReactNode
+}> = ({ name, audience, description, price, priceNote, recommended, current, cta, children }) => (
+  <Card className={cn('flex flex-col p-6', recommended && 'border-2 border-brand-600')}>
+    <div className="flex min-h-6 flex-wrap items-center gap-2">
+      <h3 className="text-lg font-bold text-ink-900">{name}</h3>
+      {recommended && <Badge tone="brand">Recommended</Badge>}
+      {current && <Badge tone="success" dot>Current plan</Badge>}
+    </div>
+    {audience && <p className="mt-0.5 text-sm text-ink-500">{audience}</p>}
+    <div className="mt-5">
+      <p className="font-display text-3xl font-bold text-ink-900 tabular">{price}</p>
+      <p className="mt-1 min-h-5 text-xs text-ink-500">{priceNote}</p>
+    </div>
+    <p className="mt-4 text-sm text-ink-600">{description}</p>
+    <div className="mt-5">{cta}</div>
+    <div className="mt-6 border-t border-ink-100 pt-5">{children}</div>
+  </Card>
+)
+
+/* ------------------------------------------------------------------ */
 
 export default function PricingPage() {
-  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly')
-  const [pricingMode, setPricingMode] = useState<'organizers' | 'providers'>('organizers')
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
-  const [showCheckoutModal, setShowCheckoutModal] = useState(false)
-  const [paymentMethod, setPaymentMethod] = useState<'esewa' | 'khalti' | 'fonepay' | 'bank'>('esewa')
-  const [isUpgrading, setIsUpgrading] = useState(false)
-  const [activePlan, setActivePlan] = useState('Free')
+  const inApp = useLocation().pathname.startsWith('/app')
+  const { status } = useAuth()
+  const signedIn = status === 'authenticated'
+  const toast = useToast()
 
-  // Section 4: Organizer SaaS Plans from Proposal Document
-  const organizerPlans = [
-    {
-      name: 'Free',
-      badge: 'Community & Student Clubs',
-      priceMonthly: 0,
-      priceAnnual: 0,
-      description: 'Perfect for local meetups, college clubs, and free community gatherings.',
-      features: [
-        'Standard Online Registration Form',
-        'Automated QR Code Digital Ticket Passes',
-        'Mobile Camera Web Scanner Terminal',
-        'Basic Attendee List & CSV Export',
-        'Single Admin Account',
-        'Up to 150 Attendees per Event',
-      ],
-      limitations: [
-        'No Custom Dynamic Form Fields',
-        'No White-label Custom Domain',
-        'No Live Cryptographic Voting Module',
-      ],
-      cta: 'Current Plan',
-      popular: false,
-    },
-    {
-      name: 'Event Pro',
-      badge: 'Most Popular',
-      priceMonthly: 1499,
-      priceAnnual: 14390,
-      description: 'Ideal for conferences, festivals, sports tournaments, and professional summits.',
-      features: [
-        'Everything in Free Plan',
-        'Unlimited Attendees & Capacity',
-        'Dynamic Registration Form Builder (10 field types)',
-        'Gate In & Gate Out Attendance Velocity Analytics',
-        'Crew Gate Staff Assignments & Terminal Accounts',
-        'Real-time Duplicate Fraud Detection Alerts',
-        'Custom Brand Logo & Ticket Header Colors',
-      ],
-      limitations: [
-        'No Custom Domain (Subdomain only)',
-      ],
-      cta: 'Upgrade to Event Pro',
-      popular: true,
-    },
-    {
-      name: 'Business',
-      badge: 'Agencies & Institutions',
-      priceMonthly: 3999,
-      priceAnnual: 38390,
-      description: 'Full-suite operations for event management companies and academic institutions.',
-      features: [
-        'Everything in Event Pro',
-        'Multiple Concurrent Events',
-        'Live Audience Voting & Polls System',
-        'Budget & Financial Expense Ledger Tracker',
-        'Crew Work Distribution Kanban Board',
-        'Push Notification Announcements to Gate Staff',
-        'Priority Phone & WhatsApp Support in Eastern Nepal',
-      ],
-      limitations: [],
-      cta: 'Get Business Plan',
-      popular: false,
-    },
-    {
-      name: 'Enterprise',
-      badge: 'Multi-Tenant SaaS',
-      priceMonthly: 'Custom',
-      priceAnnual: 'Custom',
-      description: 'Complete white-label solution with custom domain for enterprise vendors.',
-      features: [
-        'Everything in Business Plan',
-        'White-Label Custom Domain (events.yourdomain.com)',
-        'Removal of "Powered by Eventlaya" Watermark',
-        'Superadmin RBAC Module Control Killswitches',
-        'Automated CNAME & Free SSL Certificate Provisioning',
-        'Native Android Scanner Terminal App APK Support',
-        'Dedicated SLA & On-Site Gate Support in Province 1',
-      ],
-      limitations: [],
-      cta: 'Contact Enterprise',
-      popular: false,
-    },
-  ]
+  const [billing, setBilling] = useState<Billing>('monthly')
+  const [audience, setAudience] = useState<Audience>('organizers')
+  // Prices, features and limits come from the platform's plan settings; copy stays here
+  const { data: apiPlans } = usePlans()
+  const livePlans = organizerPlans.map((plan) => {
+    const live = apiPlans?.find((p) => p.code === planCodeByName[plan.name])
+    if (!live) return plan
+    return {
+      ...plan,
+      priceMonthly: plan.priceMonthly === null && !live.monthly_price ? null : live.monthly_price,
+      priceAnnual: plan.priceAnnual === null && !live.yearly_price ? null : live.yearly_price,
+      features: live.features?.length ? live.features : plan.features,
+    }
+  })
+  const isOrgAccount = inApp && signedIn
+  const mine = useMyBilling(isOrgAccount)
+  const activePlan = mine.data?.plan.name ?? 'Free'
+  const pendingPlan = mine.data?.requests.find((r) => r.status === 'pending')?.requested_plan_name
+  const [upgrade, setUpgrade] = useState<{ plan: PlanCode; cycle: Cycle } | null>(null)
 
-  // Section 5: Marketplace Service Provider Listing Plans
-  const providerPlans = [
-    {
-      name: 'Basic Listing',
-      price: 'Free',
-      description: 'List your service in the Eastern Nepal vendor directory.',
-      features: [
-        'Business Profile Name, Phone & Address',
-        'Categorized in Itahari, Dharan, or Biratnagar',
-        'Standard Search Visibility',
-        'Receive Direct Customer Phone Inquiries',
-      ],
-      cta: 'List for Free',
-      popular: false,
-    },
-    {
-      name: 'Verified Provider',
-      price: 'Rs. 500 / month',
-      description: 'Build trust with organizers and receive structured quotation leads.',
-      features: [
-        'Verified Trust Badge on Profile',
-        'Photo Portfolio Gallery (Up to 12 images)',
-        'Receive Request for Quotation (RFQ) Direct Inquiries',
-        'Organizer Ratings & Customer Reviews Display',
-        'Direct WhatsApp Inquiry Link',
-      ],
-      cta: 'Get Verified',
-      popular: true,
-    },
-    {
-      name: 'Premium Partner',
-      price: 'Rs. 1,500 / month',
-      description: 'Featured top placement and lead analytics for high-volume vendors.',
-      features: [
-        'Featured Top Placement on Marketplace Homepage',
-        'Highlighted Category Hero Spot',
-        'Lead Views & Click-Through Analytics',
-        'Unlimited Portfolio Images & Video Links',
-        'Zero Commission on Direct Client Bookings',
-      ],
-      cta: 'Become Premium Partner',
-      popular: false,
-    },
-  ]
-
-  const handleSelectPlan = (planName: string) => {
-    setSelectedPlan(planName)
-    setShowCheckoutModal(true)
+  const organizerCta = (plan: OrganizerPlan) => {
+    const variant = plan.recommended ? 'primary' : 'secondary'
+    if (!inApp) {
+      return (
+        <ButtonLink to={signedIn ? '/app/billing' : '/signup'} variant={variant} className="w-full">
+          {plan.cta}
+        </ButtonLink>
+      )
+    }
+    if (plan.name === activePlan) {
+      return (
+        <Button variant="secondary" className="w-full" disabled>
+          Current plan
+        </Button>
+      )
+    }
+    if (plan.name === pendingPlan) {
+      return (
+        <Button variant="secondary" className="w-full" disabled>
+          Request sent
+        </Button>
+      )
+    }
+    return (
+      <Button
+        variant={plan.priceMonthly === 0 ? 'secondary' : variant}
+        className="w-full"
+        disabled={!mine.data || !!pendingPlan}
+        onClick={() => setUpgrade({ plan: planCodes[plan.name], cycle: billing === 'annual' ? 'yearly' : 'monthly' })}
+      >
+        {plan.priceMonthly === 0 ? 'Move to Free' : plan.priceMonthly === null ? 'Ask for a quote' : 'Request upgrade'}
+      </Button>
+    )
   }
 
-  const handleSimulatePayment = () => {
-    setIsUpgrading(true)
-    setTimeout(() => {
-      setIsUpgrading(false)
-      setActivePlan(selectedPlan || 'Event Pro')
-      setShowCheckoutModal(false)
-      alert(`Dhanyabaad! Your account has been upgraded to the ${selectedPlan} tier.`)
-    }, 1200)
+  const providerCta = (plan: ProviderPlan) => {
+    const variant = plan.recommended ? 'primary' : 'secondary'
+    if (!inApp) {
+      return (
+        <ButtonLink to={signedIn ? '/app/listings' : '/signup?type=vendor'} variant={variant} className="w-full">
+          {plan.cta}
+        </ButtonLink>
+      )
+    }
+    if (plan.price === 0) {
+      return (
+        <ButtonLink to="/app/listings" variant={variant} className="w-full">
+          {plan.cta}
+        </ButtonLink>
+      )
+    }
+    return (
+      <Button
+        variant={variant}
+        className="w-full"
+        onClick={() => toast.info('Our team sets up listing upgrades', 'Reply to your welcome email or ask in your next inquiry, and we’ll arrange payment.')}
+      >
+        {plan.cta}
+      </Button>
+    )
   }
+
+  const controls = (
+    <div className="flex flex-wrap items-center gap-3">
+      <Segmented
+        label="Pricing for"
+        value={audience}
+        onChange={setAudience}
+        options={[
+          { value: 'organizers', label: <><Users className="h-4 w-4" aria-hidden />Organizers</> },
+          { value: 'providers', label: <><Store className="h-4 w-4" aria-hidden />Vendors and venues</> },
+        ]}
+      />
+      {audience === 'organizers' && (
+        <Segmented
+          label="Billing period"
+          value={billing}
+          onChange={setBilling}
+          options={[
+            { value: 'monthly', label: 'Monthly' },
+            {
+              value: 'annual',
+              label: (
+                <>
+                  Yearly <span className="text-xs font-semibold text-emerald-700">Save 20%</span>
+                </>
+              ),
+            },
+          ]}
+        />
+      )}
+    </div>
+  )
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 space-y-12">
-      {/* Hero Header */}
-      <div className="text-center max-w-3xl mx-auto space-y-4">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold">
-          <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-          Transparent SaaS Pricing for Eastern Nepal
+    <div className={inApp ? 'w-full space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 2xl:px-10' : 'mx-auto max-w-6xl space-y-10 px-4 py-12 sm:px-6'}>
+      {inApp ? (
+        <>
+          <PageHeader title="Plan and billing" description={`You’re on the ${activePlan} plan. Compare plans and ask for an upgrade when you need more.`} />
+          <MyPlanSection data={mine.data} isLoading={mine.isLoading} error={mine.error} onRetry={() => void mine.refetch()} />
+          <h2 className="pt-2 text-lg font-bold text-ink-900">Compare plans</h2>
+        </>
+      ) : (
+        <div className="max-w-2xl">
+          <h1 className="font-display text-4xl font-bold tracking-tight text-ink-900 sm:text-5xl">Pricing</h1>
+          <p className="mt-3 text-lg text-ink-600">
+            Free for club-sized events. Upgrade when you need bigger crowds, custom form fields, voting or your own domain.
+          </p>
         </div>
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
-          Flexible Plans Tailored for Your Event Scale
-        </h1>
-        <p className="text-slate-500 text-sm sm:text-base leading-relaxed">
-          From free community tech meetups in Dharan to multi-thousand attendee conferences across Province 1. No hidden surcharges.
-        </p>
+      )}
 
-        {/* Audience Toggle (Organizers vs Vendors) */}
-        <div className="inline-flex p-1 bg-slate-100 rounded-2xl border border-slate-200 mt-4">
-          <button
-            onClick={() => setPricingMode('organizers')}
-            className={cn(
-              'px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2',
-              pricingMode === 'organizers'
-                ? 'bg-white text-indigo-700 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
-            )}
-          >
-            <Users className="w-4 h-4" />
-            <span>Event Organizers & Clubs</span>
-          </button>
-          <button
-            onClick={() => setPricingMode('providers')}
-            className={cn(
-              'px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2',
-              pricingMode === 'providers'
-                ? 'bg-white text-emerald-700 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
-            )}
-          >
-            <Store className="w-4 h-4" />
-            <span>Vendors & Venues Marketplace</span>
-          </button>
-        </div>
-      </div>
+      {controls}
 
-      {/* ORGANIZER SAAS TIERS */}
-      {pricingMode === 'organizers' && (
-        <div className="space-y-8">
-          {/* Monthly / Annual Switcher */}
-          <div className="flex items-center justify-center gap-3 text-xs font-semibold">
-            <span className={cn(billingPeriod === 'monthly' ? 'text-slate-900' : 'text-slate-500')}>
-              Monthly Billing
-            </span>
-            <button
-              onClick={() => setBillingPeriod(billingPeriod === 'monthly' ? 'annual' : 'monthly')}
-              className="w-12 h-6 bg-slate-200 rounded-full p-0.5 transition-colors duration-200 ease-in-out relative"
-            >
-              <div
-                className={cn(
-                  'w-5 h-5 rounded-full bg-indigo-600 transition-transform duration-200 ease-in-out',
-                  billingPeriod === 'annual' ? 'transform translate-x-6' : ''
-                )}
-              />
-            </button>
-            <span className={cn(billingPeriod === 'annual' ? 'text-slate-900' : 'text-slate-500', 'flex items-center gap-1.5')}>
-              Annual Billing
-              <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                Save 20%
-              </span>
-            </span>
-          </div>
-
-          {/* Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {organizerPlans.map((plan) => {
-              const isCurrent = activePlan === plan.name
-              return (
-                <div
-                  key={plan.name}
-                  className={cn(
-                    'bg-white rounded-3xl p-6 border flex flex-col justify-between transition-all duration-200 relative',
-                    plan.popular
-                      ? 'border-indigo-600 ring-2 ring-indigo-600/20 shadow-xl'
-                      : 'border-slate-200 shadow-sm hover:shadow-md'
-                  )}
-                >
-                  {plan.popular && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-indigo-600 text-white text-[10px] font-bold uppercase tracking-wider rounded-full shadow-sm">
-                      {plan.badge}
-                    </div>
-                  )}
-
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-lg font-bold text-slate-900">{plan.name}</h3>
-                      <p className="text-xs text-slate-500 mt-1 line-clamp-2">{plan.description}</p>
-                    </div>
-
-                    <div className="py-2">
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-3xl font-black text-slate-900">
-                          {typeof plan.priceMonthly === 'number'
-                            ? `Rs. ${billingPeriod === 'monthly' ? plan.priceMonthly.toLocaleString() : (typeof plan.priceAnnual === 'number' ? (plan.priceAnnual / 12).toFixed(0) : plan.priceAnnual)}`
-                            : plan.priceMonthly}
-                        </span>
-                        {typeof plan.priceMonthly === 'number' && (
-                          <span className="text-xs text-slate-400 font-medium">/ month</span>
-                        )}
-                      </div>
-                      {billingPeriod === 'annual' && typeof plan.priceAnnual === 'number' && plan.priceAnnual > 0 && (
-                        <span className="text-[11px] text-slate-400">Billed Rs. {plan.priceAnnual.toLocaleString()} annually</span>
-                      )}
-                    </div>
-
-                    <div className="space-y-2 pt-2 border-t border-slate-100 text-xs">
-                      <span className="font-bold text-slate-700 text-[11px] uppercase tracking-wider block">
-                        Included Features:
-                      </span>
-                      {plan.features.map((f, i) => (
-                        <div key={i} className="flex items-start gap-2 text-slate-600">
-                          <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                          <span>{f}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="pt-6 mt-6 border-t border-slate-100">
-                    <button
-                      onClick={() => handleSelectPlan(plan.name)}
-                      disabled={isCurrent}
-                      className={cn(
-                        'w-full py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm',
-                        isCurrent
-                          ? 'bg-slate-100 text-slate-400 cursor-default'
-                          : plan.popular
-                          ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                          : 'bg-slate-900 hover:bg-slate-800 text-white'
-                      )}
-                    >
-                      <span>{isCurrent ? 'Current Active Tier' : plan.cta}</span>
-                      {!isCurrent && <ArrowRight className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                </div>
+      {audience === 'organizers' ? (
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+          {livePlans.map((plan) => {
+            const monthly = plan.priceMonthly
+            const annual = plan.priceAnnual
+            let price: React.ReactNode = 'Custom'
+            let note: React.ReactNode = 'Priced for your organization'
+            if (monthly === 0) {
+              price = 'Free'
+              note = 'No card needed'
+            } else if (monthly !== null && annual !== null) {
+              const perMonth = billing === 'monthly' ? monthly : Math.round(annual / 12)
+              price = (
+                <>
+                  {rs(perMonth)}
+                  <span className="ml-1 font-sans text-sm font-medium text-ink-500">/ month</span>
+                </>
               )
-            })}
+              note = billing === 'annual' ? `${rs(annual)} billed yearly` : 'Billed monthly'
+            }
+            return (
+              <PlanCard
+                key={plan.name}
+                name={plan.name}
+                audience={plan.audience}
+                description={plan.description}
+                price={price}
+                priceNote={note}
+                recommended={plan.recommended}
+                current={inApp && plan.name === activePlan}
+                cta={organizerCta(plan)}
+              >
+                <FeatureList features={plan.features} limitations={plan.limitations} />
+              </PlanCard>
+            )
+          })}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <p className="max-w-2xl text-ink-600">Listing plans for photographers, sound and stage, decorators, caterers and venue owners.</p>
+          <div className="grid gap-5 md:grid-cols-3">
+            {providerPlans.map((plan) => (
+              <PlanCard
+                key={plan.name}
+                name={plan.name}
+                description={plan.description}
+                price={
+                  plan.price === 0 ? (
+                    'Free'
+                  ) : (
+                    <>
+                      {rs(plan.price)}
+                      <span className="ml-1 font-sans text-sm font-medium text-ink-500">/ month</span>
+                    </>
+                  )
+                }
+                priceNote={plan.price === 0 ? 'Always free' : 'Billed monthly'}
+                recommended={plan.recommended}
+                cta={providerCta(plan)}
+              >
+                <FeatureList features={plan.features} />
+              </PlanCard>
+            ))}
           </div>
         </div>
       )}
 
-      {/* VENDOR & VENUE MARKETPLACE TIERS */}
-      {pricingMode === 'providers' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          {providerPlans.map((plan) => (
-            <div
-              key={plan.name}
-              className={cn(
-                'bg-white rounded-3xl p-6 border flex flex-col justify-between transition relative',
-                plan.popular
-                  ? 'border-emerald-600 ring-2 ring-emerald-600/20 shadow-xl'
-                  : 'border-slate-200 shadow-sm'
-              )}
-            >
-              {plan.popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-wider rounded-full shadow-sm">
-                  Recommended for Vendors
-                </div>
-              )}
-
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900">{plan.name}</h3>
-                  <p className="text-xs text-slate-500 mt-1">{plan.description}</p>
-                </div>
-
-                <div className="py-2">
-                  <span className="text-3xl font-black text-slate-900">{plan.price}</span>
-                </div>
-
-                <div className="space-y-2 pt-2 border-t border-slate-100 text-xs">
-                  {plan.features.map((f, i) => (
-                    <div key={i} className="flex items-start gap-2 text-slate-600">
-                      <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                      <span>{f}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="pt-6 mt-6 border-t border-slate-100">
-                <button
-                  onClick={() => handleSelectPlan(plan.name)}
-                  className={cn(
-                    'w-full py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm',
-                    plan.popular
-                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                      : 'bg-slate-900 hover:bg-slate-800 text-white'
-                  )}
-                >
-                  <span>{plan.cta}</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
+      <section aria-labelledby="pricing-faq" className={inApp ? 'pt-4' : 'pt-8'}>
+        <h2 id="pricing-faq" className={cn('font-bold text-ink-900', inApp ? 'text-lg' : 'font-display text-2xl sm:text-3xl')}>
+          Questions about plans
+        </h2>
+        <dl className="mt-4 grid gap-x-10 sm:grid-cols-2">
+          {(inApp
+            ? faqs.map((f) =>
+                f.q === 'How do I pay?'
+                  ? { ...f, a: 'Pay by eSewa, Khalti, Fonepay QR or bank transfer. Our team records the payment and your plan updates straight away.' }
+                  : f,
+              )
+            : faqs
+          ).map((f) => (
+            <div key={f.q} className="border-t border-ink-200 py-5">
+              <dt className="font-semibold text-ink-900">{f.q}</dt>
+              <dd className="mt-1.5 text-sm leading-relaxed text-ink-600">{f.a}</dd>
             </div>
           ))}
-        </div>
-      )}
+        </dl>
+      </section>
 
-      {/* Frequently Asked Questions */}
-      <div className="bg-slate-50 rounded-3xl p-8 border border-slate-200 max-w-4xl mx-auto space-y-6">
-        <div className="text-center space-y-1">
-          <h2 className="text-xl font-bold text-slate-900">Frequently Asked Questions</h2>
-          <p className="text-xs text-slate-500">Everything you need to know about Eventlaya billing in Nepal</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-          <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-1">
-            <h4 className="font-bold text-slate-900">Which payment gateways are supported in Nepal?</h4>
-            <p className="text-slate-600 leading-relaxed">
-              We support direct digital payments via eSewa, Khalti, Fonepay QR, and direct corporate bank transfers with official VAT invoices.
-            </p>
-          </div>
-          <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-1">
-            <h4 className="font-bold text-slate-900">Can colleges and student clubs get discounts?</h4>
-            <p className="text-slate-600 leading-relaxed">
-              Yes! Non-profit community clubs and IT student associations in Dharan, Itahari, and Biratnagar can apply for subsidized Event Pro licenses.
-            </p>
-          </div>
-          <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-1">
-            <h4 className="font-bold text-slate-900">Do you provide on-site gate check-in support?</h4>
-            <p className="text-slate-600 leading-relaxed">
-              For Enterprise and large symposiums, our technical field crew provides on-ground QR barcode terminal setup and gate supervisor support.
-            </p>
-          </div>
-          <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-1">
-            <h4 className="font-bold text-slate-900">Can I switch or cancel plans at any time?</h4>
-            <p className="text-slate-600 leading-relaxed">
-              Yes, you can upgrade, downgrade, or pause your subscription at any billing cycle without cancellation penalties.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Checkout / Upgrade Modal */}
-      {showCheckoutModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-150 text-xs">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div>
-                <h3 className="text-base font-bold text-slate-900">Subscribe to {selectedPlan}</h3>
-                <p className="text-slate-500 text-[11px]">Instant activation for your organizer account</p>
-              </div>
-              <button
-                onClick={() => setShowCheckoutModal(false)}
-                className="text-slate-400 hover:text-slate-600 text-lg font-bold"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="space-y-4 mt-4">
-              {/* Payment Methods */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-2">Select Payment Method (Nepal):</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { id: 'esewa', label: 'eSewa Mobile Wallet', color: 'text-emerald-700 bg-emerald-50 border-emerald-300' },
-                    { id: 'khalti', label: 'Khalti Digital Wallet', color: 'text-purple-700 bg-purple-50 border-purple-300' },
-                    { id: 'fonepay', label: 'Fonepay Interbank QR', color: 'text-red-700 bg-red-50 border-red-300' },
-                    { id: 'bank', label: 'Direct Bank Transfer', color: 'text-blue-700 bg-blue-50 border-blue-300' },
-                  ].map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => setPaymentMethod(m.id as any)}
-                      className={cn(
-                        'p-3 rounded-xl border text-left font-bold transition flex items-center gap-2',
-                        paymentMethod === m.id ? m.color : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                      )}
-                    >
-                      <CreditCard className="w-4 h-4 shrink-0" />
-                      <span className="text-[11px] leading-tight">{m.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Selected Plan:</span>
-                  <span className="font-bold text-slate-800">{selectedPlan}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Billing Cycle:</span>
-                  <span className="font-semibold text-slate-700 capitalize">{billingPeriod}</span>
-                </div>
-                <div className="flex justify-between pt-1 border-t border-slate-200 text-slate-900 font-bold">
-                  <span>Total Due:</span>
-                  <span className="text-indigo-600">
-                    {selectedPlan === 'Event Pro' ? 'Rs. 1,499' : selectedPlan === 'Business' ? 'Rs. 3,999' : 'Quote'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCheckoutModal(false)}
-                  className="px-4 py-2 border border-slate-200 rounded-xl font-semibold text-slate-600 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSimulatePayment}
-                  disabled={isUpgrading}
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-sm transition disabled:opacity-50"
-                >
-                  {isUpgrading ? 'Processing...' : 'Confirm Subscription'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {inApp && <RequestUpgradeDialog target={upgrade} data={mine.data} onClose={() => setUpgrade(null)} />}
     </div>
   )
 }
