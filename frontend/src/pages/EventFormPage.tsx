@@ -1013,7 +1013,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                     maxLength={10000}
                     className="mt-6"
                     placeholder="Refund policy, entry rules, age limits, photography consent…"
-                    hint="Optional. One term per line; shown as a numbered list in the Terms and Conditions tab of the event page."
+                    hint="Optional. Shown exactly as written in a Terms & conditions section on the event page."
                     value={content.terms}
                     onChange={(e) => setPage('terms', e.target.value)}
                   />

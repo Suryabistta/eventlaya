@@ -121,7 +121,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
 
   const sections = useMemo(() => {
     const s: SectionId[] = []
-    if (event.description || event.highlights?.length || event.terms) s.push('about')
+    if (event.description || event.highlights?.length) s.push('about')
     if (event.sub_events?.length) s.push('sessions')
     const tt = event.ticket_types ?? []
     if (tt.length > 1 || tt.some((t) => Number(t.price) > 0 || t.remaining !== null || t.description)) s.push('tickets')
@@ -247,11 +247,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
         <div className="min-w-0 space-y-14">
           {sections.includes('about') && (
             <Section id="about" title="About this event">
-              {event.terms ? (
-                <AboutTabs description={event.description} terms={event.terms} />
-              ) : (
-                event.description && <p className="whitespace-pre-line text-base leading-relaxed text-ink-700">{event.description}</p>
-              )}
+              {event.description && <p className="whitespace-pre-line text-base leading-relaxed text-ink-700">{event.description}</p>}
               {event.highlights?.length > 0 && (
                 <Card className="mt-5">
                   <CardHeader title="Highlights" />
@@ -336,6 +332,14 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
                   </details>
                 ))}
               </div>
+            </Section>
+          )}
+
+          {event.terms && (
+            <Section id="terms" title="Terms & conditions">
+              <Card>
+                <p className="whitespace-pre-line p-5 text-sm leading-relaxed text-ink-700">{event.terms}</p>
+              </Card>
             </Section>
           )}
 
@@ -926,55 +930,3 @@ const RegistrationCard: React.FC<{ event: PublicEvent; state: ReturnType<typeof 
   )
 }
 
-/** One term per line; numbering the organizer typed ("1.", "2)", "-") is dropped because the list numbers them. */
-const termLines = (terms: string) =>
-  terms
-    .split('\n')
-    .map((l) => l.replace(/^\s*(\d+[.)]|[-*•])\s*/, '').trim())
-    .filter(Boolean)
-
-/** About: Description and the event's own Terms and Conditions as tabs. */
-const AboutTabs: React.FC<{ description: string; terms: string }> = ({ description, terms }) => {
-  const [tab, setTab] = useState<'description' | 'terms'>(description ? 'description' : 'terms')
-  const id = useId()
-  const tabs = [
-    ...(description ? [{ key: 'description' as const, label: 'Description' }] : []),
-    { key: 'terms' as const, label: 'Terms and Conditions' },
-  ]
-  return (
-    <div>
-      <div role="tablist" className="flex gap-1 border-b border-ink-200">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            role="tab"
-            id={`${id}-${t.key}`}
-            aria-selected={tab === t.key}
-            aria-controls={`${id}-${t.key}-panel`}
-            onClick={() => setTab(t.key)}
-            className={cn(
-              '-mb-px border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors',
-              tab === t.key ? 'border-brand-600 text-brand-700' : 'border-transparent text-ink-500 hover:text-ink-800',
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-      <div role="tabpanel" id={`${id}-${tab}-panel`} aria-labelledby={`${id}-${tab}`} className="pt-5">
-        {tab === 'description' ? (
-          <p className="whitespace-pre-line text-base leading-relaxed text-ink-700">{description}</p>
-        ) : (
-          <ol className="list-decimal space-y-2 pl-5 text-base leading-relaxed text-ink-700 marker:text-ink-500">
-            {termLines(terms).map((line, i) => (
-              <li key={i} className="pl-1">
-                {line}
-              </li>
-            ))}
-          </ol>
-        )}
-      </div>
-    </div>
-  )
-}
