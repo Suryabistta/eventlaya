@@ -1,12 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useCities } from '@/lib/cities'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp, Building2, Plus, Trash2 } from 'lucide-react'
+import { PackagesManager } from './Packages'
 import { marketplaceApi, type VenueListing, type VenueSpace, type VenueSpaceInput, type VenueWithSpaces } from '@/services/api'
 import { useAuth } from '@/lib/auth'
-import { Button, ButtonLink, Card, CardHeader, EmptyState, ErrorState, IconButton, ImageGalleryUpload, Input, PageHeader, Select, Skeleton, Textarea, useToast } from '@/components/ui'
+import { Button, ButtonLink, Card, CardHeader, EmptyState, ErrorState, IconButton, ImageGalleryUpload, ImageUpload, Input, PageHeader, Select, Skeleton, Textarea, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
-import { BackLink, CITIES, DETAIL_ASIDE, DETAIL_GRID, DETAIL_MAIN, SPACE_TYPES, mobileBarClass, VENUE_TYPES, useErrorToast } from './shared'
+import { BackLink, DETAIL_ASIDE, DETAIL_GRID, DETAIL_MAIN, SPACE_TYPES, mobileBarClass, VENUE_TYPES, useErrorToast } from './shared'
 import { VenueCard } from './Cards'
 import { ListingStatusNotice } from '../business/status'
 
@@ -33,6 +35,7 @@ interface VenueForm {
   amenities: string[]
   otherAmenities: string
   photos: string[]
+  cover: string
   contactPerson: string
   contactPhone: string
   contactEmail: string
@@ -114,6 +117,7 @@ const formFromVenue = (v: VenueWithSpaces): VenueForm => {
     amenities: known,
     otherAmenities: v.amenities.filter((a) => !COMMON_AMENITIES.includes(a)).join(', '),
     photos: v.images,
+    cover: v.featured_image ?? '',
     contactPerson: v.contact_person,
     contactPhone: v.contact_phone,
     contactEmail: v.contact_email || '',
@@ -214,12 +218,14 @@ const VenueFormPage: React.FC<{ existing?: VenueWithSpaces; existingSpaces?: Ven
           amenities: ['Parking', 'Power backup'],
           otherAmenities: '',
           photos: [],
+          cover: '',
           contactPerson: '',
           contactPhone: user?.phone || '',
           contactEmail: user?.email || '',
         },
   )
   const [spaces, setSpaces] = useState<SpaceDraft[]>(() => existingSpaces.map(draftFromSpace))
+  const cities = useCities()
   const [submitting, setSubmitting] = useState(false)
   const capError = form.maxCap < form.minCap ? 'Must be at least the minimum' : undefined
 
@@ -271,6 +277,7 @@ const VenueFormPage: React.FC<{ existing?: VenueWithSpaces; existingSpaces?: Ven
       spaces: drafts,
       amenities,
       images,
+      featured_image: form.cover,
       contact_person: form.contactPerson,
       contact_phone: form.contactPhone,
       contact_email: form.contactEmail,
@@ -331,6 +338,7 @@ const VenueFormPage: React.FC<{ existing?: VenueWithSpaces; existingSpaces?: Ven
       price_per_day: form.price,
       amenities,
       images,
+      featured_image: form.cover,
       contact_person: form.contactPerson.trim(),
       contact_phone: form.contactPhone.trim(),
       contact_email: form.contactEmail.trim(),
@@ -391,125 +399,135 @@ const VenueFormPage: React.FC<{ existing?: VenueWithSpaces; existingSpaces?: Ven
       {existing && <ListingStatusNotice status={existing.listing_status} note={existing.review_note} />}
 
       <div className={DETAIL_GRID}>
-        <form id={formId} onSubmit={submit} onInvalidCapture={onInvalid} className={DETAIL_MAIN}>
-          <Section title="Basics">
-            <Input label="Venue name" required value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Royal Palace Banquet and Lawns" />
-            <Select label="Type" value={form.venueType} onChange={(e) => set('venueType', e.target.value as VenueListing['venue_type'])}>
-              {VENUE_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </Select>
-            <Textarea label="Description" required rows={4} value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="Parking, generator backup, catering options." />
-            <Textarea label="House rules" hint="Optional. Music cut-off, outside catering, advance payment and similar." rows={3} value={form.rules} onChange={(e) => set('rules', e.target.value)} />
-          </Section>
-
-          <Section title="Location">
-            <div className="grid gap-4 sm:grid-cols-[200px_1fr]">
-              <Select label="City" value={form.city} onChange={(e) => set('city', e.target.value)}>
-                {CITIES.map((c) => (
-                  <option key={c}>{c}</option>
+        <div className={DETAIL_MAIN}>
+          <form id={formId} onSubmit={submit} onInvalidCapture={onInvalid} className="space-y-6">
+            <Section title="Basics">
+              <Input label="Venue name" required value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Royal Palace Banquet and Lawns" />
+              <Select label="Type" value={form.venueType} onChange={(e) => set('venueType', e.target.value as VenueListing['venue_type'])}>
+                {VENUE_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
                 ))}
               </Select>
-              <Input label="Address" required value={form.address} onChange={(e) => set('address', e.target.value)} placeholder="Main Highway Chowk, Itahari-4" />
-            </div>
-          </Section>
+              <Textarea label="Description" required rows={4} value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="Parking, generator backup, catering options." />
+              <Textarea label="House rules" hint="Optional. Music cut-off, outside catering, advance payment and similar." rows={3} value={form.rules} onChange={(e) => set('rules', e.target.value)} />
+            </Section>
 
-          <Section
-            title="Halls and spaces"
-            description="Add each hall, auditorium or lawn that can be booked on its own. Leave empty if the venue is booked as a whole."
-          >
-            {spaces.length === 0 ? (
-              <EmptyState
-                className="rounded-xl border border-dashed border-ink-200 py-8"
-                icon={<Building2 className="h-6 w-6" />}
-                title="No separate spaces"
-                description="Organizers will book the whole venue."
+            <Section title="Location">
+              <div className="grid gap-4 sm:grid-cols-[200px_1fr]">
+                <Select label="City" value={form.city} onChange={(e) => set('city', e.target.value)}>
+                  {[...new Set([...cities, form.city])].map((c) => (
+                    <option key={c}>{c}</option>
+                  ))}
+                </Select>
+                <Input label="Address" required value={form.address} onChange={(e) => set('address', e.target.value)} placeholder="Main Highway Chowk, Itahari-4" />
+              </div>
+            </Section>
+
+            <Section
+              title="Halls and spaces"
+              description="Add each hall, auditorium or lawn that can be booked on its own. Leave empty if the venue is booked as a whole."
+            >
+              {spaces.length === 0 ? (
+                <EmptyState
+                  className="rounded-xl border border-dashed border-ink-200 py-8"
+                  icon={<Building2 className="h-6 w-6" />}
+                  title="No separate spaces"
+                  description="Organizers will book the whole venue."
+                />
+              ) : (
+                <ol className="space-y-4">
+                  {spaces.map((d, i) => (
+                    <SpaceEditor
+                      key={d.key}
+                      draft={d}
+                      index={i}
+                      total={spaces.length}
+                      onChange={(patch) => updateSpace(d.key, patch)}
+                      onMove={(dir) => moveSpace(i, dir)}
+                      onRemove={() => removeSpace(d)}
+                    />
+                  ))}
+                </ol>
+              )}
+              <Button variant="secondary" icon={<Plus className="h-4 w-4" aria-hidden />} onClick={() => setSpaces((all) => [...all, newDraft()])}>
+                Add a space
+              </Button>
+            </Section>
+
+            <Section
+              title="Capacity and pricing"
+              description={spaces.length ? 'Capacity and “from” price are worked out from your spaces. These are used when no spaces are available.' : undefined}
+            >
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                <Input label="Minimum guests" type="number" min={1} required value={form.minCap} onChange={(e) => set('minCap', Number(e.target.value))} />
+                <Input label="Maximum guests" type="number" min={1} required value={form.maxCap} error={capError} onChange={(e) => set('maxCap', Number(e.target.value))} />
+                <Input
+                  label="Price per day (Rs)"
+                  type="number"
+                  min={0}
+                  step={500}
+                  required
+                  value={form.price}
+                  onChange={(e) => set('price', Number(e.target.value))}
+                  containerClassName="col-span-2 sm:col-span-1"
+                />
+              </div>
+            </Section>
+
+            <Section title="Amenities" description="Select everything guests can use.">
+              <div role="group" aria-label="Common amenities" className="flex flex-wrap gap-2">
+                {COMMON_AMENITIES.map((a) => {
+                  const on = form.amenities.includes(a)
+                  return (
+                    <button
+                      key={a}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => toggleAmenity(a)}
+                      className={cn(
+                        'h-8 rounded-full border px-3.5 text-sm font-medium transition-colors',
+                        on ? 'border-brand-600 bg-brand-600 text-white' : 'border-ink-200 bg-white text-ink-700 hover:border-ink-300 hover:bg-ink-50',
+                      )}
+                    >
+                      {a}
+                    </button>
+                  )
+                })}
+              </div>
+              <Input label="Other amenities" hint="Separate with commas" value={form.otherAmenities} onChange={(e) => set('otherAmenities', e.target.value)} placeholder="Swimming pool deck, Bridal suite" />
+            </Section>
+
+            <Section title="Photos" description="Upload photos of the venue. The first one is the cover photo.">
+              <ImageUpload
+                label="Cover photo"
+                kind="venue"
+                hint="Optional. Shown on your marketplace card and at the top of your page. Without one, the first photo is used."
+                value={form.cover || null}
+                onChange={(url) => set('cover', url ?? '')}
               />
-            ) : (
-              <ol className="space-y-4">
-                {spaces.map((d, i) => (
-                  <SpaceEditor
-                    key={d.key}
-                    draft={d}
-                    index={i}
-                    total={spaces.length}
-                    onChange={(patch) => updateSpace(d.key, patch)}
-                    onMove={(dir) => moveSpace(i, dir)}
-                    onRemove={() => removeSpace(d)}
-                  />
-                ))}
-              </ol>
-            )}
-            <Button variant="secondary" icon={<Plus className="h-4 w-4" aria-hidden />} onClick={() => setSpaces((all) => [...all, newDraft()])}>
-              Add a space
-            </Button>
-          </Section>
+              <ImageGalleryUpload label="Venue photos" kind="venue" max={20} value={form.photos} onChange={(urls) => set('photos', urls)} />
+            </Section>
 
-          <Section
-            title="Capacity and pricing"
-            description={spaces.length ? 'Capacity and “from” price are worked out from your spaces. These are used when no spaces are available.' : undefined}
-          >
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-              <Input label="Minimum guests" type="number" min={1} required value={form.minCap} onChange={(e) => set('minCap', Number(e.target.value))} />
-              <Input label="Maximum guests" type="number" min={1} required value={form.maxCap} error={capError} onChange={(e) => set('maxCap', Number(e.target.value))} />
-              <Input
-                label="Price per day (Rs)"
-                type="number"
-                min={0}
-                step={500}
-                required
-                value={form.price}
-                onChange={(e) => set('price', Number(e.target.value))}
-                containerClassName="col-span-2 sm:col-span-1"
-              />
-            </div>
-          </Section>
-
-          <Section title="Amenities" description="Select everything guests can use.">
-            <div role="group" aria-label="Common amenities" className="flex flex-wrap gap-2">
-              {COMMON_AMENITIES.map((a) => {
-                const on = form.amenities.includes(a)
-                return (
-                  <button
-                    key={a}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => toggleAmenity(a)}
-                    className={cn(
-                      'h-8 rounded-full border px-3.5 text-sm font-medium transition-colors',
-                      on ? 'border-brand-600 bg-brand-600 text-white' : 'border-ink-200 bg-white text-ink-700 hover:border-ink-300 hover:bg-ink-50',
-                    )}
-                  >
-                    {a}
-                  </button>
-                )
-              })}
-            </div>
-            <Input label="Other amenities" hint="Separate with commas" value={form.otherAmenities} onChange={(e) => set('otherAmenities', e.target.value)} placeholder="Swimming pool deck, Bridal suite" />
-          </Section>
-
-          <Section title="Photos" description="Upload photos of the venue. The first one is the cover photo.">
-            <ImageGalleryUpload label="Venue photos" kind="venue" max={8} value={form.photos} onChange={(urls) => set('photos', urls)} />
-          </Section>
-
-          <Section title="Contact" description="Shown on your venue page so organizers can reach you.">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Input label="Contact person" required value={form.contactPerson} onChange={(e) => set('contactPerson', e.target.value)} placeholder="Santosh Shrestha" />
-              <Input label="Phone" type="tel" required value={form.contactPhone} onChange={(e) => set('contactPhone', e.target.value)} placeholder="98XXXXXXXX" />
-              <Input
-                label="Email"
-                type="email"
-                hint="Inquiries are sent here"
-                value={form.contactEmail}
-                onChange={(e) => set('contactEmail', e.target.value)}
-                placeholder="bookings@venue.com"
-                containerClassName="sm:col-span-2"
-              />
-            </div>
-          </Section>
-        </form>
+            <Section title="Contact" description="Shown on your venue page so organizers can reach you.">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Input label="Contact person" required value={form.contactPerson} onChange={(e) => set('contactPerson', e.target.value)} placeholder="Santosh Shrestha" />
+                <Input label="Phone" type="tel" required value={form.contactPhone} onChange={(e) => set('contactPhone', e.target.value)} placeholder="98XXXXXXXX" />
+                <Input
+                  label="Email"
+                  type="email"
+                  hint="Inquiries are sent here"
+                  value={form.contactEmail}
+                  onChange={(e) => set('contactEmail', e.target.value)}
+                  placeholder="bookings@venue.com"
+                  containerClassName="sm:col-span-2"
+                />
+              </div>
+            </Section>
+          </form>
+          {existing && <PackagesManager listing={{ venue: existing.id }} />}
+        </div>
 
         <aside aria-label="Preview" className={cn(DETAIL_ASIDE, 'hidden space-y-3 lg:block')}>
           <p className="text-sm font-medium text-ink-500">Preview</p>

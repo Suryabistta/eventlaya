@@ -253,7 +253,7 @@ class MarketCard extends StatelessWidget {
                     ),
                     if (verified) ...[
                       const SizedBox(width: 4),
-                      const Icon(Icons.verified_rounded, size: 16, color: AppColors.success),
+                      const Icon(Icons.verified_rounded, size: 16, color: AppColors.verified),
                     ],
                   ]),
                   if (subtitle.isNotEmpty) ...[

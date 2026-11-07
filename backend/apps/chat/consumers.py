@@ -35,7 +35,7 @@ def _authenticate(raw_token):
     """(user, expires_at_epoch) for a valid access token, else (None, None)."""
     if not raw_token:
         return None, None
-    from rest_framework_simplejwt.authentication import JWTAuthentication
+    from apps.accounts.authentication import JWTAuthentication
     from rest_framework_simplejwt.exceptions import AuthenticationFailed, InvalidToken, TokenError
     try:
         auth = JWTAuthentication()

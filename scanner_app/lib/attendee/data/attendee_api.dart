@@ -318,6 +318,15 @@ class AttendeeApi {
     return [for (final v in _list(resp.data)) if (v is Map) Venue.fromJson(_map(v))];
   }
 
+  /// `GET /api/marketplace/packages/?vendor=<id>` or `?venue=<id>`: active packages of a live listing.
+  Future<List<ServicePackage>> packages({String? vendorId, String? venueId}) async {
+    final resp = await _api.get('/api/marketplace/packages/', queryParameters: {
+      if (vendorId != null) 'vendor': vendorId,
+      if (venueId != null) 'venue': venueId,
+    });
+    return [for (final p in _list(resp.data)) if (p is Map) ServicePackage.fromJson(_map(p))];
+  }
+
   Future<Venue> venue(String id) async {
     final resp = await _api.get('/api/marketplace/venues/$id/');
     return Venue.fromJson(_map(resp.data));

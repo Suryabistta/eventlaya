@@ -39,6 +39,17 @@ MODULES = [
      'contests.', 'Gavel', 13, ['organizer', 'attendee', 'staff']),
     ('paid_votes', 'Paid votes', 'Voters buy vote packs in contests. Requires Pageant & contests and Online payments.',
      'Coins', 14, ['organizer', 'attendee']),
+    # November 2026 batch (docs/plan-2026-11-feature-batch.md)
+    ('banners', 'Marketplace banners', 'Sliding banner images at the top of the marketplace, uploaded by the platform team.',
+     'GalleryHorizontal', 15, ['organizer', 'staff', 'attendee', 'vendor']),
+    ('seat_numbers', 'Seat numbers', 'Organizers assign seat numbers to tickets and choose whether attendees see them.',
+     'Armchair', 16, ['organizer', 'staff', 'attendee']),
+    ('packages', 'Vendor & venue packages', 'Vendors and venues publish priced packages that customers can ask about.',
+     'Package', 17, ['organizer', 'vendor', 'attendee']),
+    ('sub_events', 'Sub-events', 'A main event with child events, each with its own registration form and tickets.',
+     'ListTree', 18, ['organizer', 'staff', 'attendee']),
+    ('offline_tickets', 'Printed tickets', 'Bulk printed tickets with QR codes for shop, counter and door sales; '
+     'scanned at the gate like online passes.', 'Printer', 19, ['organizer', 'staff']),
 ]
 
 # A module is only on when every module it requires is on too (for the same user).
@@ -46,12 +57,15 @@ MODULE_REQUIRES = {
     'contests': ['voting'],
     'judging': ['contests'],
     'paid_votes': ['contests', 'payments'],
+    'packages': ['marketplace'],
 }
 ROLES = ['superadmin', 'organizer', 'staff', 'attendee', 'vendor']
 
 # First match wins, so more specific paths come first.
 PATH_MODULES = [
     (re.compile(r'^/api/events/staff-assign/'), 'staff_management'),
+    (re.compile(r'^/api/events/[0-9a-f-]{36}/seats/'), 'seat_numbers'),
+    (re.compile(r'^/api/events/[0-9a-f-]{36}/ticket-batches/'), 'offline_tickets'),
     (re.compile(r'^/api/auth/team/'), 'staff_management'),
     (re.compile(r'^/api/events/my-assignment/'), 'gate_scanner'),
     (re.compile(r'^/api/events/[0-9a-f-]{36}/(gate|gates|tickets|export-attendees|broadcast)/'), 'gate_scanner'),
@@ -59,6 +73,7 @@ PATH_MODULES = [
     (re.compile(r'^/api/forms/events/[^/]+/register/'), 'events'),  # attendee registration belongs to events
     (re.compile(r'^/api/forms/'), 'dynamic_forms'),
     (re.compile(r'^/api/voting/'), 'voting'),
+    (re.compile(r'^/api/marketplace/packages/'), 'packages'),
     (re.compile(r'^/api/marketplace/'), 'marketplace'),
     (re.compile(r'^/api/chat/'), 'chat'),
     (re.compile(r'^/ws/chat/'), 'chat'),
@@ -73,7 +88,8 @@ PATH_MODULES = [
     # answer ("not available") even when the module is off; tenancy.white_label_active() stops the site itself.
     (re.compile(r'^/api/auth/tenant-branding/(?!resolve/)'), 'white_label'),
     (re.compile(r'^/api/platform/white-label/'), 'white_label'),
-    (re.compile(r'^/api/blog/'), 'blog'),  # public reading too: off → the blog 404s (apps.seo checks it for pages)
+    (re.compile(r'^/api/blog/'), 'blog'),
+    (re.compile(r'^/api/platform/banners/'), 'banners'),  # public reading too: off → the blog 404s (apps.seo checks it for pages)
 ]
 
 CACHE_KEY = 'platform-modules:v1'
@@ -141,7 +157,7 @@ def _jwt_user(request):
     if user is not None and user.is_authenticated:
         return user
     try:
-        from rest_framework_simplejwt.authentication import JWTAuthentication
+        from apps.accounts.authentication import JWTAuthentication
         result = JWTAuthentication().authenticate(request)
     except Exception:
         return None

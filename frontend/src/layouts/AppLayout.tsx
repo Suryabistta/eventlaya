@@ -37,6 +37,9 @@ import {
   Wallet,
   LineChart,
   Receipt,
+  MapPin,
+  GalleryHorizontal,
+  Printer,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
@@ -49,7 +52,7 @@ import { eventPhase, phaseMeta, sortByPhase } from '@/lib/phase'
 import type { AuthUser } from '@/services/api'
 import { useModules } from '@/lib/modules'
 import { ChatProvider, useChat } from '@/lib/chat/socket'
-import { personName } from '@/lib/account'
+import { mediaUrl, personName } from '@/lib/account'
 
 type Role = AuthUser['role']
 
@@ -75,8 +78,9 @@ interface NavExtras {
   marketplace: boolean
   whiteLabel: boolean
   payments: boolean
+  printedTickets: boolean
 }
-const noExtras: NavExtras = { chat: false, chatUnread: 0, reviews: false, marketplace: true, whiteLabel: true, payments: true }
+const noExtras: NavExtras = { chat: false, chatUnread: 0, reviews: false, marketplace: true, whiteLabel: true, payments: true, printedTickets: false }
 
 /** Modules on for this user + chat unread count, for the sidebar, More sheet and tab bar. */
 function useNavExtras(): NavExtras {
@@ -86,6 +90,7 @@ function useNavExtras(): NavExtras {
     chat: chat.available,
     chatUnread: chat.unread,
     reviews: modules.enabled('reviews'),
+    printedTickets: modules.enabled('offline_tickets'),
     marketplace: modules.enabled('marketplace'),
     whiteLabel: modules.enabled('white_label'),
     payments: modules.enabled('payments'),
@@ -107,6 +112,7 @@ const eventTools = (x: NavExtras): NavGroup => ({
     { label: 'Overview', to: '/app', icon: LayoutDashboard, end: true },
     { label: 'Events', to: '/app/events', icon: CalendarDays, roles: ORGANIZER },
     { label: 'Tickets', to: '/app/tickets', icon: Ticket, roles: ORGANIZER },
+    ...(x.printedTickets ? [{ label: 'Printed tickets', to: '/app/printed-tickets', icon: Printer, roles: ORGANIZER }] : []),
     { label: 'Payments', to: '/app/payments', icon: Wallet, roles: ORGANIZER },
     { label: 'Registration forms', to: '/app/forms', icon: FileText, roles: ORGANIZER },
     { label: 'Gate scanner', to: '/app/scanner', icon: ScanLine },
@@ -196,6 +202,8 @@ function buildNav(user: ShellUser | null, pending: PendingApprovals = noPending,
           ...(x.payments ? [{ label: 'Online payments', to: '/admin/payments', icon: Wallet }] : []),
           { label: 'Segments', to: '/admin/segments', icon: PieChart },
           { label: 'Modules & permissions', to: '/admin/modules', icon: SlidersHorizontal },
+          { label: 'Cities & categories', to: '/admin/catalog', icon: MapPin },
+          { label: 'Banners', to: '/admin/banners', icon: GalleryHorizontal },
           { label: 'Activity', to: '/admin/activity', icon: Activity },
           { label: 'Blog', to: '/admin/blog', icon: Newspaper },
           { label: 'Analytics', to: '/admin/analytics', icon: LineChart },
@@ -479,9 +487,7 @@ const MoreSheet: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onC
         <div className="space-y-5 overflow-y-auto overscroll-contain px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-2">
           {/* Account */}
           <div className="flex items-center gap-3 rounded-2xl bg-white p-4">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white">
-              {initialsOf(name)}
-            </span>
+            <AccountAvatar user={user} name={name} className="h-11 w-11 text-sm" />
             <div className="min-w-0">
               <p className="truncate font-semibold text-ink-900">{name}</p>
               <p className="truncate text-sm text-ink-500">
@@ -566,6 +572,26 @@ const MoreSheet: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onC
       </div>
     </div>
   )
+}
+
+/**
+ * The account's photo or logo, else initials. Business accounts usually upload a logo, so it is shown whole
+ * (contained in a rounded square) instead of cropped into a circle.
+ */
+const AccountAvatar: React.FC<{ user: AuthUser; name: string; className?: string }> = ({ user, name, className }) => {
+  const [failed, setFailed] = useState(false)
+  const src = mediaUrl(user.avatar)
+  const business = user.role === 'organizer' || user.role === 'vendor'
+  if (src && !failed)
+    return (
+      <img
+        src={src}
+        alt=""
+        onError={() => setFailed(true)}
+        className={cn('shrink-0 bg-white', business ? 'rounded-lg border border-ink-200 object-contain p-0.5' : 'rounded-full object-cover', className)}
+      />
+    )
+  return <span className={cn('flex shrink-0 items-center justify-center rounded-full bg-brand-600 font-bold text-white', className)}>{initialsOf(name)}</span>
 }
 
 const initialsOf = (name: string) =>
@@ -939,7 +965,6 @@ const UserMenu: React.FC = () => {
   if (!user) return null
 
   const name = displayName(user)
-  const initials = initialsOf(name)
 
   return (
     <div ref={ref} className="relative">
@@ -950,7 +975,7 @@ const UserMenu: React.FC = () => {
         aria-label="Account menu"
         className="flex items-center gap-2 rounded-full p-0.5 pr-0.5 hover:bg-ink-100 sm:pr-2"
       >
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white">{initials}</span>
+        <AccountAvatar user={user} name={name} className="h-8 w-8 text-xs" />
         <ChevronDown className="hidden h-4 w-4 text-ink-400 sm:block" aria-hidden />
       </button>
       {open && (

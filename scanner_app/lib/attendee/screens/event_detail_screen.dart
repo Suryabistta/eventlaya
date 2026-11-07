@@ -8,6 +8,7 @@ import '../../providers/modules_provider.dart';
 import '../../reviews/review_models.dart';
 import '../../reviews/review_widgets.dart';
 import '../../screens/common/event_phase.dart';
+import '../../screens/common/format.dart';
 import '../../ui/ui.dart';
 import '../models/contest.dart';
 import '../models/poll.dart';
@@ -98,6 +99,38 @@ class EventDetailScreen extends ConsumerWidget {
                     ],
                     _VotingCard(slug: slug, pass: pass),
                     _InfoSection(event: event),
+                    if (event.parent != null)
+                      GroupedSection(children: [
+                        ListRow(
+                          leading: const RowIcon(Icons.account_tree_rounded),
+                          title: event.parent!.$1,
+                          subtitle: 'Part of this event',
+                          chevron: true,
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => EventDetailScreen(slug: event.parent!.$2)),
+                          ),
+                        ),
+                      ]),
+                    if (event.subEvents.isNotEmpty)
+                      GroupedSection(
+                        header: 'Sub-events',
+                        footer: 'Each has its own registration.',
+                        children: [
+                          for (final s in event.subEvents)
+                            ListRow(
+                              title: s.title,
+                              subtitle: [
+                                if (s.startDate != null) Fmt.date(s.startDate),
+                                if (s.location.isNotEmpty) s.location,
+                                s.registrationOpen ? 'Registration open' : 'Registration closed',
+                              ].join(' · '),
+                              chevron: true,
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(builder: (_) => EventDetailScreen(slug: s.slug)),
+                              ),
+                            ),
+                        ],
+                      ),
                     if ((event.description ?? '').trim().isNotEmpty)
                       GroupedSection(
                         header: 'About',
@@ -273,7 +306,13 @@ class _TitleBlock extends StatelessWidget {
           ],
           if (event.organizerName.isNotEmpty) ...[
             const SizedBox(height: 10),
-            Text('by ${event.organizerName}', style: AppType.body(13, weight: FontWeight.w500, color: AppColors.ink600)),
+            Row(children: [
+              Flexible(child: Text('by ${event.organizerName}', style: AppType.body(13, weight: FontWeight.w500, color: AppColors.ink600))),
+              if (event.organizerVerified) ...[
+                const SizedBox(width: 4),
+                const Icon(Icons.verified_rounded, size: 16, color: AppColors.verified, semanticLabel: 'Verified by Eventlaya'),
+              ],
+            ]),
           ],
         ],
       ),

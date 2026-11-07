@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { CalendarDays, ExternalLink, MapPin, Printer, QrCode, Star, Ticket as TicketIcon, Users } from 'lucide-react'
+import { VerifiedBadge } from '@/components/VerifiedBadge'
 import type { Ticket } from '@/services/api'
 import { accountApi, mediaUrl, type MyTicket } from '@/lib/account'
 import { eventWhen, sortPasses } from '@/lib/event-page'
@@ -186,7 +187,10 @@ const TicketCard: React.FC<{ tickets: MyTicket[]; onShowPass: (t: MyTicket) => v
               {e.title}
             </Link>
           </h3>
-          <p className="mt-0.5 text-xs text-ink-500">By {e.organizer_name}</p>
+          <p className="mt-0.5 text-xs text-ink-500">
+            By {e.organizer_name}
+            {e.organizer_verified && <VerifiedBadge className="ml-1 [&_svg]:h-3.5 [&_svg]:w-3.5" />}
+          </p>
         </div>
         <ul className="space-y-1 text-sm text-ink-700">
           <li className="flex items-start gap-2">

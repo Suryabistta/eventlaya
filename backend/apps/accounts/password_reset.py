@@ -39,6 +39,46 @@ def reset_link(user):
     return f"{settings.FRONTEND_URL.rstrip('/')}/reset-password?uid={uid}&token={token}"
 
 
+INTRO = {
+    'reset': (
+        'Reset your Eventlaya password',
+        'Someone asked to reset the password for your Eventlaya account. Open this link to choose a new one:',
+        'If you didn’t ask for this, you can ignore this email; your password stays the same.',
+    ),
+    'admin_reset': (
+        'Set a new Eventlaya password',
+        'An Eventlaya administrator reset the password for your account, so you have been signed out. '
+        'Open this link to choose a new one:',
+        'If you didn’t expect this, reply to this email.',
+    ),
+    'welcome': (
+        'Your Eventlaya account is ready',
+        'An Eventlaya administrator created an account for your organization. Open this link to set your password and sign in:',
+        'Questions? Reply to this email.',
+    ),
+}
+
+
+def send_password_email(user, kind='reset'):
+    """Email a one-time set-password link. Returns True when the email was handed to the mail server."""
+    subject, intro, outro = INTRO[kind]
+    name = user.organization_name or user.username or 'there'
+    try:
+        send_mail(
+            subject=subject,
+            message=(
+                f'Namaste {name},\n\n{intro}\n\n{reset_link(user)}\n\n'
+                f'The link works once and expires in 3 days. {outro}\n\nEventlaya'
+            ),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+        )
+        return True
+    except Exception:
+        logger.exception('Password email (%s) failed for user %s', kind, user.pk)
+        return False
+
+
 class PasswordResetRequestView(APIView):
     """POST {email}. Always answers the same way so it can't be used to find accounts."""
 
@@ -52,25 +92,7 @@ class PasswordResetRequestView(APIView):
 
         user = User.objects.filter(email__iexact=email, is_active=True).first()
         if user and user.has_usable_password():
-            link = reset_link(user)
-            name = user.organization_name or user.username or 'there'
-            try:
-                send_mail(
-                    subject='Reset your Eventlaya password',
-                    message=(
-                        f'Namaste {name},\n\n'
-                        'Someone asked to reset the password for your Eventlaya account. '
-                        'Open this link to choose a new one:\n\n'
-                        f'{link}\n\n'
-                        'The link works once and expires in 3 days. '
-                        'If you didn’t ask for this, you can ignore this email; your password stays the same.\n\n'
-                        'Eventlaya'
-                    ),
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[user.email],
-                )
-            except Exception:  # never reveal delivery problems to the requester
-                logger.exception('Password reset email failed for user %s', user.pk)
+            send_password_email(user)  # never reveal delivery problems to the requester
         return Response({'message': GENERIC_OK})
 
 
@@ -106,5 +128,6 @@ class PasswordResetConfirmView(APIView):
             return Response({'error': ' '.join(e.messages), 'new_password': e.messages}, status=status.HTTP_400_BAD_REQUEST)
 
         user.set_password(new_password)  # also invalidates the link: tokens are tied to the password hash
-        user.save(update_fields=['password'])
+        user.must_change_password = False
+        user.save(update_fields=['password', 'must_change_password'])
         return Response({'message': 'Password changed. Sign in with your new password.'})

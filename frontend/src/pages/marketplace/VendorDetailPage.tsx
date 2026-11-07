@@ -7,7 +7,11 @@ import { Badge, ButtonLink, Card, CardHeader, ErrorState, Skeleton } from '@/com
 import { useAuth } from '@/lib/auth'
 import { ListingStatusNotice } from '../business/status'
 import { cn } from '@/lib/utils'
-import { BackLink, DETAIL_ASIDE, DETAIL_GRID, DETAIL_MAIN, DetailShell, Fact, MobileActionBar, NotFound, NotTakingRequests, Photo, Rating, Verified, fetchVendor, formatRs, useErrorToast, useMarketplaceBase } from './shared'
+import { BackLink, DETAIL_ASIDE, DETAIL_GRID, DETAIL_MAIN, DetailShell, Fact, MobileActionBar, NotFound, BusinessLogo, NotTakingRequests, Photo, Rating, Verified, fetchVendor, formatRs, useErrorToast, useMarketplaceBase } from './shared'
+import { mediaUrl } from '@/lib/account'
+import { PhotoLightbox, withCover } from '@/components/PhotoLightbox'
+import { PackagesSection } from './Packages'
+import type { ServicePackage } from '@/services/api'
 import { VendorQuoteForm } from './VendorQuoteForm'
 import { AvailabilitySection } from './AvailabilitySection'
 import type { PublicSlot } from '@/lib/availability'
@@ -20,6 +24,8 @@ export const VendorDetailPage: React.FC = () => {
   const { inApp, base } = useMarketplaceBase()
   const { user } = useAuth()
   const [slot, setSlot] = useState<PublicSlot | null>(null)
+  const [lightbox, setLightbox] = useState<number | null>(null)
+  const [pkg, setPkg] = useState<ServicePackage | null>(null)
 
   const { data: vendor, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['vendor', id],
@@ -65,7 +71,7 @@ export const VendorDetailPage: React.FC = () => {
   }
 
   const location = [vendor.address, vendor.city].filter(Boolean).join(', ')
-  const photos = vendor.portfolio_images?.filter(Boolean) ?? []
+  const photos = withCover(vendor.featured_image, vendor.portfolio_images)
   const isOwner = Boolean(user && (user.id === vendor.user || user.role === 'superadmin'))
   const paused = Boolean(vendor.is_paused)
 
@@ -74,15 +80,29 @@ export const VendorDetailPage: React.FC = () => {
       <BackLink to={base} />
       {isOwner && <ListingStatusNotice status={vendor.listing_status} note={vendor.review_note} />}
 
+      {photos.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setLightbox(0)}
+          aria-label={`Open ${vendor.business_name} photos full screen`}
+          className="block w-full cursor-zoom-in rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+        >
+          <Photo src={photos[0]} alt={vendor.business_name} icon={Store} className="aspect-[5/2] w-full rounded-2xl sm:aspect-[4/1]" />
+        </button>
+      )}
+
       <header className="space-y-2">
         <div className="flex flex-wrap gap-1.5">
           <Badge>{vendor.category_name}</Badge>
           {vendor.is_featured && <Badge tone="warning">Featured</Badge>}
         </div>
-        <h1 className={cn('font-bold text-ink-900', inApp ? 'text-2xl sm:text-[28px] sm:leading-tight' : 'font-display text-3xl tracking-tight sm:text-4xl')}>
-          {vendor.business_name}
-          {vendor.is_verified && <Verified label="Verified business" />}
-        </h1>
+        <div className="flex items-center gap-4">
+          <BusinessLogo src={mediaUrl(vendor.logo) ?? undefined} className="h-16 w-16" />
+          <h1 className={cn('font-bold text-ink-900', inApp ? 'text-2xl sm:text-[28px] sm:leading-tight' : 'font-display text-3xl tracking-tight sm:text-4xl')}>
+            {vendor.business_name}
+            {vendor.is_verified && <Verified label="Verified business" />}
+          </h1>
+        </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-600">
             <span className="inline-flex items-center gap-1">
@@ -129,15 +149,33 @@ export const VendorDetailPage: React.FC = () => {
             </div>
           </Card>
 
+          {!paused && (
+            <PackagesSection
+              listing={{ vendor: vendor.id }}
+              selectedId={pkg?.id}
+              onSelect={(p) => {
+                setPkg(p)
+                document.getElementById(FORM_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }}
+            />
+          )}
           {!paused && <AvailabilitySection kind="vendor" listingId={vendor.id} selectedId={slot?.id} onSelect={setSlot} formId={FORM_ID} />}
 
+          <PhotoLightbox photos={photos} index={lightbox} onIndex={setLightbox} alt={`${vendor.business_name} photo`} />
           <Card>
             <CardHeader title="Portfolio" />
             {photos.length ? (
               <ul className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-3">
                 {photos.map((src, i) => (
                   <li key={src}>
-                    <Photo src={src} alt={`${vendor.business_name} portfolio photo ${i + 1}`} icon={Store} className="aspect-[4/3] w-full rounded-xl" />
+                    <button
+                      type="button"
+                      onClick={() => setLightbox(i)}
+                      aria-label={`Open photo ${i + 1} of ${photos.length} full screen`}
+                      className="block w-full cursor-zoom-in rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                    >
+                      <Photo src={src} alt={`${vendor.business_name} portfolio photo ${i + 1}`} icon={Store} className="aspect-[4/3] w-full rounded-xl" />
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -153,7 +191,7 @@ export const VendorDetailPage: React.FC = () => {
           {paused ? (
             <NotTakingRequests name={vendor.business_name} isOwner={isOwner} />
           ) : (
-            <VendorQuoteForm vendor={vendor} id={FORM_ID} slot={slot} onClearSlot={() => setSlot(null)} />
+            <VendorQuoteForm vendor={vendor} id={FORM_ID} slot={slot} onClearSlot={() => setSlot(null)} pkg={pkg} onClearPackage={() => setPkg(null)} />
           )}
         </aside>
       </div>

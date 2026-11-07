@@ -299,7 +299,9 @@ TicketPass passWidget(StoredPass p, {Color notchColor = AppColors.background}) {
     statusLabel: label,
     statusTone: tone,
     notchColor: notchColor,
+    landscape: p.isLandscape,
     fields: [
+      if (p.seatNumber.isNotEmpty) PassField('Seat', p.seatNumber),
       ...ticketTypeFields(p.ticketType),
       if (p.attendeeEmail.isNotEmpty) PassField('Email', p.attendeeEmail),
       if (p.event.startsAt != null) PassField('Date', Fmt.date(p.startDate)),

@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { useCities } from '@/lib/cities'
 import { Navigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, Building2, CheckCircle2, Clock, Inbox, Store } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 import { Button, ButtonLink, Card, CardHeader, ErrorState, Input, PageHeader, Select, Skeleton, Textarea, useToast } from '@/components/ui'
-import { CITIES, useErrorToast } from '../marketplace/shared'
+import { useErrorToast } from '../marketplace/shared'
 import { BUSINESS_TYPES, businessApi, type AccessRequest, type AccessRequestInput } from './api'
 import { PAGE } from './ListingsPage'
 import { fmtDate } from './InquiriesPage'
@@ -26,6 +27,7 @@ const RequestForm: React.FC<{ previous?: AccessRequest | null; onDone: () => voi
     phone: previous?.phone ?? user?.phone ?? '',
     note: previous?.note ?? '',
   })
+  const cities = useCities()
   const [submitting, setSubmitting] = useState(false)
   const set = <K extends keyof AccessRequestInput>(k: K, v: AccessRequestInput[K]) => setForm((f) => ({ ...f, [k]: v }))
 
@@ -63,7 +65,7 @@ const RequestForm: React.FC<{ previous?: AccessRequest | null; onDone: () => voi
             ))}
           </Select>
           <Select label="City" value={form.city} onChange={(e) => set('city', e.target.value)}>
-            {[...new Set([...CITIES, form.city])].map((c) => (
+            {[...new Set([...cities, form.city])].map((c) => (
               <option key={c}>{c}</option>
             ))}
           </Select>

@@ -60,8 +60,117 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.fill()
 }
 
+function toPng(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not create the image'))), 'image/png'))
+}
+
 async function renderPass(qr: HTMLCanvasElement, p: PassMeta): Promise<Blob> {
   await document.fonts?.ready
+  return p.ticket.pass_layout === 'landscape' ? renderLandscape(qr, p) : renderVertical(qr, p)
+}
+
+/** Phone-shaped pass (1080 × 1920): body on top, tear line, QR stub below. Fits a lock screen or a story. */
+async function renderVertical(qr: HTMLCanvasElement, p: PassMeta): Promise<Blob> {
+  const VW = 1080
+  const VH = 1920
+  const M = 60 // outer margin
+  const SPLIT = 1090 // y of the tear line
+  const canvas = document.createElement('canvas')
+  canvas.width = VW
+  canvas.height = VH
+  const ctx = canvas.getContext('2d')!
+  const t = p.ticket
+
+  ctx.fillStyle = '#F7F5F9'
+  ctx.fillRect(0, 0, VW, VH)
+  ctx.fillStyle = '#FFFFFF'
+  roundRect(ctx, M, M, VW - 2 * M, SPLIT - M, 40)
+  ctx.fillStyle = BRAND
+  roundRect(ctx, M, SPLIT, VW - 2 * M, VH - M - SPLIT, 40)
+  ctx.fillRect(M, SPLIT, VW - 2 * M, 40) // square the stub's top corners
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fillRect(M, SPLIT - 40, VW - 2 * M, 40) // and the body's bottom corners
+  ctx.fillStyle = '#F7F5F9'
+  for (const x of [M, VW - M]) {
+    ctx.beginPath()
+    ctx.arc(x, SPLIT, 26, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)'
+  ctx.lineWidth = 4
+  ctx.setLineDash([14, 14])
+  ctx.beginPath()
+  ctx.moveTo(M + 50, SPLIT + 2)
+  ctx.lineTo(VW - M - 50, SPLIT + 2)
+  ctx.stroke()
+  ctx.setLineDash([])
+
+  const left = M + 64
+  const width = VW - 2 * M - 128
+  let y = M + 110
+  ctx.textBaseline = 'alphabetic'
+  if (t.ticket_type_name) {
+    ctx.font = `700 30px ${FONT}`
+    const label = t.ticket_type_name.toUpperCase()
+    const bw = ctx.measureText(label).width + 44
+    ctx.fillStyle = INK
+    roundRect(ctx, left, y - 42, bw, 58, 14)
+    ctx.fillStyle = '#FFFFFF'
+    ctx.fillText(label, left + 22, y)
+    y += 80
+  }
+  if (p.eventTitle) {
+    ctx.fillStyle = BRAND
+    ctx.font = `600 38px ${FONT}`
+    y = drawWrapped(ctx, p.eventTitle, left, y, width, 48, 2)
+  }
+  ctx.fillStyle = INK
+  ctx.font = `800 76px ${DISPLAY}`
+  y = drawWrapped(ctx, t.attendee_name, left, y + 70, width, 84, 2) + 20
+
+  const field = (label: string, value: string, top: number, big = false, mono = false) => {
+    ctx.fillStyle = MUTED
+    ctx.font = `400 28px ${FONT}`
+    ctx.fillText(label, left, top)
+    ctx.fillStyle = INK
+    ctx.font = big ? `800 56px ${DISPLAY}` : mono ? `600 34px ui-monospace, "JetBrains Mono", monospace` : `600 36px ${FONT}`
+    return drawWrapped(ctx, value, left, top + (big ? 62 : 46), width, 44, 1)
+  }
+  if (t.seat_number) y = field('Seat', t.seat_number, y + 16, true) + 10
+  if (p.eventDate) y = field('Date', p.eventDate, y + 16) + 10
+  if (p.eventLocation) y = field('Venue', p.eventLocation, y + 16) + 10
+  if (y < SPLIT - 160) field('Ticket', t.ticket_number, y + 16, false, true)
+
+  const line = passPaymentLine(t)
+  if (line) {
+    const text = line.text + (t.promo_code ? ` · code ${t.promo_code}` : '')
+    ctx.font = `600 30px ${FONT}`
+    ctx.fillStyle = line.paid ? '#ECFDF5' : '#FFF7E6'
+    roundRect(ctx, left, SPLIT - 120, Math.min(width, ctx.measureText(text).width + 48), 70, 16)
+    ctx.fillStyle = line.paid ? '#065F46' : '#7A4E00'
+    ctx.fillText(text, left + 24, SPLIT - 74)
+  }
+
+  const tile = 560
+  const tx = (VW - tile) / 2
+  const ty = SPLIT + 70
+  ctx.fillStyle = '#FFFFFF'
+  roundRect(ctx, tx, ty, tile, tile, 32)
+  ctx.imageSmoothingEnabled = false
+  ctx.drawImage(qr, tx + 30, ty + 30, tile - 60, tile - 60)
+  ctx.textAlign = 'center'
+  ctx.fillStyle = '#FDF2F6'
+  ctx.font = `500 34px ${FONT}`
+  ctx.fillText('Show this at the gate', VW / 2, ty + tile + 66)
+  ctx.font = `500 26px ui-monospace, "JetBrains Mono", monospace`
+  ctx.fillStyle = 'rgba(255,255,255,0.8)'
+  ctx.fillText(t.ticket_number, VW / 2, VH - M - 36)
+  ctx.textAlign = 'start'
+
+  return toPng(canvas)
+}
+
+async function renderLandscape(qr: HTMLCanvasElement, p: PassMeta): Promise<Blob> {
   const canvas = document.createElement('canvas')
   canvas.width = W
   canvas.height = H
@@ -124,7 +233,10 @@ async function renderPass(qr: HTMLCanvasElement, p: PassMeta): Promise<Blob> {
   }
   if (p.eventDate) y = field('Date', p.eventDate, left, y + 12, width) + 6
   if (p.eventLocation) y = field('Venue', p.eventLocation, left, y + 12, width) + 6
-  field('Ticket', t.ticket_number, left, y + 12, width)
+  if (t.seat_number) {
+    field('Ticket', t.ticket_number, left, y + 12, width / 2 - 12)
+    field('Seat', t.seat_number, left + width / 2, y + 12, width / 2)
+  } else field('Ticket', t.ticket_number, left, y + 12, width)
 
   const line = passPaymentLine(t)
   if (line) {
@@ -154,24 +266,40 @@ async function renderPass(qr: HTMLCanvasElement, p: PassMeta): Promise<Blob> {
   ctx.fillText('eventlaya.com', W - 24 - STUB / 2, H - 60)
   ctx.textAlign = 'start'
 
-  return new Promise((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not create the image'))), 'image/png'),
-  )
+  return toPng(canvas)
 }
 
-async function savePass(qr: HTMLCanvasElement, p: PassMeta) {
+const isPhone = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+
+/**
+ * Saves the pass image. On phones the share sheet comes first ("Save image" puts it in Photos / Gallery);
+ * elsewhere, or if sharing is unavailable or cancelled, it downloads as a file.
+ */
+async function savePass(qr: HTMLCanvasElement, p: PassMeta, share = true) {
   const blob = await renderPass(qr, p)
+  const name = `eventlaya-pass-${p.ticket.ticket_number}.png`
+  if (share && isPhone()) {
+    const file = new File([blob], name, { type: 'image/png' })
+    if (navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: p.eventTitle ?? 'Entry pass' })
+        return
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') return // they closed the sheet on purpose
+      }
+    }
+  }
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `eventlaya-pass-${p.ticket.ticket_number}.png`
+  a.download = name
   document.body.appendChild(a)
   a.click()
   a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 2000)
 }
 
-/** Downloads the pass (with its QR code) as a PNG image the attendee can keep in their photos. */
+/** Saves the pass (with its QR code) as a PNG image the attendee can keep in their photos. Vertical or landscape per event. */
 export const DownloadPassButton: React.FC<Props> = (props) => {
   const qrWrap = useRef<HTMLDivElement>(null)
   const [busy, setBusy] = useState(false)
@@ -201,7 +329,7 @@ export const DownloadPassButton: React.FC<Props> = (props) => {
         icon={<Download className={props.size === 'lg' ? 'h-5 w-5' : 'h-4 w-4'} aria-hidden />}
         onClick={download}
       >
-        {props.label ?? 'Download pass'}
+        {props.label ?? (isPhone() ? 'Save to photos' : 'Download pass')}
       </Button>
     </>
   )
@@ -218,7 +346,8 @@ export const DownloadAllPassesButton: React.FC<Omit<Props, 'ticket' | 'label'> &
     try {
       for (let i = 0; i < tickets.length; i++) {
         setDone(i)
-        await savePass(canvases[i], { ...meta, ticket: tickets[i] })
+        // One share sheet per pass would be tiring: several passes always download as files
+        await savePass(canvases[i], { ...meta, ticket: tickets[i] }, false)
         // A short gap so the browser treats each as its own download
         if (i < tickets.length - 1) await new Promise((r) => setTimeout(r, 400))
       }

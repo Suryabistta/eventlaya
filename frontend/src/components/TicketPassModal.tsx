@@ -6,6 +6,7 @@ import type { Ticket } from '@/services/api'
 import { Button, Modal } from '@/components/ui'
 import { DownloadPassButton } from '@/components/DownloadPassButton'
 import { passPaymentLine } from '@/lib/payments'
+import { cn } from '@/lib/utils'
 
 interface PassProps {
   ticket: Ticket
@@ -31,6 +32,8 @@ const statusLabel: Record<Ticket['status'], string> = {
  */
 const passCss = `
 .el-pass { container-type: inline-size; }
+.el-pass.is-vertical { max-width: 380px; margin-inline: auto; }
+.el-pass.is-vertical .el-pass-qr { width: 208px; height: 208px; }
 .el-pass-inner { display: flex; flex-direction: column; }
 .el-pass-body {
   -webkit-mask: radial-gradient(circle 12px at 0 100%, transparent 98%, #000) left / 51% 100% no-repeat,
@@ -51,25 +54,26 @@ const passCss = `
   border-top: 2px dashed rgb(255 255 255 / 0.22);
 }
 .el-pass-qr { width: 168px; height: 168px; }
+/* Landscape passes put the stub beside the body once there is room; vertical passes always stack */
 @container (min-width: 440px) {
-  .el-pass-inner { flex-direction: row; }
-  .el-pass-body {
+  .el-pass:not(.is-vertical) .el-pass-inner { flex-direction: row; }
+  .el-pass:not(.is-vertical) .el-pass-body {
     -webkit-mask: radial-gradient(circle 12px at 100% 0, transparent 98%, #000) top / 100% 51% no-repeat,
                   radial-gradient(circle 12px at 100% 100%, transparent 98%, #000) bottom / 100% 51% no-repeat;
             mask: radial-gradient(circle 12px at 100% 0, transparent 98%, #000) top / 100% 51% no-repeat,
                   radial-gradient(circle 12px at 100% 100%, transparent 98%, #000) bottom / 100% 51% no-repeat;
   }
-  .el-pass-stub {
+  .el-pass:not(.is-vertical) .el-pass-stub {
     width: 176px; flex-shrink: 0;
     -webkit-mask: radial-gradient(circle 12px at 0 0, transparent 98%, #000) top / 100% 51% no-repeat,
                   radial-gradient(circle 12px at 0 100%, transparent 98%, #000) bottom / 100% 51% no-repeat;
             mask: radial-gradient(circle 12px at 0 0, transparent 98%, #000) top / 100% 51% no-repeat,
                   radial-gradient(circle 12px at 0 100%, transparent 98%, #000) bottom / 100% 51% no-repeat;
   }
-  .el-pass-body { border-radius: 16px 0 0 16px; }
-  .el-pass-stub { border-radius: 0 16px 16px 0; }
-  .el-pass-stub::before { top: 18px; bottom: 18px; left: 0; right: auto; border-top: 0; border-left: 2px dashed rgb(255 255 255 / 0.22); }
-  .el-pass-qr { width: 132px; height: 132px; }
+  .el-pass:not(.is-vertical) .el-pass-body { border-radius: 16px 0 0 16px; }
+  .el-pass:not(.is-vertical) .el-pass-stub { border-radius: 0 16px 16px 0; }
+  .el-pass:not(.is-vertical) .el-pass-stub::before { top: 18px; bottom: 18px; left: 0; right: auto; border-top: 0; border-left: 2px dashed rgb(255 255 255 / 0.22); }
+  .el-pass:not(.is-vertical) .el-pass-qr { width: 132px; height: 132px; }
 }
 .el-print-pass { display: none; }
 @media print {
@@ -90,7 +94,7 @@ export const TicketPass: React.FC<PassProps> = ({ ticket, eventTitle, eventLocat
 const PassBody: React.FC<PassProps & { payLine: ReturnType<typeof passPaymentLine> }> = ({ ticket, eventTitle, eventLocation, eventDate, className, payLine }) => (
   <div className={className}>
     <style>{passCss}</style>
-    <div className="el-pass" role="group" aria-label={`Entry pass for ${ticket.attendee_name}`}>
+    <div className={cn('el-pass', ticket.pass_layout !== 'landscape' && 'is-vertical')} role="group" aria-label={`Entry pass for ${ticket.attendee_name}`}>
       <div className="el-pass-inner drop-shadow-[0_10px_24px_rgba(28,23,36,0.16)]">
         <div className="el-pass-body min-w-0 flex-1 bg-white p-5 text-ink-900 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
@@ -121,6 +125,12 @@ const PassBody: React.FC<PassProps & { payLine: ReturnType<typeof passPaymentLin
               <dt className="text-xs text-ink-500">Status</dt>
               <dd className="font-semibold">{statusLabel[ticket.status] ?? ticket.status}</dd>
             </div>
+            {ticket.seat_number && (
+              <div className="col-span-2 min-w-0">
+                <dt className="text-xs text-ink-500">Seat</dt>
+                <dd className="font-display text-xl font-bold">{ticket.seat_number}</dd>
+              </div>
+            )}
           </dl>
           {payLine && (
             <p

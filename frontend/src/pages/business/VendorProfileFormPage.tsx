@@ -1,7 +1,9 @@
 import React, { useRef, useState } from 'react'
+import { useCities } from '@/lib/cities'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Store } from 'lucide-react'
+import { PackagesManager } from '../marketplace/Packages'
 import { api } from '@/services/api'
 import { useAuth } from '@/lib/auth'
 import {
@@ -12,6 +14,7 @@ import {
   EmptyState,
   ErrorState,
   ImageGalleryUpload,
+  ImageUpload,
   Input,
   PageHeader,
   Select,
@@ -19,7 +22,7 @@ import {
   Textarea,
   useToast,
 } from '@/components/ui'
-import { BackLink, CITIES, mobileBarClass, useErrorToast } from '../marketplace/shared'
+import { BackLink, mobileBarClass, useErrorToast } from '../marketplace/shared'
 import { businessApi, isUuid, type OwnedVendorProfile, type VendorProfileInput } from './api'
 import { PAGE } from './ListingsPage'
 import { ListingStatusNotice } from './status'
@@ -54,7 +57,10 @@ const VendorProfileForm: React.FC<{ existing?: OwnedVendorProfile }> = ({ existi
     description: existing?.description ?? '',
     starting_price: existing ? String(Number(existing.starting_price)) : '',
     portfolio_images: existing?.portfolio_images ?? [],
+    logo: existing?.logo ?? '',
+    featured_image: existing?.featured_image ?? '',
   }))
+  const cities = useCities()
   const [submitting, setSubmitting] = useState(false)
   const set = <K extends keyof VendorProfileInput>(key: K, value: VendorProfileInput[K]) => setForm((f) => ({ ...f, [key]: value }))
 
@@ -121,6 +127,15 @@ const VendorProfileForm: React.FC<{ existing?: OwnedVendorProfile }> = ({ existi
       <form id={FORM_ID} onSubmit={submit} onInvalidCapture={onInvalid} className="max-w-3xl space-y-6">
         <Section title="Your service">
           <Input label="Business name" required value={form.business_name} onChange={(e) => set('business_name', e.target.value)} placeholder="Himalayan Waves Sound and Light" />
+          <ImageUpload
+            label="Logo"
+            kind="logo"
+            shape="square"
+            className="max-w-[200px]"
+            hint="Optional. Shown next to your name in the marketplace."
+            value={form.logo || null}
+            onChange={(url) => set('logo', url ?? '')}
+          />
           {categories.isError ? (
             <ErrorState message="We couldn’t load the service categories." onRetry={categories.refetch} />
           ) : (
@@ -157,13 +172,20 @@ const VendorProfileForm: React.FC<{ existing?: OwnedVendorProfile }> = ({ existi
         </Section>
 
         <Section title="Portfolio" description="Photos of your recent work. The first one is the cover photo.">
-          <ImageGalleryUpload label="Portfolio photos" kind="vendor" max={8} value={form.portfolio_images} onChange={(urls) => set('portfolio_images', urls)} />
+          <ImageUpload
+            label="Cover photo"
+            kind="vendor"
+            hint="Optional. Shown on your marketplace card and at the top of your page. Without one, the first portfolio photo is used."
+            value={form.featured_image || null}
+            onChange={(url) => set('featured_image', url ?? '')}
+          />
+          <ImageGalleryUpload label="Portfolio photos" kind="vendor" max={20} value={form.portfolio_images} onChange={(urls) => set('portfolio_images', urls)} />
         </Section>
 
         <Section title="Contact and location" description="Shown on your profile so organizers can reach you.">
           <div className="grid gap-4 sm:grid-cols-[200px_1fr]">
             <Select label="City" value={form.city} onChange={(e) => set('city', e.target.value)}>
-              {[...new Set([...CITIES, form.city])].map((c) => (
+              {[...new Set([...cities, form.city])].map((c) => (
                 <option key={c}>{c}</option>
               ))}
             </Select>
@@ -177,6 +199,11 @@ const VendorProfileForm: React.FC<{ existing?: OwnedVendorProfile }> = ({ existi
 
         <div className="hidden justify-end gap-2 lg:flex">{actions}</div>
       </form>
+      {existing && (
+        <div className="mt-6 max-w-3xl">
+          <PackagesManager listing={{ vendor: existing.id }} />
+        </div>
+      )}
       <div className={mobileBarClass(true)}>
         <div className="flex gap-2">{actions}</div>
       </div>

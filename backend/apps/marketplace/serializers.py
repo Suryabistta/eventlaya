@@ -1,3 +1,4 @@
+from django.utils.text import slugify
 from rest_framework import serializers
 from .models import (
     AvailabilitySlot, ListingStatus, MarketplaceAccessRequest, VendorCategory, VendorProfile,
@@ -73,9 +74,26 @@ class VendorCategorySerializer(serializers.ModelSerializer):
     def get_vendors_count(self, obj):
         return sum(1 for v in obj.vendors.all() if v.listing_status == ListingStatus.APPROVED and not v.is_paused)
 
+    def validate_name(self, value):
+        value = value.strip()
+        clash = VendorCategory.objects.filter(name__iexact=value)
+        if self.instance:
+            clash = clash.exclude(pk=self.instance.pk)
+        if clash.exists():
+            raise serializers.ValidationError('That category already exists.')
+        return value
+
+    def create(self, validated_data):
+        base = slugify(validated_data['name']) or 'category'
+        slug, n = base, 2
+        while VendorCategory.objects.filter(slug=slug).exists():
+            slug, n = f'{base}-{n}', n + 1
+        return super().create({**validated_data, 'slug': slug})
+
     class Meta:
         model = VendorCategory
-        fields = ['id', 'name', 'slug', 'icon', 'vendors_count']
+        fields = ['id', 'name', 'slug', 'icon', 'order', 'is_active', 'vendors_count']
+        read_only_fields = ['slug']
 
 
 class VendorProfileSerializer(AdminOnlyFieldsMixin, serializers.ModelSerializer):
@@ -86,13 +104,21 @@ class VendorProfileSerializer(AdminOnlyFieldsMixin, serializers.ModelSerializer)
     class Meta:
         model = VendorProfile
         fields = [
-            'id', 'user', 'business_name', 'category', 'category_name',
+            'id', 'user', 'business_name', 'logo', 'category', 'category_name',
             'category_slug', 'city', 'address', 'phone', 'email',
-            'description', 'starting_price', 'portfolio_images',
+            'description', 'starting_price', 'portfolio_images', 'featured_image',
             'is_verified', 'is_featured', 'rating', 'listing_status', 'review_note', 'is_paused', 'created_at'
         ]
         # listing_status/review_note change only through the platform approval endpoints
         read_only_fields = ['id', 'user', 'listing_status', 'review_note', 'created_at']
+
+    def validate_logo(self, value):
+        from apps.platform.catalog import safe_url
+        return safe_url(value, 'Logo')
+
+    def validate_featured_image(self, value):
+        from apps.platform.catalog import safe_url
+        return safe_url(value, 'Cover photo')
 
     def to_representation(self, obj):
         return apply_review_stats(super().to_representation(obj), obj, 'vendor', None)
@@ -120,6 +146,7 @@ class VenueSpaceSerializer(serializers.ModelSerializer):
 
 class VenueInquirySerializer(BookingRequestFieldsMixin, serializers.ModelSerializer):
     venue_name = serializers.CharField(source='venue.name', read_only=True)
+    package_name = serializers.CharField(source='package.name', read_only=True, default=None)
     space_name = serializers.CharField(source='space.name', read_only=True, default=None)
 
     class Meta:
@@ -128,6 +155,7 @@ class VenueInquirySerializer(BookingRequestFieldsMixin, serializers.ModelSeriali
             'id', 'venue', 'venue_name', 'space', 'space_name', 'sender_name', 'sender_email',
             'sender_phone', 'event_type', 'event_date', 'guest_count',
             'budget_range', 'message', 'status', 'slot_id', 'slot', 'owner_note', 'created_at', 'updated_at',
+            'package', 'package_name',
         ]
         read_only_fields = ['id', 'status', 'owner_note', 'created_at', 'updated_at']
         # A booking request takes its date from the slot; plain inquiries still need one (see validate).
@@ -143,6 +171,9 @@ class VenueInquirySerializer(BookingRequestFieldsMixin, serializers.ModelSeriali
                 raise serializers.ValidationError({'space': 'This space does not belong to the selected venue.'})
             if not space.is_active:
                 raise serializers.ValidationError({'space': 'This space is not available for booking.'})
+        if self.instance is None and venue is not None:
+            from .packages import package_for
+            package_for(attrs, venue)
         return attrs
 
 
@@ -161,7 +192,7 @@ class VenueListingSerializer(AdminOnlyFieldsMixin, serializers.ModelSerializer):
         fields = [
             'id', 'owner', 'owner_name', 'name', 'slug', 'venue_type',
             'venue_type_display', 'city', 'address', 'capacity_min',
-            'capacity_max', 'price_per_day', 'price_from', 'amenities', 'images',
+            'capacity_max', 'price_per_day', 'price_from', 'amenities', 'images', 'featured_image',
             'contact_person', 'contact_phone', 'contact_email',
             'description', 'rules_policy', 'is_verified', 'is_featured',
             'rating', 'review_count', 'inquiries_count', 'spaces',
@@ -170,6 +201,10 @@ class VenueListingSerializer(AdminOnlyFieldsMixin, serializers.ModelSerializer):
         # slug is generated on create (see VenueListingViewSet.perform_create);
         # listing_status/review_note change only through the platform approval endpoints
         read_only_fields = ['id', 'owner', 'slug', 'listing_status', 'review_note', 'created_at', 'updated_at']
+
+    def validate_featured_image(self, value):
+        from apps.platform.catalog import safe_url
+        return safe_url(value, 'Cover photo')
 
     @staticmethod
     def _active_spaces(obj):
@@ -198,15 +233,24 @@ class VenueListingSerializer(AdminOnlyFieldsMixin, serializers.ModelSerializer):
 
 class VendorInquirySerializer(BookingRequestFieldsMixin, serializers.ModelSerializer):
     vendor_name = serializers.CharField(source='vendor.business_name', read_only=True)
+    package_name = serializers.CharField(source='package.name', read_only=True, default=None)
 
     class Meta:
         model = VendorInquiry
         fields = [
             'id', 'vendor', 'vendor_name', 'sender_name', 'sender_email', 'sender_phone',
             'event_type', 'event_date', 'budget_range', 'message', 'status', 'slot_id', 'slot', 'owner_note',
-            'created_at', 'updated_at',
+            'created_at', 'updated_at', 'package', 'package_name',
         ]
         read_only_fields = ['id', 'vendor', 'status', 'owner_note', 'created_at', 'updated_at']
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        vendor = self.context.get('vendor')
+        if self.instance is None and vendor is not None:
+            from .packages import package_for
+            package_for(attrs, vendor)
+        return attrs
 
 
 class OwnerDecisionSerializer(serializers.Serializer):

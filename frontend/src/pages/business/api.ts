@@ -37,6 +37,7 @@ export interface VendorBusinessInquiry {
   owner_note?: string
   created_at: string
   updated_at?: string
+  package_name?: string | null
 }
 
 export type BusinessType = 'venue' | 'sound_stage' | 'photo_video' | 'decoration' | 'catering' | 'other'
@@ -68,7 +69,7 @@ export type AccessRequestInput = Pick<AccessRequest, 'business_name' | 'business
 
 export type VendorProfileInput = Pick<
   Vendor,
-  'business_name' | 'category' | 'city' | 'address' | 'phone' | 'email' | 'description' | 'starting_price' | 'portfolio_images'
+  'business_name' | 'category' | 'city' | 'address' | 'phone' | 'email' | 'description' | 'starting_price' | 'portfolio_images' | 'logo' | 'featured_image'
 >
 
 const json = (body: unknown) => JSON.stringify(body)

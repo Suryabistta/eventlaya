@@ -11,6 +11,7 @@ import '../models/stored_pass.dart';
 import '../providers/pass_providers.dart';
 import '../widgets/attendee_widgets.dart';
 import 'event_detail_screen.dart';
+import 'save_pass_sheet.dart';
 
 /// Opens a saved pass on its own page.
 Future<void> openPass(BuildContext context, StoredPass pass) => openPasses(context, [pass]);
@@ -195,6 +196,14 @@ class _PassViewScreenState extends ConsumerState<PassViewScreen> {
                         label: 'Show QR full screen',
                         icon: Icons.fullscreen_rounded,
                         onPressed: () => openFullScreenQr(context, pass),
+                      ),
+                      const SizedBox(height: 8),
+                      PrimaryButton(
+                        label: 'Save to gallery or print',
+                        icon: Icons.download_rounded,
+                        tone: ButtonTone.neutral,
+                        tonal: true,
+                        onPressed: () => showSavePassSheet(context, pass),
                       ),
                       const SizedBox(height: 8),
                       PrimaryButton(

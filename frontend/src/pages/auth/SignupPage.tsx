@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCities } from '@/lib/cities'
 import { track } from '@/lib/analytics'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Building2, CalendarDays, Check, ImagePlus, Inbox, QrCode, ShieldCheck, Star, Store, Ticket } from 'lucide-react'
@@ -51,7 +52,13 @@ const BUSINESS_TYPES: { value: BusinessType; label: string }[] = [
   { value: 'catering', label: 'Catering' },
   { value: 'other', label: 'Something else' },
 ]
-const CITIES = ['Dharan', 'Itahari', 'Biratnagar', 'Kathmandu']
+const CityOptions: React.FC = () => (
+  <>
+    {useCities().map((c) => (
+      <option key={c}>{c}</option>
+    ))}
+  </>
+)
 const OTHER_CITY = '__other'
 
 /** Which step owns each field, so server errors can send the user back to it. */
@@ -243,9 +250,7 @@ const PersonStep: React.FC<StepProps> = ({ data, errors, set }) => (
     <div className="grid gap-5 sm:grid-cols-2">
       <Select name="city" label="City" hint="Optional" className="h-11" value={data.city} error={errors.city} onChange={(e) => set('city', e.target.value)}>
         <option value="">Not set</option>
-        {CITIES.map((c) => (
-          <option key={c}>{c}</option>
-        ))}
+        <CityOptions />
         <option value={OTHER_CITY}>Other…</option>
       </Select>
       <Input name="phone" label="Phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="98XXXXXXXX" hint="Optional, fills in event forms for you" className="h-11" value={data.phone} error={errors.phone} onChange={(e) => set('phone', e.target.value)} />
@@ -287,9 +292,7 @@ const OrganizationStep: React.FC<StepProps> = ({ data, errors, set }) => {
       <div className="grid gap-5 sm:grid-cols-2">
         <Select name="city" label="City" required={vendor} hint={vendor ? undefined : 'Optional'} className="h-11" value={data.city} error={errors.city} onChange={(e) => set('city', e.target.value)}>
           <option value="">{vendor ? 'Choose a city' : 'Not set'}</option>
-          {CITIES.map((c) => (
-            <option key={c}>{c}</option>
-          ))}
+          <CityOptions />
           <option value={OTHER_CITY}>Other…</option>
         </Select>
         <Input

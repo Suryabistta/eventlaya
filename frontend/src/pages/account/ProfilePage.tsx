@@ -19,6 +19,15 @@ export const ProfilePage: React.FC = () => {
   return (
     <div className={ACCOUNT_PAGE}>
       <PageHeader title="Profile" description="Your details, sign-in and account settings." />
+      {user.must_change_password && (
+        <div role="alert" className="flex items-start gap-3 rounded-xl border border-marigold-200 bg-marigold-50 p-4 text-sm text-ink-800">
+          <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-marigold-700" aria-hidden />
+          <p>
+            <span className="font-semibold">Choose your own password to continue.</span> You signed in with a temporary password from
+            Eventlaya. Enter it as your current password below.
+          </p>
+        </div>
+      )}
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <DetailsCard />
         <div className="space-y-6">
@@ -91,7 +100,14 @@ const DetailsCard: React.FC = () => {
     <Card>
       <CardHeader title="Your details" description="Used to fill in event registrations and inquiries for you." />
       <form onSubmit={save} className="space-y-5 p-5" noValidate>
-        <ImageUpload label="Photo" kind="avatar" shape="square" value={avatar} onChange={setAvatar} hint="Square photos look best. Up to 5 MB." />
+        <ImageUpload
+          label={user.role === 'organizer' || user.role === 'vendor' ? 'Logo' : 'Photo'}
+          kind="avatar"
+          shape="square"
+          value={avatar}
+          onChange={setAvatar}
+          hint="Shown in the top bar, chat and next to your name. Square images look best. Up to 5 MB."
+        />
         {errors.avatar_url && <p className="text-xs font-medium text-red-600">{errors.avatar_url}</p>}
         <div className="grid gap-4 sm:grid-cols-2">
           <Input label="First name" autoComplete="given-name" value={form.first_name} error={errors.first_name} onChange={(e) => set('first_name', e.target.value)} />
@@ -178,7 +194,7 @@ const PasswordCard: React.FC = () => {
     setSaving(true)
     try {
       const res = await accountApi.changePassword({ ...(hasPassword ? { current_password: current } : {}), new_password: next })
-      updateUser({ ...user, has_password: true })
+      updateUser({ ...user, has_password: true, must_change_password: false })
       setCurrent('')
       setNext('')
       setConfirm('')

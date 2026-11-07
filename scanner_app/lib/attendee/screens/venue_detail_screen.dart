@@ -10,6 +10,7 @@ import '../models/marketplace.dart';
 import '../providers/marketplace_providers.dart';
 import '../widgets/attendee_widgets.dart';
 import '../widgets/gallery_header.dart';
+import '../widgets/packages_section.dart';
 import 'inquiry_screen.dart';
 import 'vendors_screen.dart' show RatingLabel;
 
@@ -91,7 +92,7 @@ class VenueDetailScreen extends ConsumerWidget {
                       Flexible(child: Text(v.name, style: AppType.heading(26, weight: FontWeight.w800))),
                       if (v.isVerified) ...[
                         const SizedBox(width: 6),
-                        const Icon(Icons.verified_rounded, color: AppColors.success, size: 22),
+                        const Icon(Icons.verified_rounded, color: AppColors.verified, size: 22),
                       ],
                     ]),
                     const SizedBox(height: 6),
@@ -172,6 +173,7 @@ class VenueDetailScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
+                PackagesSection(kind: 'venue', listingId: v.id),
                 if (v.rules.isNotEmpty)
                   GroupedSection(
                     header: 'Rules & policy',

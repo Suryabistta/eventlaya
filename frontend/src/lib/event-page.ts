@@ -57,12 +57,34 @@ export interface EventPageContent {
   faqs: Faq[]
 }
 
+export interface SubEventCard {
+  id: string
+  title: string
+  slug: string
+  tagline: string
+  start_date: string
+  start_time: string | null
+  end_date: string | null
+  end_time: string | null
+  location: string
+  phase: string
+  registration_open: boolean
+  registration_closed_reason: string | null
+  allow_registration: boolean
+}
+
 export type PublicEvent = Event &
   EventPageContent & {
     organizer_name?: string
     banner_absolute: string | null
     spots_left: number | null
-    organizer_info: { name: string; logo: string | null }
+    organizer_info: { name: string; logo: string | null; verified?: boolean }
+    /** Only present when the organizer switched "Managed by" on */
+    managed_by_info?: { name: string; logo: string | null } | null
+    /** Published sub-events of a main event (module sub_events), soonest first */
+    sub_events?: SubEventCard[]
+    /** The main event, when this is a sub-event */
+    parent?: { id: string; title: string; slug: string } | null
     /** How attendees can pay (online via Khalti/eSewa and/or at the venue) */
     payment_options?: import('@/lib/payments').PaymentOptions
   }

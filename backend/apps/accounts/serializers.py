@@ -13,9 +13,9 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'email', 'phone', 'role', 'organization_name', 'avatar', 'marketplace_access',
                   'business_type', 'city', 'first_name', 'last_name', 'full_name',
                   'email_verified', 'email_verified_at', 'has_password', 'social_providers', 'date_joined',
-                  'terms_accepted_at', 'terms_version']
+                  'terms_accepted_at', 'terms_version', 'is_verified', 'must_change_password']
         read_only_fields = ['id', 'marketplace_access', 'email_verified', 'email_verified_at', 'date_joined',
-                            'terms_accepted_at', 'terms_version']
+                            'terms_accepted_at', 'terms_version', 'is_verified', 'must_change_password']
 
     def get_full_name(self, obj):
         return obj.get_full_name()

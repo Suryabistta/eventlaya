@@ -21,6 +21,7 @@ import {
   Ticket as TicketIcon,
   Users,
 } from 'lucide-react'
+import { VerifiedBadge } from '@/components/VerifiedBadge'
 import { Badge, Button, ButtonLink, Card, EmptyState, ErrorState, Skeleton, useToast } from '@/components/ui'
 import {
   categoryLabel,
@@ -107,8 +108,8 @@ export const PublicEventPage: React.FC = () => {
 
 /* ------------------------------------------------------------------ */
 
-type SectionId = 'about' | 'tickets' | 'schedule' | 'speakers' | 'venue' | 'faqs'
-const SECTION_LABEL: Record<SectionId, string> = { about: 'About', tickets: 'Tickets', schedule: 'Schedule', speakers: 'Speakers', venue: 'Venue', faqs: 'FAQs' }
+type SectionId = 'about' | 'sessions' | 'tickets' | 'schedule' | 'speakers' | 'venue' | 'faqs'
+const SECTION_LABEL: Record<SectionId, string> = { about: 'About', sessions: 'Sub-events', tickets: 'Tickets', schedule: 'Schedule', speakers: 'Speakers', venue: 'Venue', faqs: 'FAQs' }
 
 const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
   const toast = useToast()
@@ -120,6 +121,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
   const sections = useMemo(() => {
     const s: SectionId[] = []
     if (event.description || event.highlights?.length) s.push('about')
+    if (event.sub_events?.length) s.push('sessions')
     const tt = event.ticket_types ?? []
     if (tt.length > 1 || tt.some((t) => Number(t.price) > 0 || t.remaining !== null || t.description)) s.push('tickets')
     if (event.agenda?.length) s.push('schedule')
@@ -163,6 +165,14 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
               {state.phase === 'cancelled' && <Badge tone="danger">Cancelled</Badge>}
               {!state.open && !over && <Badge tone="warning">{state.label}</Badge>}
             </div>
+            {event.parent && (
+              <p className="mt-3 text-sm font-medium text-ink-600">
+                Part of{' '}
+                <Link to={`/e/${event.parent.slug}`} className="font-semibold text-brand-700 hover:underline">
+                  {event.parent.title}
+                </Link>
+              </p>
+            )}
             <h1 className="mt-3 text-3xl font-bold leading-[1.1] text-ink-900 sm:text-5xl">{event.title}</h1>
             {event.tagline && <p className="mt-3 max-w-3xl text-lg text-ink-600 sm:text-xl">{event.tagline}</p>}
             <OrganizerLine event={event} className="mt-4" />
@@ -249,6 +259,35 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
                   ))}
                 </ul>
               )}
+            </Section>
+          )}
+
+          {sections.includes('sessions') && (
+            <Section id="sessions" title="Sub-events">
+              <ul className="grid gap-3 sm:grid-cols-2">
+                {event.sub_events!.map((s) => (
+                  <li key={s.id} className="flex flex-col gap-2 rounded-xl border border-ink-200 bg-white p-4">
+                    <Link to={`/e/${s.slug}`} className="font-bold text-ink-900 hover:text-brand-700 hover:underline">
+                      {s.title}
+                    </Link>
+                    {s.tagline && <p className="text-sm text-ink-600">{s.tagline}</p>}
+                    <p className="text-sm text-ink-500">
+                      {fmtShortDate(s.start_date)}
+                      {s.start_time && `, ${fmtClock(s.start_time)}`}
+                      {s.location && ` · ${s.location}`}
+                    </p>
+                    <div className="mt-auto pt-1">
+                      {s.registration_open ? (
+                        <ButtonLink to={`/e/${s.slug}/register`} size="sm">
+                          Register
+                        </ButtonLink>
+                      ) : (
+                        <Badge tone="neutral">{s.allow_registration ? (s.registration_closed_reason ?? 'Registration closed') : 'No registration needed'}</Badge>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </Section>
           )}
 
@@ -397,6 +436,8 @@ const OrganizerLine: React.FC<{ event: PublicEvent; className?: string; large?: 
   const name = event.organizer_info?.name || event.organizer_name || 'Organizer'
   const logo = event.organizer_info?.logo
   const [logoFailed, setLogoFailed] = useState(false)
+  const [managedLogoFailed, setManagedLogoFailed] = useState(false)
+  const managed = event.managed_by_info
   const size = large ? 'h-12 w-12' : 'h-9 w-9'
   return (
     <div className={cn('flex items-center gap-3', className)}>
@@ -410,6 +451,17 @@ const OrganizerLine: React.FC<{ event: PublicEvent; className?: string; large?: 
       <p className="text-sm text-ink-600">
         {large ? '' : 'Organised by '}
         <span className="font-semibold text-ink-900">{name}</span>
+        {event.organizer_info?.verified && <VerifiedBadge />}
+        {managed && (
+          <span className="mt-0.5 flex items-center gap-1.5">
+            {managed.logo && !managedLogoFailed && (
+              <img src={managed.logo} alt="" onError={() => setManagedLogoFailed(true)} className="h-5 w-5 rounded border border-ink-200 bg-white object-contain" />
+            )}
+            <span>
+              Managed by <span className="font-semibold text-ink-900">{managed.name}</span>
+            </span>
+          </span>
+        )}
       </p>
     </div>
   )

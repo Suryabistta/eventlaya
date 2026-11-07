@@ -2,13 +2,14 @@ import React, { useEffect, useState } from 'react'
 import { track } from '@/lib/analytics'
 import { useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, Phone } from 'lucide-react'
-import { isApiError, marketplaceApi, type VenueWithSpaces } from '@/services/api'
+import { isApiError, marketplaceApi, type ServicePackage, type VenueWithSpaces } from '@/services/api'
 import { useAuth } from '@/lib/auth'
 import { apiErrorText, fmtDay, slotTime, slotsApi, type PublicSlot } from '@/lib/availability'
 import { BookingSlotBox } from '@/components/BookingSlot'
 import { Button, Card, Input, Select, Textarea, buttonClass, useToast } from '@/components/ui'
 import { formatRs, spaceCapacity } from './shared'
 import { availabilityKey } from './AvailabilitySection'
+import { useCalendarSystem } from '@/lib/calendar'
 
 const EVENT_TYPES = ['Wedding or reception', 'Conference or seminar', 'College fest', 'Concert or show', 'Sports event', 'Other']
 const BUDGETS = ['Under Rs 25,000', 'Rs 25,000 – 50,000', 'Rs 50,000 – 1,00,000', 'Over Rs 1,00,000']
@@ -23,8 +24,12 @@ export const VenueInquiryForm: React.FC<{
   /** An availability slot picked on the page: the request is for that slot (date and space come from it). */
   slot?: PublicSlot | null
   onClearSlot?: () => void
-}> = ({ venue, id, spaceId, onSpaceChange, slot = null, onClearSlot }) => {
+  /** A package picked on the page: sent with the request so the venue knows what it's about */
+  pkg?: ServicePackage | null
+  onClearPackage?: () => void
+}> = ({ venue, id, spaceId, onSpaceChange, slot = null, onClearSlot, pkg = null, onClearPackage }) => {
   const spaces = venue.spaces ?? []
+  useCalendarSystem() // slot dates follow the viewer's BS / AD choice
   const space = spaces.find((s) => s.id === (slot ? slot.space : spaceId))
   const toast = useToast()
   const { user } = useAuth()
@@ -75,6 +80,7 @@ export const VenueInquiryForm: React.FC<{
           guest_count: form.guests,
           budget_range: form.budget,
           message: form.message.trim(),
+          package: pkg?.id ?? null,
         })
         setSentSlot(slot)
         setSent(true)
@@ -113,6 +119,7 @@ export const VenueInquiryForm: React.FC<{
         guest_count: form.guests,
         budget_range: form.budget,
         message: form.message.trim(),
+        package: pkg?.id ?? null,
       })
       setSentSlot(null)
       setSent(true)
@@ -225,6 +232,21 @@ export const VenueInquiryForm: React.FC<{
         </p>
       </div>
       <form onSubmit={submit} className="space-y-4 p-5">
+        {pkg && (
+          <div className="flex items-start justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50 px-3.5 py-3 text-sm">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-brand-700">Package</p>
+              <p className="font-semibold text-ink-900">
+                {pkg.name} · {formatRs(pkg.price)} {pkg.price_unit_display}
+              </p>
+            </div>
+            {onClearPackage && (
+              <button type="button" onClick={onClearPackage} className="shrink-0 text-xs font-semibold text-brand-700 hover:underline">
+                Remove
+              </button>
+            )}
+          </div>
+        )}
         {slot && (
           <BookingSlotBox slot={slot} label="Your slot">
             {onClearSlot && (

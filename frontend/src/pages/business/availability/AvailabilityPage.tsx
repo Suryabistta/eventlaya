@@ -31,12 +31,15 @@ import { InquiryStatusBadge } from '../status'
 import { timeAgo } from '../InquiriesPage'
 import { DecisionModal, type Decision, type DecisionTarget } from '../DecisionModal'
 import { BlockDatesModal, DeleteSlotModal, RepeatSlotsModal, SlotFormModal } from './SlotDialogs'
-import { Legend, MonthNav, SpaceSelect, StatusDot, WeekdayHeader, monthGrid, monthOf, type ListingRef } from './shared'
+import { Legend, MonthNav, SpaceSelect, StatusDot, WeekdayHeader, bsDayOf, monthGrid, monthOf, type ListingRef } from './shared'
+import { CalendarToggle } from '@/components/CalendarToggle'
+import { useCalendarSystem } from '@/lib/calendar'
 
 const MAX_CHIPS = 3
 
 /** Business portal: availability calendar for one venue / service profile. */
 export const AvailabilityPage: React.FC = () => {
+  useCalendarSystem() // re-render dates when the viewer switches BS / AD
   const marketplaceOn = useModuleEnabled('marketplace')
   const listingsQ = useMyListings()
   const [params, setParams] = useSearchParams()
@@ -204,6 +207,7 @@ export const AvailabilityPage: React.FC = () => {
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 px-4 py-3 sm:px-5">
             <MonthNav month={month} onChange={(m) => setParam({ month: m })} />
             <div className="flex items-center gap-2">
+              <CalendarToggle />
               {month !== monthOf(today) && (
                 <button type="button" onClick={() => setParam({ month: null, day: today })} className={buttonClass('ghost', 'sm')}>
                   Today
@@ -299,6 +303,7 @@ const DayCell: React.FC<{ date: string; slots: Slot[]; inMonth: boolean; today: 
 }) => {
   const past = date < today
   const n = Number(date.slice(8))
+  const bs = bsDayOf(date)
   const label = `${fmtDay(date, true)}${slots.length ? `, ${slots.length} slot${slots.length === 1 ? '' : 's'}: ${slots.map((s) => SLOT_STATUS[s.status].label).join(', ')}` : ', no slots'}`
   return (
     <button
@@ -321,6 +326,11 @@ const DayCell: React.FC<{ date: string; slots: Slot[]; inMonth: boolean; today: 
       >
         {n}
       </span>
+      {bs !== null && (
+        <span className="absolute right-1 top-1 text-[10px] font-medium text-ink-400 tabular sm:right-1.5 sm:top-1.5" title="BS date">
+          {bs}
+        </span>
+      )}
       {/* Phones: dots */}
       {slots.length > 0 && (
         <span className="flex flex-wrap gap-0.5 px-0.5 sm:hidden" aria-hidden>
@@ -375,6 +385,7 @@ const AgendaList: React.FC<{ days: string[]; byDate: Map<string, Slot[]>; select
             <span className="w-12 shrink-0 text-center">
               <span className="block text-[11px] font-semibold uppercase text-ink-500">{parseIso(d).toLocaleDateString('en-GB', { weekday: 'short' })}</span>
               <span className={cn('block text-lg font-bold tabular', d === today ? 'text-brand-700' : 'text-ink-900')}>{Number(d.slice(8))}</span>
+              {bsDayOf(d) !== null && <span className="block text-[10px] font-medium text-ink-400 tabular">BS {bsDayOf(d)}</span>}
             </span>
             <span className="flex min-w-0 flex-1 flex-col gap-1">
               {(byDate.get(d) ?? []).map((s) => (

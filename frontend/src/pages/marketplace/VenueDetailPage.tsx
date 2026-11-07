@@ -3,7 +3,7 @@ import { track } from '@/lib/analytics'
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Check, MapPin, Pencil, Ruler, Users } from 'lucide-react'
-import type { VenueSpace } from '@/services/api'
+import type { ServicePackage, VenueSpace } from '@/services/api'
 import type { PublicSlot } from '@/lib/availability'
 import { useAuth } from '@/lib/auth'
 import { Badge, ButtonLink, Card, CardHeader, ErrorState, Skeleton } from '@/components/ui'
@@ -12,6 +12,8 @@ import { BackLink, DETAIL_ASIDE, DETAIL_GRID, DETAIL_MAIN, DetailShell, Fact, Mo
 import { VenueInquiryForm } from './VenueInquiryForm'
 import { AvailabilitySection } from './AvailabilitySection'
 import { ReviewsSection } from '@/components/reviews'
+import { PhotoLightbox, withCover } from '@/components/PhotoLightbox'
+import { PackagesSection } from './Packages'
 import { ListingStatusNotice } from '../business/status'
 
 const FORM_ID = 'venue-inquiry'
@@ -20,6 +22,8 @@ export const VenueDetailPage: React.FC = () => {
   const { slug = '' } = useParams()
   const { inApp, base } = useMarketplaceBase()
   const [photoIndex, setPhotoIndex] = useState(0)
+  const [lightbox, setLightbox] = useState<number | null>(null)
+  const [pkg, setPkg] = useState<ServicePackage | null>(null)
   const [spaceId, setSpaceId] = useState('')
   const [slot, setSlot] = useState<PublicSlot | null>(null)
   const { user } = useAuth()
@@ -70,7 +74,7 @@ export const VenueDetailPage: React.FC = () => {
     )
   }
 
-  const photos = venue.images?.filter(Boolean) ?? []
+  const photos = withCover(venue.featured_image, venue.images)
   const location = [venue.address, venue.city].filter(Boolean).join(', ')
   const spaces = venue.spaces ?? []
   const isOwner = Boolean(user && (user.id === venue.owner || user.role === 'superadmin'))
@@ -109,7 +113,24 @@ export const VenueDetailPage: React.FC = () => {
       <div className={DETAIL_GRID}>
         <div className={DETAIL_MAIN}>
           <div className="space-y-3">
-            <Photo src={photos[photoIndex]} alt={venue.name} className="h-64 w-full rounded-2xl sm:h-[420px]" />
+            <button
+              type="button"
+              disabled={!photos.length}
+              onClick={() => setLightbox(photoIndex)}
+              aria-label={photos.length ? `Open photo ${photoIndex + 1} of ${photos.length} full screen` : undefined}
+              className="block w-full cursor-zoom-in rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-default"
+            >
+              <Photo src={photos[photoIndex]} alt={venue.name} className="h-64 w-full rounded-2xl sm:h-[420px]" />
+            </button>
+            <PhotoLightbox
+              photos={photos}
+              index={lightbox}
+              alt={venue.name}
+              onIndex={(i) => {
+                setLightbox(i)
+                if (i !== null) setPhotoIndex(i)
+              }}
+            />
             {photos.length > 1 && (
               <div className="flex gap-2" role="group" aria-label="Photos">
                 {photos.map((src, i) => (
@@ -141,6 +162,16 @@ export const VenueDetailPage: React.FC = () => {
             </Card>
           )}
 
+          {!paused && (
+            <PackagesSection
+              listing={{ venue: venue.id }}
+              selectedId={pkg?.id}
+              onSelect={(p) => {
+                setPkg(p)
+                document.getElementById(FORM_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }}
+            />
+          )}
           {!paused && (
             <AvailabilitySection
               kind="venue"
@@ -216,7 +247,7 @@ export const VenueDetailPage: React.FC = () => {
           {paused ? (
             <NotTakingRequests name={venue.name} isOwner={isOwner} />
           ) : (
-            <VenueInquiryForm venue={venue} id={FORM_ID} spaceId={spaceId} onSpaceChange={setSpaceId} slot={slot} onClearSlot={() => setSlot(null)} />
+            <VenueInquiryForm venue={venue} id={FORM_ID} spaceId={spaceId} onSpaceChange={setSpaceId} slot={slot} onClearSlot={() => setSlot(null)} pkg={pkg} onClearPackage={() => setPkg(null)} />
           )}
         </aside>
       </div>

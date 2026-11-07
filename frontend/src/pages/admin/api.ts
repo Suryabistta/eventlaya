@@ -1,4 +1,4 @@
-import { request, type DomainCheckResult, type TenantDomainStatus } from '@/services/api'
+import { request, type Banner, type City, type DomainCheckResult, type TenantDomainStatus, type VendorCategory } from '@/services/api'
 
 export type ReviewStatus = 'pending' | 'approved' | 'rejected'
 export type MarketplaceAccess = 'none' | 'pending' | 'approved' | 'rejected'
@@ -96,6 +96,7 @@ export interface Organization {
   role: 'organizer' | 'vendor'
   marketplace_access: MarketplaceAccess
   is_active: boolean
+  is_verified: boolean
   date_joined: string
   last_login: string | null
   events: number
@@ -116,6 +117,23 @@ export interface OrganizationDetail extends Organization {
     checkins: number
   }[]
   white_label: { status: ReviewStatus | 'none'; active: boolean; custom_domain: string | null; is_domain_verified: boolean }
+  listings: { kind: ListingKind; id: string; name: string; status: ReviewStatus; is_verified: boolean }[]
+  admin_actions: { kind: string; label: string; actor: string | null; note: string; at: string }[]
+}
+
+export interface NewOrganization {
+  organization_name: string
+  email: string
+  role: 'organizer' | 'vendor'
+  phone?: string
+  city?: string
+  is_verified?: boolean
+}
+
+/** Set-password link is only returned when the email couldn't be sent, so the admin can share it another way. */
+export interface EmailedLink {
+  email_sent: boolean
+  set_password_link?: string
 }
 
 export interface ActivityItem {
@@ -175,8 +193,22 @@ export interface Segments {
 export const post = <T>(url: string, body?: unknown) =>
   request<T>(url, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) })
 
+const json = (method: string, body?: unknown): RequestInit => ({ method, body: body === undefined ? undefined : JSON.stringify(body) })
+
 export const platformApi = {
   stats: () => request<PlatformStats>('/platform/stats/'),
+
+  // Cities & vendor categories (?all=1 includes inactive ones)
+  cities: () => request<City[]>('/platform/cities/?all=1'),
+  saveCity: (c: Partial<City>) => (c.id ? request<City>(`/platform/cities/${c.id}/`, json('PATCH', c)) : request<City>('/platform/cities/', json('POST', c))),
+  deleteCity: (id: string) => request<void>(`/platform/cities/${id}/`, json('DELETE')),
+  categories: () => request<VendorCategory[]>('/marketplace/categories/?all=1'),
+  saveCategory: (c: Partial<VendorCategory>) =>
+    c.id ? request<VendorCategory>(`/marketplace/categories/${c.id}/`, json('PATCH', c)) : request<VendorCategory>('/marketplace/categories/', json('POST', c)),
+  deleteCategory: (id: string) => request<void>(`/marketplace/categories/${id}/`, json('DELETE')),
+  banners: () => request<Banner[]>('/platform/banners/?all=1'),
+  saveBanner: (b: Partial<Banner>) => (b.id ? request<Banner>(`/platform/banners/${b.id}/`, json('PATCH', b)) : request<Banner>('/platform/banners/', json('POST', b))),
+  deleteBanner: (id: string) => request<void>(`/platform/banners/${id}/`, json('DELETE')),
   activity: () => request<ActivityItem[]>('/platform/activity/'),
 
   organizations: (params: { search?: string; type?: string; status?: string; city?: string; plan?: string }) => {
@@ -186,6 +218,12 @@ export const platformApi = {
   organization: (id: string) => request<OrganizationDetail>(`/platform/organizations/${id}/`),
   suspend: (id: string) => post<Organization>(`/platform/organizations/${id}/suspend/`),
   activate: (id: string) => post<Organization>(`/platform/organizations/${id}/activate/`),
+  createOrganization: (body: NewOrganization) => post<EmailedLink & { id: string; name: string; email: string }>('/platform/organizations/', body),
+  resetPassword: (id: string, mode: 'email' | 'temporary') =>
+    post<EmailedLink & { message: string; temporary_password?: string }>(`/platform/organizations/${id}/reset-password/`, { mode }),
+  verifyOrganization: (id: string, is_verified: boolean) => post<{ is_verified: boolean }>(`/platform/organizations/${id}/verify/`, { is_verified }),
+  verifyListing: (kind: ListingKind, id: string, is_verified: boolean) =>
+    request<unknown>(`/marketplace/${kind === 'venue' ? 'venues' : 'vendors'}/${id}/`, json('PATCH', { is_verified })),
 
   whiteLabelRequests: (status: ReviewStatus | 'revoked' | 'all' = 'pending') =>
     request<WhiteLabelRequest[]>(`/platform/white-label/requests/?status=${status}`),

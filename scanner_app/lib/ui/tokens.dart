@@ -17,6 +17,8 @@ class AppColors {
 
   // Emerald — success and gate-in
   static const success = Color(0xFF15803D);
+  /// Blue tick: organization, vendor or venue verified by Eventlaya (matches the web's sky-600)
+  static const verified = Color(0xFF0284C7);
   static const successTint = Color(0xFFECFDF5);
 
   // Danger

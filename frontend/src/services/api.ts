@@ -38,10 +38,22 @@ export interface Event {
   max_tickets_per_order?: number
   /** Organizer setting: show attendees how many spots/tickets are left */
   show_spots_left?: boolean
+  /** "Managed by" line next to the organizer (e.g. the agency running the event) */
+  managed_by?: string
+  managed_by_logo?: string
+  show_managed_by?: boolean
+  ticket_layout?: 'vertical' | 'landscape'
+  /** Main event id when this is a sub-event (module sub_events) */
+  parent?: string | null
+  parent_title?: string | null
+  /** Attendees see their seat number on the pass (module seat_numbers) */
+  show_seat_number?: boolean
   /** Public responses: counts are blanked (capacity 0, spots_left null, ticket remaining null) */
   spots_hidden?: boolean
   /** Public responses: no spots left (also when counts are hidden) */
   is_full?: boolean
+  /** Blue tick: the organizer was verified by Eventlaya */
+  organizer_verified?: boolean
 }
 
 export interface FormField {
@@ -90,6 +102,10 @@ export interface Ticket {
   order_reference?: string | null
   /** 0 = the buyer's own pass, 1.. = their guests */
   guest_number?: number
+  /** '' when none, or hidden from attendees by the event */
+  seat_number?: string
+  /** Shape of the pass, set per event (default vertical) */
+  pass_layout?: 'vertical' | 'landscape'
 }
 
 export interface RegisterItem {
@@ -155,6 +171,8 @@ export interface Poll {
 export interface Vendor {
   id: string
   business_name: string
+  /** Business logo URL ('' when not set) */
+  logo?: string
   category: string
   category_name: string
   category_slug: string
@@ -165,6 +183,8 @@ export interface Vendor {
   description: string
   starting_price: string
   portfolio_images: string[]
+  /** Cover photo ('' = use the first photo) */
+  featured_image?: string
   is_verified: boolean
   is_featured: boolean
   rating: string
@@ -186,7 +206,45 @@ export interface VendorCategory {
   name: string
   slug: string
   icon: string
+  order: number
+  is_active: boolean
   vendors_count: number
+}
+
+export interface Banner {
+  id: string
+  placement: 'marketplace'
+  image: string
+  title: string
+  link: string
+  order: number
+  is_active: boolean
+  starts_at: string | null
+  ends_at: string | null
+}
+
+export interface ServicePackage {
+  id: string
+  vendor: string | null
+  venue: string | null
+  name: string
+  price: string
+  price_unit: 'event' | 'day' | 'plate' | 'hour' | 'person'
+  price_unit_display: string
+  description: string
+  inclusions: string[]
+  max_guests: number | null
+  image: string
+  is_active: boolean
+  order: number
+}
+
+export interface City {
+  id: string
+  name: string
+  province: string
+  order: number
+  is_active: boolean
 }
 
 export interface VenueListing {
@@ -203,6 +261,8 @@ export interface VenueListing {
   price_per_day: string | number
   amenities: string[]
   images: string[]
+  /** Cover photo ('' = use the first photo) */
+  featured_image?: string
   contact_person: string
   contact_phone: string
   contact_email: string
@@ -236,6 +296,9 @@ export interface VenueInquiry {
   message: string
   status?: string
   created_at?: string
+  /** Package the request is about (module packages) */
+  package?: string | null
+  package_name?: string | null
 }
 
 export interface TenantBranding {
@@ -431,6 +494,10 @@ export interface AuthUser {
   has_password?: boolean
   social_providers?: ('google' | 'facebook')[]
   date_joined?: string
+  /** Blue tick, set by a platform admin */
+  is_verified?: boolean
+  /** A platform admin gave out a temporary password: the app sends them to change it first */
+  must_change_password?: boolean
 }
 
 // Token storage. "Remember me" keeps tokens in localStorage; otherwise in sessionStorage,
@@ -653,6 +720,26 @@ export const api = {
 
   // Marketplace & Venues
   getCategories: () => request<VendorCategory[]>('/marketplace/categories/'),
+  getCities: () => request<City[]>('/platform/cities/'),
+  getPackages: (listing: { vendor?: string; venue?: string; mine?: boolean }) => {
+    const q = new URLSearchParams()
+    if (listing.vendor) q.set('vendor', listing.vendor)
+    if (listing.venue) q.set('venue', listing.venue)
+    if (listing.mine) q.set('mine', '1')
+    return request<ServicePackage[]>(`/marketplace/packages/?${q}`)
+  },
+  savePackage: (p: Partial<ServicePackage>) =>
+    request<ServicePackage>(p.id ? `/marketplace/packages/${p.id}/` : '/marketplace/packages/', {
+      method: p.id ? 'PATCH' : 'POST',
+      body: JSON.stringify(p),
+    }),
+  deletePackage: (id: string) => request<void>(`/marketplace/packages/${id}/`, { method: 'DELETE' }),
+  assignSeats: (eventId: string, assignments: { ticket: string; seat: string }[]) =>
+    request<{ updated: number; errors: { row: number | null; ticket: string; error: string }[] }>(`/events/${eventId}/seats/`, {
+      method: 'POST',
+      body: JSON.stringify({ assignments }),
+    }),
+  getBanners: (placement: Banner['placement']) => request<Banner[]>(`/platform/banners/?placement=${placement}`),
   getVendors: (params?: { category?: string; city?: string }) => {
     const q = new URLSearchParams()
     if (params?.category) q.append('category', params.category)

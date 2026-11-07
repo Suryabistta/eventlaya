@@ -180,3 +180,71 @@ class PlanChangeRequest(models.Model):
 
     def __str__(self):
         return f'{self.organization.email} → {self.requested_plan.name} [{self.status}]'
+
+
+class City(models.Model):
+    """A city offered in pickers and filters (events, vendors, venues, sign-up). Managed by the superadmin."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100, unique=True)
+    province = models.CharField(max_length=100, blank=True)
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['order', 'name']
+        verbose_name_plural = 'Cities'
+
+    def __str__(self):
+        return self.name
+
+
+class AdminAction(models.Model):
+    """Audit trail of sensitive platform-admin actions on an account (create, password reset, verify)."""
+
+    class Kind(models.TextChoices):
+        CREATED = 'created', 'Created the account'
+        PASSWORD_EMAIL = 'password_email', 'Sent a password reset email'
+        PASSWORD_TEMPORARY = 'password_temporary', 'Set a temporary password'
+        VERIFIED = 'verified', 'Verified'
+        UNVERIFIED = 'unverified', 'Removed verification'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='+')
+    target = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='admin_actions')
+    kind = models.CharField(max_length=30, choices=Kind.choices)
+    note = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.actor} {self.kind} {self.target}'
+
+
+class Banner(models.Model):
+    """A slide in the sliding banner at the top of a page (module `banners`). Managed by the superadmin."""
+
+    class Placement(models.TextChoices):
+        MARKETPLACE = 'marketplace', 'Marketplace'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    placement = models.CharField(max_length=20, choices=Placement.choices, default=Placement.MARKETPLACE, db_index=True)
+    image = models.CharField(max_length=500, help_text='Image URL from /api/uploads/ (wide, about 4:1)')
+    title = models.CharField(max_length=120, blank=True, help_text='Alt text, and a caption when set')
+    link = models.CharField(max_length=500, blank=True, help_text='Optional: where a tap goes (/marketplace/... or https://...)')
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    starts_at = models.DateTimeField(null=True, blank=True)
+    ends_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['placement', 'order', '-created_at']
+
+    def __str__(self):
+        return self.title or self.image

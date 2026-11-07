@@ -8,6 +8,8 @@ class EventTicketSerializer(serializers.ModelSerializer):
     gate_note = serializers.SerializerMethodField()
     order_reference = serializers.CharField(source='order.reference', default=None, read_only=True)
     payment = serializers.SerializerMethodField()
+    seat_number = serializers.SerializerMethodField()
+    pass_layout = serializers.CharField(source='event.ticket_layout', read_only=True)
 
     class Meta:
         model = EventTicket
@@ -16,8 +18,13 @@ class EventTicketSerializer(serializers.ModelSerializer):
             'attendee_email', 'attendee_phone', 'status',
             'is_attended', 'first_check_in', 'last_activity', 'created_at',
             'ticket_type', 'ticket_type_name', 'price', 'promo_code', 'gate_note',
-            'order_reference', 'guest_number', 'payment',
+            'order_reference', 'guest_number', 'payment', 'seat_number', 'pass_layout',
         ]
+
+    def get_seat_number(self, obj):
+        """Attendee-facing by default; organizer and gate views pass context={'staff': True}."""
+        from .seats import visible_seat
+        return visible_seat(obj, staff=self.context.get('staff', False))
 
     def get_payment(self, obj):
         """How the order was / will be paid: {method, status, provider, reference, amount, paid_at, label}."""
@@ -50,6 +57,8 @@ class EventSerializer(serializers.ModelSerializer):
     registered_count = serializers.IntegerField(read_only=True)
     checked_in_count = serializers.IntegerField(read_only=True)
     organizer_name = serializers.CharField(source='organizer.organization_name', read_only=True)
+    organizer_verified = serializers.BooleanField(source='organizer.is_verified', read_only=True)
+    parent_title = serializers.CharField(source='parent.title', read_only=True, default=None)
     registration_form_title = serializers.CharField(source='registration_form.title', read_only=True, default=None)
     slug = serializers.CharField(required=False, allow_blank=True)
     # Path of an image uploaded via /api/uploads/ (e.g. "/media/uploads/banner/…"); empty string clears the banner
@@ -61,15 +70,41 @@ class EventSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
         fields = [
-            'id', 'organizer', 'organizer_name', 'title', 'slug', 'description',
+            'id', 'organizer', 'organizer_name', 'organizer_verified', 'title', 'slug', 'description',
             'banner', 'banner_url', 'location', 'start_date', 'start_time', 'end_date', 'end_time',
             'capacity', 'status', 'allow_registration', 'registration_deadline',
             'is_paid', 'ticket_price', 'registration_form', 'registration_form_title',
             'registered_count', 'checked_in_count', 'created_at', 'updated_at',
             'tagline', 'category', 'phase', 'registration_open', 'registration_closed_reason',
             'max_tickets_per_order', 'show_spots_left',
+            'managed_by', 'managed_by_logo', 'show_managed_by', 'ticket_layout', 'show_seat_number',
+            'parent', 'parent_title',
         ]
         read_only_fields = ['id', 'organizer', 'created_at', 'updated_at']
+
+    def validate_parent(self, parent):
+        """A sub-event hangs under one of the organizer's own main events, one level deep."""
+        if parent is None:
+            return None
+        from .sub_events import sub_events_on
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if user is None or not sub_events_on(user):
+            raise serializers.ValidationError('Sub-events are turned off for your account.')
+        if parent.organizer_id != (self.instance.organizer_id if self.instance else user.id) and not user.is_superadmin:
+            raise serializers.ValidationError('Pick one of your own events.')
+        if parent.parent_id:
+            raise serializers.ValidationError('A sub-event can’t have sub-events of its own. Pick a main event.')
+        if self.instance is not None:
+            if parent.pk == self.instance.pk:
+                raise serializers.ValidationError('An event can’t be its own main event.')
+            if self.instance.sub_events.exists():
+                raise serializers.ValidationError('This event has sub-events, so it can’t become a sub-event itself.')
+        return parent
+
+    def validate_managed_by_logo(self, value):
+        from apps.platform.catalog import safe_url
+        return safe_url(value, 'Logo')
 
 
     def get_phase(self, obj):

@@ -1,4 +1,5 @@
 import { ApiError, request } from '@/services/api'
+import { BS_MONTHS, calendarSystem, toBs } from './calendar'
 
 /**
  * Vendor availability slots and booking requests (marketplace module).
@@ -199,9 +200,21 @@ export const addDays = (iso: string, n: number) => {
 export const apiWeekday = (iso: string) => (parseIso(iso).getDay() + 6) % 7
 export const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
 
-/** "Sat, 14 Nov" / "Saturday, 14 November 2026" */
-export const fmtDay = (iso: string, long = false) =>
-  parseIso(iso).toLocaleDateString('en-GB', long ? { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' } : { weekday: 'short', day: 'numeric', month: 'short' })
+/**
+ * AD: "Sat, 14 Nov" / "Saturday, 14 November 2026".
+ * BS (the viewer's choice, see lib/calendar): "Sat, 28 Kartik" / "Saturday, 28 Kartik 2083 (14 Nov 2026)".
+ */
+export const fmtDay = (iso: string, long = false) => {
+  const date = parseIso(iso)
+  const bs = calendarSystem() === 'bs' ? toBs(date) : null
+  if (!bs) {
+    return date.toLocaleDateString('en-GB', long ? { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' } : { weekday: 'short', day: 'numeric', month: 'short' })
+  }
+  const weekday = date.toLocaleDateString('en-GB', { weekday: long ? 'long' : 'short' })
+  const month = BS_MONTHS[bs.month]
+  if (!long) return `${weekday}, ${bs.day} ${month}`
+  return `${weekday}, ${bs.day} ${month} ${bs.year} (${date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })})`
+}
 
 /** "10:00" -> "10:00 AM" */
 export const fmtTime = (hhmm: string) => {

@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { BadgeCheck, Building2, ChevronLeft, ImageOff, PauseCircle, Star } from 'lucide-react'
+import { Building2, ChevronLeft, ImageOff, PauseCircle, Star } from 'lucide-react'
 import { marketplaceApi, request, type Vendor, type VenueListing, type VenueSpace, type VenueWithSpaces } from '@/services/api'
-import { ButtonLink, Card, EmptyState, useToast } from '@/components/ui'
+import { ButtonLink, Card, EmptyState, controlClass, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
-
-export const CITIES = ['Dharan', 'Itahari', 'Biratnagar', 'Damak', 'Kathmandu']
 
 export const VENUE_TYPES = [
   { value: 'banquet', label: 'Banquet hall' },
@@ -97,12 +95,21 @@ export const Rating: React.FC<{ value: string | number; count?: number }> = ({ v
   </span>
 )
 
-export const Verified: React.FC<{ label: string }> = ({ label }) => (
-  <span className="ml-1.5 inline-flex items-center align-[-3px] text-emerald-600" title={label}>
-    <BadgeCheck className="h-[18px] w-[18px]" aria-hidden />
-    <span className="sr-only">{label}</span>
-  </span>
-)
+export { VerifiedBadge as Verified } from '@/components/VerifiedBadge'
+
+/** A business logo shown whole in a rounded square; renders nothing without a logo or when it fails to load. */
+export const BusinessLogo: React.FC<{ src?: string; className?: string }> = ({ src, className }) => {
+  const [failed, setFailed] = useState(false)
+  if (!src || failed) return null
+  return (
+    <img
+      src={src}
+      alt=""
+      onError={() => setFailed(true)}
+      className={cn('shrink-0 rounded-xl border border-ink-200 bg-white object-contain p-1', className ?? 'h-12 w-12')}
+    />
+  )
+}
 
 /** Image with a neutral placeholder when the URL is missing or fails to load. */
 export const Photo: React.FC<{ src?: string; alt?: string; className?: string; icon?: React.ElementType }> = ({
@@ -214,40 +221,25 @@ interface ChipOption {
   label: string
 }
 
-/**
- * Single-select filter chips. They wrap onto more lines on narrow screens so every option
- * stays visible (a sideways-scrolling row cut the last chips off at the screen edge).
- */
-export const FilterChips: React.FC<{
+/** Labelled single-select filter dropdown; the first option is the "All …" default (value ''). */
+export const FilterSelect: React.FC<{
+  id: string
   label: string
   options: ChipOption[]
   value: string
   onChange: (value: string) => void
   className?: string
-}> = ({ label, options, value, onChange, className }) => (
-  <div
-    role="group"
-    aria-label={label}
-    className={cn('flex flex-wrap gap-2', className)}
-  >
-    {options.map((o) => {
-      const active = o.value === value
-      return (
-        <button
-          key={o.value || 'all'}
-          type="button"
-          aria-pressed={active}
-          onClick={() => onChange(o.value)}
-          className={cn(
-            'h-8 shrink-0 rounded-full border px-3.5 text-sm font-medium transition-colors',
-            active
-              ? 'border-brand-600 bg-brand-600 text-white'
-              : 'border-ink-200 bg-white text-ink-700 hover:border-ink-300 hover:bg-ink-50',
-          )}
-        >
+}> = ({ id, label, options, value, onChange, className }) => (
+  <div className={className}>
+    <label htmlFor={id} className="sr-only">
+      {label}
+    </label>
+    <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className={cn(controlClass, 'pr-8')}>
+      {options.map((o) => (
+        <option key={o.value || 'all'} value={o.value}>
           {o.label}
-        </button>
-      )
-    })}
+        </option>
+      ))}
+    </select>
   </div>
 )

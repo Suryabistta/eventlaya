@@ -1,8 +1,11 @@
 import React, { useDeferredValue, useState } from 'react'
 import { useTrackSearch } from '@/lib/analytics'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
+import { useCities } from '@/lib/cities'
+import { FilterSelect } from './marketplace/shared'
 import { useQuery } from '@tanstack/react-query'
 import { MapPin, Search, Clock, Users, CalendarX2 } from 'lucide-react'
+import { VerifiedBadge } from '@/components/VerifiedBadge'
 import { api, type Event } from '@/services/api'
 import { buttonClass } from '@/components/ui/Button'
 import { Badge, EmptyState, ErrorState, Skeleton } from '@/components/ui'
@@ -12,11 +15,13 @@ import { cn } from '@/lib/utils'
 
 type PublicEvent = Event & { organizer_name?: string }
 
-const cities = ['All cities', 'Dharan', 'Itahari', 'Biratnagar', 'Kathmandu']
-
 export const ExploreEventsPage: React.FC = () => {
   const [when, setWhen] = useState<'upcoming' | 'past'>('upcoming')
-  const [city, setCity] = useState('All cities')
+  const cities = useCities()
+  // City lives in the URL so a filtered list can be shared
+  const [params, setParams] = useSearchParams()
+  const city = params.get('city') ?? ''
+  const setCity = (v: string) => setParams(v ? { city: v } : {}, { replace: true })
   const [search, setSearch] = useState('')
   const deferredSearch = useDeferredValue(search.trim())
   useTrackSearch(deferredSearch, 'events')
@@ -24,7 +29,7 @@ export const ExploreEventsPage: React.FC = () => {
   const { data: events = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['public-events', when, city, deferredSearch],
     queryFn: () =>
-      api.getPublicEvents({ when, search: deferredSearch || undefined, city: city === 'All cities' ? undefined : city }),
+      api.getPublicEvents({ when, search: deferredSearch || undefined, city: city || undefined }),
     placeholderData: (prev) => prev,
   })
 
@@ -58,23 +63,14 @@ export const ExploreEventsPage: React.FC = () => {
               </button>
             ))}
           </div>
-          {/* Wraps instead of scrolling sideways, so no city is cut off at the screen edge */}
-          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="City">
-            {cities.map((c) => (
-              <button
-                key={c}
-                role="radio"
-                aria-checked={city === c}
-                onClick={() => setCity(c)}
-                className={cn(
-                  'h-8 shrink-0 rounded-full border px-3.5 text-sm font-medium transition-colors',
-                  city === c ? 'border-brand-600 bg-brand-600 text-white' : 'border-ink-200 bg-white text-ink-700 hover:border-ink-300',
-                )}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
+          <FilterSelect
+            id="event-city"
+            label="City"
+            value={city}
+            onChange={setCity}
+            options={[{ value: '', label: 'All cities' }, ...cities.map((c) => ({ value: c, label: c }))]}
+            className="sm:w-52"
+          />
         </div>
         <label className="relative block lg:w-72">
           <span className="sr-only">Search events</span>
@@ -102,9 +98,9 @@ export const ExploreEventsPage: React.FC = () => {
         ) : events.length === 0 ? (
           <EmptyState
             icon={<CalendarX2 className="h-6 w-6" />}
-            title={deferredSearch || city !== 'All cities' ? 'No events match those filters' : when === 'upcoming' ? 'No upcoming events yet' : 'No past events'}
+            title={deferredSearch || city ? 'No events match those filters' : when === 'upcoming' ? 'No upcoming events yet' : 'No past events'}
             description={
-              deferredSearch || city !== 'All cities'
+              deferredSearch || city
                 ? 'Try another city or a shorter search.'
                 : 'Organizing something? Publish it on Eventlaya and it shows up here.'
             }
@@ -190,7 +186,12 @@ export const EventCard: React.FC<{ event: PublicEvent; past: boolean }> = ({ eve
       </div>
 
       <div className="flex flex-1 flex-col px-5 pb-5 pt-9">
-        {e.organizer_name && <p className="truncate text-sm font-medium text-brand-700">{e.organizer_name}</p>}
+        {e.organizer_name && (
+          <p className="truncate text-sm font-medium text-brand-700">
+            {e.organizer_name}
+            {e.organizer_verified && <VerifiedBadge className="ml-1" />}
+          </p>
+        )}
         <h2 className="mt-0.5 line-clamp-2 text-lg font-bold leading-snug text-ink-900">
           <Link to={`/e/${e.slug}`} className="after:absolute after:inset-0 after:rounded-2xl focus-visible:outline-none">
             {e.title}

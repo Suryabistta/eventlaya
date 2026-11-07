@@ -252,6 +252,7 @@ def _org_row(u):
         'role': u.role,
         'marketplace_access': getattr(u, 'marketplace_access', 'none'),
         'is_active': u.is_active,
+        'is_verified': u.is_verified,
         'date_joined': u.date_joined,
         'last_login': u.last_login,
         'events': u.events,
@@ -317,6 +318,10 @@ class OrganizationListView(APIView):
             )
         return Response([_org_row(u) for u in qs.order_by('-date_joined')])
 
+    def post(self, request):
+        from .org_admin import create_organization
+        return create_organization(request)
+
 
 class OrganizationDetailView(APIView):
     permission_classes = [IsSuperadmin]
@@ -334,9 +339,12 @@ class OrganizationDetailView(APIView):
         branding = TenantBranding.objects.filter(organizer=user).first()
         latest_wl = WhiteLabelRequest.objects.filter(organizer=user).first()
         approved_wl = WhiteLabelRequest.approved_for(user)
+        from .org_admin import actions_for
         return Response({
             **_org_row(user),
             'checkins': sum(e.checkins for e in events),
+            'listings': _listings_of(user),
+            'admin_actions': actions_for(user),
             'events_list': [
                 {
                     'id': str(e.id), 'title': e.title, 'slug': e.slug, 'status': e.status,
@@ -352,6 +360,21 @@ class OrganizationDetailView(APIView):
                 'is_domain_verified': bool(branding and approved_wl and branding.is_domain_verified),
             },
         })
+
+
+def _listings_of(user):
+    """Vendor profiles and venues this account owns, for the verified switches on the organization page."""
+    try:
+        from apps.marketplace.models import VendorProfile, VenueListing
+    except OPTIONAL_MODEL_ERRORS:
+        return []
+    return [
+        {'kind': 'vendor', 'id': str(v.id), 'name': v.business_name, 'status': v.listing_status, 'is_verified': v.is_verified}
+        for v in VendorProfile.objects.filter(user=user)
+    ] + [
+        {'kind': 'venue', 'id': str(v.id), 'name': v.name, 'status': v.listing_status, 'is_verified': v.is_verified}
+        for v in VenueListing.objects.filter(owner=user)
+    ]
 
 
 class _OrganizationStatusView(APIView):
@@ -435,6 +458,13 @@ class ActivityView(APIView):
                 items.append(_item('listing_created', v.created_at, f'New venue listing: {v.name}', v.city, f'/marketplace/venues/{v.slug}'))
         except OPTIONAL_MODEL_ERRORS:
             pass
+
+        from .models import AdminAction
+        for a in AdminAction.objects.select_related('actor', 'target').order_by('-created_at')[:n]:
+            items.append(_item(
+                f'admin_{a.kind}', a.created_at, f'{a.get_kind_display()}: {display_name(a.target)}',
+                f'by {a.actor.email}' if a.actor else '', f'/admin/organizations/{a.target_id}',
+            ))
 
         items.sort(key=lambda i: i['at'], reverse=True)
         return Response(items[:n])

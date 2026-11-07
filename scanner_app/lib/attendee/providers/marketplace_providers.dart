@@ -23,3 +23,15 @@ final vendorDetailProvider = FutureProvider.autoDispose.family<Vendor, String>((
 final venueDetailProvider = FutureProvider.autoDispose.family<Venue, String>((ref, id) {
   return ref.watch(attendeeApiProvider).venue(id);
 });
+
+/// Packages of a listing: key is ('vendor' | 'venue', id). Empty when the module is off or the call fails.
+final packagesProvider = FutureProvider.autoDispose.family<List<ServicePackage>, (String, String)>((ref, key) async {
+  final (kind, id) = key;
+  try {
+    return await ref
+        .watch(attendeeApiProvider)
+        .packages(vendorId: kind == 'vendor' ? id : null, venueId: kind == 'venue' ? id : null);
+  } catch (_) {
+    return const [];
+  }
+});

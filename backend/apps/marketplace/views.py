@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotAuthenticated, PermissionDenied
 from rest_framework.views import APIView
+from apps.platform.catalog import ReadPublicWriteSuperadmin, include_inactive
 from .models import (
     ListingStatus, MarketplaceAccessRequest, VendorCategory, VendorProfile,
     VenueListing, VenueSpace, VenueInquiry, VendorInquiry,
@@ -93,10 +94,24 @@ class ListingWritePermissionsMixin:
         return super().get_permissions()
 
 
-class VendorCategoryViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = VendorCategory.objects.all().prefetch_related('vendors')
+class VendorCategoryViewSet(viewsets.ModelViewSet):
+    """Public read (active only); superadmin create/update/delete. ?all=1 as superadmin includes inactive."""
     serializer_class = VendorCategorySerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [ReadPublicWriteSuperadmin]
+    pagination_class = None
+
+    def get_queryset(self):
+        qs = VendorCategory.objects.all().prefetch_related('vendors')
+        return qs if include_inactive(self.request) or self.action != 'list' else qs.filter(is_active=True)
+
+    def destroy(self, request, *args, **kwargs):
+        category = self.get_object()
+        if category.vendors.exists():
+            return Response(
+                {'detail': f'{category.vendors.count()} vendor(s) use this category. Move them or deactivate it instead.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return super().destroy(request, *args, **kwargs)
 
 
 class VendorProfileViewSet(ListingWritePermissionsMixin, viewsets.ModelViewSet):
@@ -150,7 +165,7 @@ class VendorProfileViewSet(ListingWritePermissionsMixin, viewsets.ModelViewSet):
             if vendor.is_paused:
                 raise listing_paused()
             data = inquiry_data_with_sender(request, {k: v for k, v in request.data.items()})
-            serializer = VendorInquirySerializer(data=data)
+            serializer = VendorInquirySerializer(data=data, context={'vendor': vendor})
             serializer.is_valid(raise_exception=True)
             save_inquiry(request, serializer, vendor, vendor=vendor)
             return Response(serializer.data, status=status.HTTP_201_CREATED)

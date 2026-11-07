@@ -35,6 +35,9 @@ class ScanResultModel {
   /// Ticket type, price due and gate note. Empty for offline/legacy scans.
   final TicketTypeInfo ticketType;
 
+  /// Seat ("A-12") when the organizer assigned one; empty otherwise.
+  final String seatNumber;
+
   ScanResultModel({
     required this.outcome,
     required this.message,
@@ -46,6 +49,7 @@ class ScanResultModel {
     this.scannedAt,
     this.rawData,
     this.ticketType = TicketTypeInfo.empty,
+    this.seatNumber = '',
   });
 
   bool get isSuccess => outcome == ScanOutcome.success;
@@ -134,6 +138,7 @@ class ScanResultModel {
       scannedAt: DateTime.tryParse(json['scanned_at']?.toString() ?? '') ?? DateTime.now(),
       rawData: json,
       ticketType: TicketTypeInfo.fromTicket(ticketData),
+      seatNumber: ticketData?['seat_number']?.toString().trim() ?? '',
     );
   }
 

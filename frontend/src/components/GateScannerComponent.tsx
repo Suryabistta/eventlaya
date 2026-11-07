@@ -462,7 +462,7 @@ const ScanResultPanel: React.FC<{ scan: LastScan }> = ({ scan }) => {
       </div>
       {scan.ticket && (
         <div className="mt-4 border-t pt-4" style={{ borderColor: scan.tone === 'warning' ? 'rgb(28 23 36 / 0.2)' : 'rgb(255 255 255 / 0.25)' }}>
-          {scan.ticket.ticket_type_name && <TicketTypeStrip ticket={scan.ticket} />}
+          {(scan.ticket.ticket_type_name || scan.ticket.seat_number) && <TicketTypeStrip ticket={scan.ticket} />}
           <p className="break-words text-2xl font-bold leading-tight">{scan.ticket.attendee_name}</p>
           {Boolean(scan.ticket.guest_number) && (
             <p className={cn('mt-0.5 break-all text-sm font-semibold', s.sub)}>
@@ -485,10 +485,15 @@ const ScanResultPanel: React.FC<{ scan: LastScan }> = ({ scan }) => {
   )
 }
 
-/** Ticket type and the organizer's note for gate staff, e.g. "STUDENT · Check student ID". */
+/** Ticket type, seat and the organizer's note for gate staff, e.g. "STUDENT · SEAT A-12 · Check student ID". */
 export const TicketTypeStrip: React.FC<{ ticket: Ticket; className?: string }> = ({ ticket, className }) => (
   <div className={cn('mb-3 flex flex-wrap items-center gap-2', className)}>
-    <span className="rounded-md bg-ink-950 px-2.5 py-1 text-sm font-bold uppercase tracking-wider text-white ring-1 ring-white/30">{ticket.ticket_type_name}</span>
+    {ticket.ticket_type_name && (
+      <span className="rounded-md bg-ink-950 px-2.5 py-1 text-sm font-bold uppercase tracking-wider text-white ring-1 ring-white/30">{ticket.ticket_type_name}</span>
+    )}
+    {ticket.seat_number && (
+      <span className="rounded-md bg-ink-950 px-2.5 py-1 text-sm font-bold uppercase tracking-wider text-white ring-1 ring-white/30">Seat {ticket.seat_number}</span>
+    )}
     {ticket.gate_note && <span className="rounded-md bg-white px-2.5 py-1 text-base font-bold text-ink-900 shadow-xs">{ticket.gate_note}</span>}
   </div>
 )

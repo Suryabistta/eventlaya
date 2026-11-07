@@ -3,6 +3,7 @@ import { useMutation, useQueryClient, type QueryKey } from '@tanstack/react-quer
 import { CheckCircle2, Clock, XCircle } from 'lucide-react'
 import { Badge, Button, Modal, Textarea, useToast } from '@/components/ui'
 import { platformApi, STATS_KEY, type ListingKind, type PlatformStats, type ReviewStatus } from './api'
+import { cn } from '@/lib/utils'
 
 export const PAGE = 'w-full space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 2xl:px-10'
 
@@ -292,4 +293,36 @@ export const countLabel = (label: string, n?: number) => (
     {label}
     {n !== undefined && <span className="text-xs font-semibold text-ink-500 tabular">{n}</span>}
   </>
+)
+
+/** Accessible on/off switch. */
+export const Switch: React.FC<{
+  checked: boolean
+  onChange: (v: boolean) => void
+  label: string
+  disabled?: boolean
+  size?: 'sm' | 'md'
+}> = ({ checked, onChange, label, disabled, size = 'md' }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    aria-label={label}
+    disabled={disabled}
+    onClick={() => onChange(!checked)}
+    className={cn(
+      'relative inline-flex shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2 disabled:opacity-50',
+      size === 'md' ? 'h-6 w-11' : 'h-5 w-9',
+      checked ? 'bg-brand-600' : 'bg-ink-300',
+    )}
+  >
+    <span
+      aria-hidden
+      className={cn(
+        'inline-block rounded-full bg-white shadow-xs transition-transform',
+        size === 'md' ? 'h-5 w-5' : 'h-4 w-4',
+        checked ? (size === 'md' ? 'translate-x-[22px]' : 'translate-x-[18px]') : 'translate-x-0.5',
+      )}
+    />
+  </button>
 )

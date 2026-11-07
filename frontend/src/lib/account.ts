@@ -37,6 +37,7 @@ export interface MyTicketEvent {
   status: string
   phase: EventPhase
   organizer_name: string
+  organizer_verified?: boolean
 }
 
 export interface MyTicket extends Omit<Ticket, 'ticket_type'> {

@@ -35,6 +35,7 @@ class TicketPass extends StatelessWidget {
     this.statusTone = Tone.neutral,
     this.fields = const [],
     this.notchColor = AppColors.background,
+    this.landscape = false,
   });
 
   /// Colour of the surface behind the pass, used for the punched notches.
@@ -48,55 +49,123 @@ class TicketPass extends StatelessWidget {
         decoration: BoxDecoration(color: notchColor, shape: BoxShape.circle),
       );
 
+  /// Lay the stub beside the body (when there is room, about 440 wide). Phones in portrait still stack.
+  final bool landscape;
+
+  static const landscapeMinWidth = 440.0;
+
+  Widget _body() => Padding(
+        padding: const EdgeInsets.fromLTRB(22, 20, 22, 22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                const LogoMark(size: 24),
+                const SizedBox(width: 8),
+                Text('Eventlaya', style: AppType.heading(15, weight: FontWeight.w700)),
+                const Spacer(),
+                if (statusLabel != null) Flexible(child: StatusBadge(statusLabel!, tone: statusTone)),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Text(eventTitle, style: AppType.heading(22, weight: FontWeight.w700)),
+            if (eventSubtitle != null && eventSubtitle!.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(eventSubtitle!, style: AppType.body(13, color: AppColors.textSecondary)),
+            ],
+            const SizedBox(height: 18),
+            _Field(label: 'Attendee', value: attendeeName, large: true),
+            if (fields.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              _FieldGrid(fields: fields),
+            ],
+          ],
+        ),
+      );
+
+  Widget _stub(double qrSize, {EdgeInsets padding = const EdgeInsets.fromLTRB(22, 4, 22, 22)}) => Container(
+        color: AppColors.brand,
+        padding: padding,
+        alignment: Alignment.center,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (qrData != null && qrData!.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                ),
+                child: QrImageView(
+                  data: qrData!,
+                  size: qrSize,
+                  padding: EdgeInsets.zero,
+                  backgroundColor: Colors.white,
+                  eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: AppColors.ink900),
+                  dataModuleStyle: const QrDataModuleStyle(
+                    dataModuleShape: QrDataModuleShape.square,
+                    color: AppColors.ink900,
+                  ),
+                  semanticsLabel: 'Ticket QR code',
+                ),
+              )
+            else
+              Container(
+                height: 72,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                ),
+                child: Text('No QR code for this pass', style: AppType.body(13, color: Colors.white)),
+              ),
+            if (ticketCode != null && ticketCode!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              SelectableText(
+                ticketCode!,
+                textAlign: TextAlign.center,
+                style: AppType.mono(15, weight: FontWeight.w600, color: Colors.white),
+              ),
+            ],
+          ],
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, c) {
-      final qrSize = (c.maxWidth * 0.5).clamp(140.0, 220.0);
-      return DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppRadius.xl),
-          boxShadow: [
-            BoxShadow(
-                color: AppColors.ink900.withValues(alpha: 0.08), blurRadius: 24, offset: const Offset(0, 8)),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.xl),
-          child: Container(
-            color: AppColors.surface,
-            child: Column(
+      final side = landscape && c.maxWidth >= landscapeMinWidth;
+      final qrSize = side ? 150.0 : (c.maxWidth * 0.5).clamp(140.0, 220.0);
+      final Widget content = side
+          ? IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: Container(color: AppColors.surface, child: _body())),
+                  // Perforation with punched notches, running top to bottom
+                  Container(
+                    width: _notchRadius * 2,
+                    color: AppColors.brand,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Positioned.fill(child: CustomPaint(painter: _DashPainter(inset: _notchRadius + 8, vertical: true))),
+                        Positioned(top: -_notchRadius, left: 0, child: _notch()),
+                        Positioned(bottom: -_notchRadius, left: 0, child: _notch()),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: qrSize + 56, child: _stub(qrSize, padding: const EdgeInsets.fromLTRB(4, 22, 22, 22))),
+                ],
+              ),
+            )
+          : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(22, 20, 22, 22),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const LogoMark(size: 24),
-                          const SizedBox(width: 8),
-                          Text('Eventlaya', style: AppType.heading(15, weight: FontWeight.w700)),
-                          const Spacer(),
-                          if (statusLabel != null)
-                            Flexible(child: StatusBadge(statusLabel!, tone: statusTone)),
-                        ],
-                      ),
-                      const SizedBox(height: 18),
-                      Text(eventTitle, style: AppType.heading(22, weight: FontWeight.w700)),
-                      if (eventSubtitle != null && eventSubtitle!.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(eventSubtitle!, style: AppType.body(13, color: AppColors.textSecondary)),
-                      ],
-                      const SizedBox(height: 18),
-                      _Field(label: 'Attendee', value: attendeeName, large: true),
-                      if (fields.isNotEmpty) ...[
-                        const SizedBox(height: 14),
-                        _FieldGrid(fields: fields),
-                      ],
-                    ],
-                  ),
-                ),
+                Container(color: AppColors.surface, child: _body()),
                 // Perforation with punched notches
                 Container(
                   height: _notchRadius * 2,
@@ -110,57 +179,17 @@ class TicketPass extends StatelessWidget {
                     ],
                   ),
                 ),
-                Container(
-                  color: AppColors.brand,
-                  padding: const EdgeInsets.fromLTRB(22, 4, 22, 22),
-                  child: Column(
-                    children: [
-                      if (qrData != null && qrData!.isNotEmpty)
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(AppRadius.lg),
-                          ),
-                          child: QrImageView(
-                            data: qrData!,
-                            size: qrSize,
-                            padding: EdgeInsets.zero,
-                            backgroundColor: Colors.white,
-                            eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: AppColors.ink900),
-                            dataModuleStyle: const QrDataModuleStyle(
-                              dataModuleShape: QrDataModuleShape.square,
-                              color: AppColors.ink900,
-                            ),
-                            semanticsLabel: 'Ticket QR code',
-                          ),
-                        )
-                      else
-                        Container(
-                          height: 72,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.16),
-                            borderRadius: BorderRadius.circular(AppRadius.lg),
-                          ),
-                          child:
-                              Text('No QR code for this pass', style: AppType.body(13, color: Colors.white)),
-                        ),
-                      if (ticketCode != null && ticketCode!.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        SelectableText(
-                          ticketCode!,
-                          textAlign: TextAlign.center,
-                          style: AppType.mono(15, weight: FontWeight.w600, color: Colors.white),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
+                _stub(qrSize),
               ],
-            ),
-          ),
+            );
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          boxShadow: [
+            BoxShadow(color: AppColors.ink900.withValues(alpha: 0.08), blurRadius: 24, offset: const Offset(0, 8)),
+          ],
         ),
+        child: ClipRRect(borderRadius: BorderRadius.circular(AppRadius.xl), child: content),
       );
     });
   }
@@ -250,7 +279,8 @@ class _FieldGrid extends StatelessWidget {
 
 class _DashPainter extends CustomPainter {
   final double inset;
-  _DashPainter({required this.inset});
+  final bool vertical;
+  _DashPainter({required this.inset, this.vertical = false});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -259,14 +289,20 @@ class _DashPainter extends CustomPainter {
       ..strokeWidth = 1.5
       ..strokeCap = StrokeCap.round;
     const dash = 7.0, gap = 6.0;
-    final y = size.height / 2;
-    var x = inset;
-    while (x < size.width - inset) {
-      canvas.drawLine(Offset(x, y), Offset((x + dash).clamp(0, size.width - inset), y), paint);
-      x += dash + gap;
+    final length = vertical ? size.height : size.width;
+    final mid = (vertical ? size.width : size.height) / 2;
+    var t = inset;
+    while (t < length - inset) {
+      final end = (t + dash).clamp(0.0, length - inset);
+      canvas.drawLine(
+        vertical ? Offset(mid, t) : Offset(t, mid),
+        vertical ? Offset(mid, end) : Offset(end, mid),
+        paint,
+      );
+      t += dash + gap;
     }
   }
 
   @override
-  bool shouldRepaint(_DashPainter old) => old.inset != inset;
+  bool shouldRepaint(_DashPainter old) => old.inset != inset || old.vertical != vertical;
 }

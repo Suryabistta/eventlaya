@@ -20,12 +20,17 @@ import {
   Circle,
   CheckCircle2,
   Copy,
+  QrCode,
+  Armchair,
 } from 'lucide-react'
 import { api, tokenStore, type Event, type Ticket, type EventTask } from '@/services/api'
 import { eventPhase, startsInText } from '@/lib/phase'
 import { useAuth } from '@/lib/auth'
 import { useCurrentEvent } from '@/lib/event-context'
 import { TicketPassModal } from '@/components/TicketPassModal'
+import { RegistrationQrModal } from '@/components/RegistrationQrModal'
+import { SeatsModal } from '@/components/SeatsModal'
+import { useModuleEnabled } from '@/lib/modules'
 import { Badge, Button, ButtonLink, Card, CardHeader, EmptyState, ErrorState, Skeleton, useToast } from '@/components/ui'
 import { chartColors, fmtNpr, lineOptions } from '@/pages/analytics/charts'
 import { ChartCard, Legend } from '@/pages/analytics/shared'
@@ -92,6 +97,7 @@ const trafficOptions: ChartOptions<'bar'> = {
 /* ------------------------------------------------------------------ */
 
 export const DashboardPage: React.FC = () => {
+  const [qrOpen, setQrOpen] = useState(false)
   const toast = useToast()
   const { user } = useAuth()
   const { currentEvent, isLoading: eventsLoading, isError: eventsError, error, refetch } = useCurrentEvent()
@@ -214,6 +220,10 @@ export const DashboardPage: React.FC = () => {
           <Button variant="secondary" icon={<Link2 className="h-4 w-4" />} onClick={copyLink}>
             Copy registration link
           </Button>
+          <Button variant="secondary" icon={<QrCode className="h-4 w-4" />} onClick={() => setQrOpen(true)}>
+            Registration QR
+          </Button>
+          <RegistrationQrModal open={qrOpen} onClose={() => setQrOpen(false)} url={publicUrl} title={currentEvent.title} />
           <ButtonLink to="/app/scanner" icon={<ScanLine className="h-4 w-4" />}>
             Open gate scanner
           </ButtonLink>
@@ -725,6 +735,9 @@ const AttendeesCard: React.FC<{
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [exporting, setExporting] = useState(false)
+  const [seatsOpen, setSeatsOpen] = useState(false)
+  const seatsOn = useModuleEnabled('seat_numbers')
+  const hasSeats = seatsOn && tickets.some((t) => t.seat_number)
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -762,11 +775,19 @@ const AttendeesCard: React.FC<{
         title="Attendees"
         description={`${tickets.length} registered. Open a pass to view or print it.`}
         actions={
-          <Button variant="secondary" size="sm" loading={exporting} icon={<Download className="h-4 w-4" />} onClick={exportCsv}>
-            Export CSV
-          </Button>
+          <div className="flex gap-2">
+            {seatsOn && tickets.length > 0 && (
+              <Button variant="secondary" size="sm" icon={<Armchair className="h-4 w-4" />} onClick={() => setSeatsOpen(true)}>
+                Seats
+              </Button>
+            )}
+            <Button variant="secondary" size="sm" loading={exporting} icon={<Download className="h-4 w-4" />} onClick={exportCsv}>
+              Export CSV
+            </Button>
+          </div>
         }
       />
+      {seatsOpen && <SeatsModal open onClose={() => setSeatsOpen(false)} eventId={eventId} tickets={tickets} />}
       {tickets.length > 0 && (
         <div className="flex flex-col gap-3 border-b border-ink-100 px-5 py-3 md:flex-row md:items-center md:justify-between">
           <div role="radiogroup" aria-label="Filter by status" className="-mx-1 flex gap-1 overflow-x-auto px-1">
@@ -824,6 +845,7 @@ const AttendeesCard: React.FC<{
               <tr>
                 <th scope="col" className="px-5 py-2.5 font-medium">Attendee</th>
                 <th scope="col" className="hidden px-4 py-2.5 font-medium 2xl:table-cell">Ticket</th>
+                {hasSeats && <th scope="col" className="px-4 py-2.5 font-medium">Seat</th>}
                 <th scope="col" className="px-4 py-2.5 font-medium">Status</th>
                 <th scope="col" className="hidden whitespace-nowrap px-4 py-2.5 font-medium sm:table-cell">First in</th>
                 <th scope="col" className="hidden px-4 py-2.5 font-medium md:table-cell">Registered</th>
@@ -857,6 +879,7 @@ const AttendeesCard: React.FC<{
                       </div>
                     </td>
                     <td className="hidden whitespace-nowrap px-4 py-3 font-mono text-xs text-ink-600 2xl:table-cell">{t.ticket_number}</td>
+                    {hasSeats && <td className="whitespace-nowrap px-4 py-3 font-semibold text-ink-800">{t.seat_number || '–'}</td>}
                     <td className="px-4 py-3">
                       <Badge tone={s.tone} dot>
                         {s.label}

@@ -80,8 +80,10 @@ def send_ticket_email(ticket, event, order=None):
     Sends an automated email confirmation with the attendee's digital ticket
     number, QR pass link, and entry instructions (plus the payment receipt when there's an order).
     """
+    from apps.events.sub_events import display_title
+    title = display_title(event)  # "Main event › Sub-event" for a sub-event
     receipt = payment_receipt(order if order is not None else (ticket.order if ticket.order_id else None))
-    subject = f"🎟️ Your Digital Ticket Pass: {event.title}"
+    subject = f"🎟️ Your Digital Ticket Pass: {title}"
     recipient = ticket.attendee_email
     brand, powered = email_brand(event)
     signature = 'Organized via Eventlaya Platform\nEastern Nepal Hub • Dharan • Itahari • Biratnagar' if brand == 'Eventlaya' else (
@@ -94,14 +96,14 @@ def send_ticket_email(ticket, event, order=None):
 
     text_content = f"""Namaste {ticket.attendee_name},
 
-Your registration for '{event.title}' is confirmed!
+Your registration for '{title}' is confirmed!
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 TICKET DETAILS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 • Ticket Number : {ticket.ticket_number}
 • Attendee      : {ticket.attendee_name}
-• Event         : {event.title}
+• Event         : {title}
 • Date & Time   : {event.start_date} {event.start_time or ''}
 • Location      : {event.location}
 • Status        : Verified & Active
@@ -120,7 +122,7 @@ Event page: {event_url(event)}
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0;">
         <div style="background: linear-gradient(135deg, #4F46E5 0%, #06B6D4 100%); padding: 32px 24px; text-align: center; color: #ffffff;">
             <span style="background: rgba(255, 255, 255, 0.2); padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: inline-block; margin-bottom: 12px;">{badge}</span>
-            <h1 style="margin: 0; font-size: 24px; font-weight: 800; line-height: 1.3;">{event.title}</h1>
+            <h1 style="margin: 0; font-size: 24px; font-weight: 800; line-height: 1.3;">{title}</h1>
             <p style="margin: 8px 0 0; font-size: 14px; opacity: 0.9;">Registration Confirmed</p>
         </div>
         
@@ -181,6 +183,8 @@ def send_order_email(order, tickets, event):
     """One email to the buyer with every pass in the order (single tickets use the regular ticket email)."""
     if len(tickets) == 1:
         return send_ticket_email(tickets[0], event, order)
+    from apps.events.sub_events import display_title
+    title = display_title(event)  # "Main event › Sub-event" for a sub-event
     when = f"{event.start_date} {event.start_time or ''}".strip()
     brand, powered = email_brand(event)
     signature = 'Organized via Eventlaya' if brand == 'Eventlaya' else (brand + ('\nPowered by Eventlaya' if powered else ''))
@@ -191,9 +195,9 @@ def send_order_email(order, tickets, event):
     )
     text = f"""Namaste {order.buyer_name},
 
-Your {len(tickets)} passes for '{event.title}' are ready (order {order.reference}).
+Your {len(tickets)} passes for '{title}' are ready (order {order.reference}).
 
-• Event    : {event.title}
+• Event    : {title}
 • When     : {when}
 • Where    : {event.location}
 {_receipt_text(receipt)}
@@ -216,7 +220,7 @@ Event page: {event_url(event)}
     )
     html = f"""<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#1C1724;">
 <h2 style="margin:0 0 4px;">Your {len(tickets)} passes are ready</h2>
-<p style="color:#64748b;margin:0 0 16px;">{event.title} · {when} · {event.location}</p>
+<p style="color:#64748b;margin:0 0 16px;">{title} · {when} · {event.location}</p>
 <p style="margin:0 0 16px;">Order <strong>{order.reference}</strong> · {total}</p>
 <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px;">{_receipt_html(receipt)}</table>
 <table style="width:100%;border-collapse:collapse;">{rows}</table>
@@ -225,7 +229,7 @@ Event page: {event_url(event)}
 </div>"""
     try:
         send_mail(
-            subject=f"🎟️ Your {len(tickets)} passes: {event.title}",
+            subject=f"🎟️ Your {len(tickets)} passes: {title}",
             message=text,
             from_email=from_email(event),
             recipient_list=[order.buyer_email],

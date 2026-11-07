@@ -25,6 +25,9 @@ class AppModule {
   /// Khalti / eSewa online payments.
   static const payments = 'payments';
 
+  /// Vendor & venue packages (needs [marketplace]).
+  static const packages = 'packages';
+
   /// Modules that only work when these others are on too.
   static const requires = <String, List<String>>{
     contests: [voting],

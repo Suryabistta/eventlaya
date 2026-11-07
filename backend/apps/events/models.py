@@ -69,6 +69,25 @@ class Event(models.Model):
     contact_email = models.EmailField(blank=True)
     contact_phone = models.CharField(max_length=30, blank=True)
     map_query = models.CharField(max_length=255, blank=True, help_text='Overrides the location for the map embed')
+    # "Managed by" line next to the organizer's name (e.g. the event agency running it); shown only when switched on
+    managed_by = models.CharField(max_length=120, blank=True)
+    managed_by_logo = models.CharField(max_length=500, blank=True, help_text='Image URL from /api/uploads/')
+    show_managed_by = models.BooleanField(default=False)
+
+    class PassLayout(models.TextChoices):
+        VERTICAL = 'vertical', 'Vertical (phone)'
+        LANDSCAPE = 'landscape', 'Landscape'
+
+    # Shape of the pass image, the printed pass and the pass in the app
+    ticket_layout = models.CharField(max_length=10, choices=PassLayout.choices, default=PassLayout.VERTICAL)
+    # Seat numbers (module `seat_numbers`): attendees see theirs only when this is on; gate staff always do
+    show_seat_number = models.BooleanField(default=False)
+
+    # Sub-events (module `sub_events`): a child of a main event, one level deep. It has its own form, capacity,
+    # tickets and registration switch; organizer and white-label site come from the main event.
+    parent = models.ForeignKey(
+        'self', null=True, blank=True, on_delete=models.CASCADE, related_name='sub_events',
+    )
 
     registration_form = models.ForeignKey(
         'dynamic_forms.Form',
@@ -241,6 +260,9 @@ class EventTicket(models.Model):
     # Several tickets bought together share an order; guest_number 0 is the buyer, 1.. are their guests.
     order = models.ForeignKey('TicketOrder', null=True, blank=True, on_delete=models.SET_NULL, related_name='tickets')
     guest_number = models.PositiveSmallIntegerField(default=0)
+    seat_number = models.CharField(max_length=20, blank=True)
+    # Printed tickets for physical sales (TicketBatch); null for online registrations
+    batch = models.ForeignKey('TicketBatch', null=True, blank=True, on_delete=models.SET_NULL, related_name='tickets')
     is_attended = models.BooleanField(default=False)
     first_check_in = models.DateTimeField(null=True, blank=True)
     last_activity = models.DateTimeField(null=True, blank=True)
@@ -632,3 +654,42 @@ class TicketOrder(models.Model):
             ref = 'ORD-' + ''.join(secrets.choice(alphabet) for _ in range(6))
             if not TicketOrder.objects.filter(reference=ref).exists():
                 return ref
+
+
+class TicketBatch(models.Model):
+    """Printed tickets for physical sales (module `offline_tickets`): a bulk run of real tickets with QR codes,
+    printed on the organizer's design and sold at shops, counters or the door. They scan like any pass."""
+
+    class Template(models.TextChoices):
+        CLASSIC = 'classic', 'Classic'
+        BOLD = 'bold', 'Bold'
+        MINIMAL = 'minimal', 'Minimal'
+        CUSTOM = 'custom', 'Own artwork'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='ticket_batches')
+    ticket_type = models.ForeignKey('TicketType', null=True, blank=True, on_delete=models.SET_NULL, related_name='batches')
+    name = models.CharField(max_length=120, help_text='Where they are sold, e.g. "Bhatbhateni Dharan" or "Door"')
+    quantity = models.PositiveIntegerField()
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text='Printed price, paid at the point of sale')
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name='+')
+
+    # Design
+    layout = models.CharField(max_length=10, choices=Event.PassLayout.choices, default=Event.PassLayout.LANDSCAPE)
+    template = models.CharField(max_length=10, choices=Template.choices, default=Template.CLASSIC)
+    color = models.CharField(max_length=7, default='#C2215A', help_text='Accent colour for the ready-made designs')
+    background = models.CharField(max_length=500, blank=True, help_text='Own artwork (upload URL) for the custom design')
+    # QR placement on own artwork, as % of the ticket: centre x / y and width
+    qr_x = models.PositiveSmallIntegerField(default=80)
+    qr_y = models.PositiveSmallIntegerField(default=50)
+    qr_size = models.PositiveSmallIntegerField(default=28)
+
+    voided_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.name} × {self.quantity}'

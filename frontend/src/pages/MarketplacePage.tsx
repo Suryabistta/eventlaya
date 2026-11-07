@@ -1,17 +1,18 @@
 import React, { useDeferredValue, useState } from 'react'
 import { useTrackSearch } from '@/lib/analytics'
 import { useQuery } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
+import { useCities } from '@/lib/cities'
 import { Building2, Plus, Search, Store } from 'lucide-react'
 import { api } from '@/services/api'
 import { useAuth } from '@/lib/auth'
 import { Button, ButtonLink, Card, EmptyState, ErrorState, PageHeader, Skeleton, controlClass } from '@/components/ui'
 import { cn } from '@/lib/utils'
-import { CITIES, FilterChips, VENUE_TYPES, useErrorToast, useMarketplaceBase, vendorPath, venuePath } from './marketplace/shared'
+import { FilterSelect, VENUE_TYPES, useErrorToast, useMarketplaceBase, vendorPath, venuePath } from './marketplace/shared'
 import { VenueCard, VendorCard } from './marketplace/Cards'
+import { BannerSlider } from '@/components/BannerSlider'
 
 type Tab = 'venues' | 'vendors'
-
-const cityOptions = [{ value: '', label: 'All cities' }, ...CITIES.map((c) => ({ value: c, label: c }))]
 
 export const MarketplacePage: React.FC = () => {
   const { inApp, base } = useMarketplaceBase()
@@ -19,8 +20,19 @@ export const MarketplacePage: React.FC = () => {
   const signedIn = status === 'authenticated'
 
   const [tab, setTab] = useState<Tab>('venues')
-  const [city, setCity] = useState('')
-  const [category, setCategory] = useState('')
+  // City and category live in the URL so a filtered list can be shared
+  const [params, setParams] = useSearchParams()
+  const city = params.get('city') ?? ''
+  const category = params.get('category') ?? ''
+  const setParam = (key: string, value: string) =>
+    setParams((p) => {
+      if (value) p.set(key, value)
+      else p.delete(key)
+      return p
+    }, { replace: true })
+  const setCity = (v: string) => setParam('city', v)
+  const setCategory = (v: string) => setParam('category', v)
+  const cityOptions = [{ value: '', label: 'All cities' }, ...useCities().map((c) => ({ value: c, label: c }))]
   const [venueType, setVenueType] = useState('')
   const [search, setSearch] = useState('')
   const deferredSearch = useDeferredValue(search.trim())
@@ -44,8 +56,7 @@ export const MarketplacePage: React.FC = () => {
 
   const filtersActive = Boolean(city || (tab === 'vendors' ? category : venueType || deferredSearch))
   const clearFilters = () => {
-    setCity('')
-    setCategory('')
+    setParams({}, { replace: true })
     setVenueType('')
     setSearch('')
   }
@@ -71,23 +82,15 @@ export const MarketplacePage: React.FC = () => {
   return (
     <div className={inApp ? 'w-full space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 2xl:px-10' : 'mx-auto max-w-6xl space-y-8 px-4 py-12 sm:px-6'}>
       {inApp ? (
-        <PageHeader
-          title="Vendors and venues"
-          description="Find halls, photographers, sound, decoration and catering in Eastern Nepal."
-          actions={listVenueAction}
-        />
+        <PageHeader title="Vendors and venues" actions={listVenueAction} />
       ) : (
-        <div className="flex flex-wrap items-end justify-between gap-6">
-          <div className="max-w-2xl">
-            <h1 className="font-display text-4xl font-bold tracking-tight text-ink-900 sm:text-5xl">Vendors and venues</h1>
-            <p className="mt-3 text-lg text-ink-600">
-              Halls, photographers, sound and stage, decoration and catering in Dharan, Itahari, Biratnagar and beyond. Compare
-              prices and ask about your date directly.
-            </p>
-          </div>
+        <div className="flex justify-end">
+          {/* The banner replaces the intro text; the heading stays for screen readers and search engines */}
+          <h1 className="sr-only">Vendors and venues in Eastern Nepal</h1>
           {listVenueAction}
         </div>
       )}
+      <BannerSlider placement="marketplace" />
 
       <div className="space-y-4">
         <div role="tablist" aria-label="Browse" className="inline-flex rounded-xl bg-ink-100 p-1">
@@ -112,7 +115,7 @@ export const MarketplacePage: React.FC = () => {
         </div>
 
         {tab === 'venues' ? (
-          <div className="grid gap-3 sm:grid-cols-[1fr_220px]">
+          <div className="grid gap-3 sm:grid-cols-[1fr_200px_200px]">
             <div className="relative">
               <label htmlFor="venue-search" className="sr-only">
                 Search venues by name
@@ -140,17 +143,20 @@ export const MarketplacePage: React.FC = () => {
                 ))}
               </select>
             </div>
+            <FilterSelect id="venue-city" label="City" value={city} onChange={setCity} options={cityOptions} />
           </div>
         ) : (
-          <FilterChips
-            label="Category"
-            value={category}
-            onChange={setCategory}
-            options={[{ value: '', label: 'All categories' }, ...categories.map((c) => ({ value: c.slug, label: c.name }))]}
-          />
+          <div className="grid gap-3 sm:grid-cols-[240px_200px]">
+            <FilterSelect
+              id="vendor-category"
+              label="Category"
+              value={category}
+              onChange={setCategory}
+              options={[{ value: '', label: 'All categories' }, ...categories.map((c) => ({ value: c.slug, label: c.name }))]}
+            />
+            <FilterSelect id="vendor-city" label="City" value={city} onChange={setCity} options={cityOptions} />
+          </div>
         )}
-
-        <FilterChips label="City" value={city} onChange={setCity} options={cityOptions} />
       </div>
 
       <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>

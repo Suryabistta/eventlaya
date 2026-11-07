@@ -29,7 +29,8 @@ class ChangePasswordView(APIView):
             return Response({'error': ' '.join(e.messages), 'new_password': e.messages}, status=status.HTTP_400_BAD_REQUEST)
         had_password = user.has_usable_password()
         user.set_password(new_password)
-        user.save(update_fields=['password', 'updated_at'])
+        user.must_change_password = False
+        user.save(update_fields=['password', 'must_change_password', 'updated_at'])
         return Response({'message': 'Password changed.' if had_password else 'Password set.', 'has_password': True})
 
 

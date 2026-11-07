@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarCheck, CalendarDays, CalendarX, Inbox, Mail, MessageSquareText, Phone, Users, Wallet } from 'lucide-react'
+import { CalendarCheck, CalendarDays, CalendarX, Inbox, Mail, MessageSquareText, Phone, Users, Wallet, Package } from 'lucide-react'
 import { Badge, Button, ButtonLink, Card, EmptyState, ErrorState, PageHeader, Select, Skeleton, buttonClass, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { apiErrorText, type InquirySlot } from '@/lib/availability'
@@ -54,6 +54,7 @@ interface InboxItem {
   event_date: string | null
   guest_count: number | null
   budget_range?: string
+  package_name?: string | null
   message: string
   status: InquiryStatus
   slot: InquirySlot | null
@@ -74,6 +75,7 @@ const fromVenue = (i: BusinessInquiry): InboxItem => ({
   event_date: i.event_date || null,
   guest_count: i.guest_count,
   budget_range: i.budget_range,
+  package_name: i.package_name,
   message: i.message,
   status: i.status,
   slot: i.slot ?? null,
@@ -93,6 +95,7 @@ const fromVendor = (i: VendorBusinessInquiry): InboxItem => ({
   event_date: i.event_date,
   guest_count: null,
   budget_range: i.budget_range,
+  package_name: i.package_name,
   message: i.message,
   status: i.status,
   slot: i.slot ?? null,
@@ -152,6 +155,13 @@ const InquiryCard: React.FC<{
                 <Users className="h-4 w-4 text-ink-400" aria-hidden />
                 <dt className="sr-only">Guests</dt>
                 <dd>{inquiry.guest_count.toLocaleString()} guests</dd>
+              </div>
+            )}
+            {inquiry.package_name && (
+              <div className="inline-flex items-center gap-1.5">
+                <Package className="h-4 w-4 text-ink-400" aria-hidden />
+                <dt className="sr-only">Package</dt>
+                <dd className="font-semibold text-ink-900">{inquiry.package_name}</dd>
               </div>
             )}
             {inquiry.budget_range && (

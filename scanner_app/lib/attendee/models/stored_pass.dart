@@ -57,6 +57,14 @@ class StoredPass {
   /// "Paid online · Khalti · ref 4H7Ah…" / "Pay Rs 500 at the venue".
   final String? paymentLabel;
 
+  /// Seat ("A-12"); empty when there is none or the event hides seats.
+  final String seatNumber;
+
+  /// 'vertical' (default) or 'landscape', chosen per event by the organizer.
+  final String passLayout;
+
+  bool get isLandscape => passLayout == 'landscape';
+
   const StoredPass({
     required this.ticketNumber,
     required this.qrToken,
@@ -87,6 +95,8 @@ class StoredPass {
     this.guestNumber = 0,
     this.paymentStatus,
     this.paymentLabel,
+    this.seatNumber = '',
+    this.passLayout = 'vertical',
   });
 
   static String? _payStatus(Object? p) => p is Map ? p['status']?.toString() : null;
@@ -124,6 +134,8 @@ class StoredPass {
       guestNumber: _int(t['guest_number']),
       paymentStatus: _payStatus(t['payment']),
       paymentLabel: _payLabel(t['payment']),
+      seatNumber: t['seat_number']?.toString() ?? '',
+      passLayout: t['pass_layout']?.toString() ?? 'vertical',
     );
   }
 
@@ -172,6 +184,8 @@ class StoredPass {
       guestNumber: _int(t['guest_number']),
       paymentStatus: _payStatus(t['payment']),
       paymentLabel: _payLabel(t['payment']),
+      seatNumber: s(t, 'seat_number') ?? '',
+      passLayout: s(t, 'pass_layout') ?? 'vertical',
     );
   }
 
@@ -217,6 +231,8 @@ class StoredPass {
       guestNumber: _int(j['guest_number']),
       paymentStatus: s('payment_status'),
       paymentLabel: s('payment_label'),
+      seatNumber: s('seat_number') ?? '',
+      passLayout: s('pass_layout') ?? 'vertical',
     );
   }
 
@@ -250,6 +266,8 @@ class StoredPass {
         'guest_number': guestNumber,
         'payment_status': paymentStatus,
         'payment_label': paymentLabel,
+        'seat_number': seatNumber,
+        'pass_layout': passLayout,
       };
 
   /// Stable identity across sources.

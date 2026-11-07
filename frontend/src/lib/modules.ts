@@ -19,6 +19,12 @@ export type ModuleSlug =
   | 'contests'
   | 'judging'
   | 'paid_votes'
+  // November 2026 batch
+  | 'banners'
+  | 'seat_numbers'
+  | 'packages'
+  | 'sub_events'
+  | 'offline_tickets'
 
 interface ModulesResponse {
   role: string

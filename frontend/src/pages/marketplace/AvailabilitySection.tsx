@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { CalendarCheck, Check } from 'lucide-react'
+import { CalendarToggle } from '@/components/CalendarToggle'
+import { BS_MONTHS, toBs, useCalendarSystem } from '@/lib/calendar'
 import type { VenueSpace } from '@/services/api'
 import { addDays, fmtDay, fmtPrice, parseIso, slotTime, slotsApi, todayIso, type ListingKind, type PublicSlot } from '@/lib/availability'
 import { useModuleEnabled } from '@/lib/modules'
@@ -43,6 +45,7 @@ export const AvailabilitySection: React.FC<{
   const enabled = useModuleEnabled('marketplace')
   const { data, isLoading } = usePublicAvailability(kind, listingId)
   const [day, setDay] = useState<string | null>(null)
+  const [system] = useCalendarSystem()
   const [pages, setPages] = useState(1)
 
   // A space filter keeps that space's slots plus whole-venue slots.
@@ -88,6 +91,7 @@ export const AvailabilitySection: React.FC<{
       <CardHeader
         title="Availability"
         description={`Open slots for the next ${DAYS_AHEAD} days. Pick one to request it; the ${unit} confirms with you.`}
+        actions={<CalendarToggle />}
       />
       <div className="space-y-4 p-5">
         {spaces.length > 0 && onSpaceChange && (
@@ -116,6 +120,9 @@ export const AvailabilitySection: React.FC<{
               const open = list.filter((s) => s.available).length
               const taken = list.length > 0 && open === 0
               const date = parseIso(d)
+              const bs = system === 'bs' ? toBs(date) : null
+              const dayNum = bs ? bs.day : date.getDate()
+              const monthMark = (dayNum === 1 || d === start) && (bs ? BS_MONTHS[bs.month].slice(0, 3) : date.toLocaleDateString('en-GB', { month: 'short' }))
               const selected = day === d
               return (
                 <button
@@ -137,10 +144,8 @@ export const AvailabilitySection: React.FC<{
                   )}
                 >
                   <span className="text-[10px] font-semibold uppercase">{date.toLocaleDateString('en-GB', { weekday: 'short' }).slice(0, 2)}</span>
-                  <span className={cn('text-sm font-bold tabular', taken && !selected && 'line-through')}>{date.getDate()}</span>
-                  <span className="text-[9px] font-medium uppercase leading-none opacity-70">
-                    {date.getDate() === 1 || d === start ? date.toLocaleDateString('en-GB', { month: 'short' }) : ' '}
-                  </span>
+                  <span className={cn('text-sm font-bold tabular', taken && !selected && 'line-through')}>{dayNum}</span>
+                  <span className="text-[9px] font-medium uppercase leading-none opacity-70">{monthMark || ' '}</span>
                 </button>
               )
             })}

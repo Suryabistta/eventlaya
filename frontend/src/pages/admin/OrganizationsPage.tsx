@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Building2, ChevronRight, Search } from 'lucide-react'
+import { Building2, ChevronRight, Plus, Search } from 'lucide-react'
+import { VerifiedBadge } from '@/components/VerifiedBadge'
+import { AddOrganizationModal } from './OrganizationActions'
 import { Badge, Button, Card, EmptyState, ErrorState, PageHeader, Select, Skeleton, useToast } from '@/components/ui'
 import { platformApi, STATS_KEY, type Organization } from './api'
 import { PAGE, fmtDate, fmtNum } from './shared'
@@ -72,6 +74,7 @@ export const OrganizationsPage: React.FC = () => {
   const plan = params.get('plan') || 'all'
   const city = params.get('city') || ''
   const [search, setSearch] = useState(params.get('search') || '')
+  const [adding, setAdding] = useState(false)
   const [debounced, setDebounced] = useState(search)
   const orgStatus = useOrgStatus()
 
@@ -110,7 +113,16 @@ export const OrganizationsPage: React.FC = () => {
 
   return (
     <div className={PAGE}>
-      <PageHeader title="Organizations" description="Every event company and vendor on Eventlaya. Open one to see their events, or suspend an account." />
+      <PageHeader
+        title="Organizations"
+        description="Every event company and vendor on Eventlaya. Open one to see their events, or suspend an account."
+        actions={
+          <Button icon={<Plus className="h-4 w-4" />} onClick={() => setAdding(true)}>
+            Add organization
+          </Button>
+        }
+      />
+      <AddOrganizationModal open={adding} onClose={() => setAdding(false)} />
 
       <Card>
         <div className="grid gap-3 border-b border-ink-100 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-4 2xl:grid-cols-[minmax(0,1fr)_200px_160px_160px_190px]">
@@ -207,7 +219,10 @@ export const OrganizationsPage: React.FC = () => {
                 <li key={o.id}>
                   <Link to={`/admin/organizations/${o.id}`} className="flex items-start gap-3 px-5 py-4 hover:bg-ink-50">
                     <div className="min-w-0 flex-1 space-y-1">
-                      <p className="truncate font-semibold text-ink-900">{o.name}</p>
+                      <p className="truncate font-semibold text-ink-900">
+                        {o.name}
+                        {o.is_verified && <VerifiedBadge />}
+                      </p>
                       <p className="truncate text-sm text-ink-500">{o.email}</p>
                       <div className="flex flex-wrap gap-1">
                         {roleBadge(o)}
@@ -266,6 +281,7 @@ export const OrganizationsPage: React.FC = () => {
                       <td className="max-w-[280px] px-5 py-3">
                         <Link to={`/admin/organizations/${o.id}`} className="block truncate font-semibold text-ink-900 hover:text-brand-700 hover:underline">
                           {o.name}
+                          {o.is_verified && <VerifiedBadge />}
                         </Link>
                         <span className="block truncate text-xs text-ink-500">{o.email}</span>
                       </td>

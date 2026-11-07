@@ -5,6 +5,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import EventTicket
+from .seats import visible_seat
+from .sub_events import display_title
 
 UPCOMING_PHASES = ('upcoming', 'live', 'draft')
 
@@ -16,7 +18,7 @@ def event_summary(event, request=None):
     org = event.organizer
     return {
         'id': str(event.id),
-        'title': event.title,
+        'title': display_title(event),
         'slug': event.slug,
         'tagline': event.tagline,
         'category': event.category,
@@ -32,6 +34,7 @@ def event_summary(event, request=None):
         'status': event.status,
         'phase': event.phase(),
         'organizer_name': org.organization_name or org.get_full_name() or 'Organizer',
+        'organizer_verified': org.is_verified,
     }
 
 
@@ -48,6 +51,8 @@ def my_ticket_data(ticket, request=None, review_ids=None):
         'attendee_email': ticket.attendee_email,
         'order_reference': ticket.order.reference if ticket.order_id else None,
         'guest_number': ticket.guest_number,
+        'seat_number': visible_seat(ticket),
+        'pass_layout': ticket.event.ticket_layout,
         'attendee_phone': ticket.attendee_phone,
         'ticket_type': {'id': str(ticket.ticket_type_id), 'name': ticket.ticket_type.name} if ticket.ticket_type_id else None,
         'ticket_type_name': ticket.ticket_type_name,

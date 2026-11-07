@@ -6,6 +6,7 @@ from .views import (
     MyListingsView, MyInquiriesView, MyInquiryDetailView, MyVendorInquiriesView, MyVendorInquiryDetailView,
     OwnerDecisionView, AccessRequestCreateView, AccessRequestMineView,
 )
+from .packages import ServicePackageViewSet
 from .slot_views import MySlotDetailView, MySlotsBlockView, MySlotsBulkView, MySlotsView
 
 router = DefaultRouter()
@@ -13,6 +14,7 @@ router.register(r'categories', VendorCategoryViewSet, basename='vendor-categorie
 router.register(r'vendors', VendorProfileViewSet, basename='vendors')
 router.register(r'venues', VenueListingViewSet, basename='venues')
 router.register(r'inquiries', VenueInquiryViewSet, basename='inquiries')
+router.register(r'packages', ServicePackageViewSet, basename='packages')
 
 urlpatterns = [
     path('my/listings/', MyListingsView.as_view(), name='marketplace_my_listings'),

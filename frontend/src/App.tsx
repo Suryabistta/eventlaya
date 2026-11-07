@@ -31,6 +31,7 @@ const FormBuilderPage = lazyPage(() => import('./pages/FormBuilderPage'), 'FormB
 const GateScannerPage = lazyPage(() => import('./pages/GateScannerPage'), 'GateScannerPage')
 const GatesPage = lazyPage(() => import('./pages/GatesPage'), 'GatesPage')
 const TicketsPage = lazyPage(() => import('./pages/TicketsPage'), 'TicketsPage')
+const PrintedTicketsPage = lazyPage(() => import('./pages/PrintedTicketsPage'), 'PrintedTicketsPage')
 const TeamPage = lazyPage(() => import('./pages/TeamPage'), 'TeamPage')
 const VotingPage = lazyPage(() => import('./pages/VotingPage'), 'VotingPage')
 const PollBuilderPage = lazyPage(() => import('./pages/voting/PollBuilderPage'), 'PollBuilderPage')
@@ -70,6 +71,8 @@ const ListingsApprovalsPage = lazyPage(() => import('./pages/admin/approvals/Lis
 const AdminBillingPage = lazyPage(() => import('./pages/admin/billing/BillingPage'), 'BillingPage')
 const SegmentsPage = lazyPage(() => import('./pages/admin/SegmentsPage'), 'SegmentsPage')
 const ModulesPage = lazyPage(() => import('./pages/admin/ModulesPage'), 'ModulesPage')
+const CatalogPage = lazyPage(() => import('./pages/admin/CatalogPage'), 'CatalogPage')
+const BannersPage = lazyPage(() => import('./pages/admin/BannersPage'), 'BannersPage')
 const ActivityPage = lazyPage(() => import('./pages/admin/ActivityPage'), 'ActivityPage')
 const PaymentsPage = lazyPage(() => import('./pages/payments/PaymentsPage'), 'PaymentsPage')
 const PaymentsAdminPage = lazyPage(() => import('./pages/admin/PaymentsAdminPage'), 'PaymentsAdminPage')
@@ -211,6 +214,7 @@ export const App: React.FC = () => {
                 <Route path="scanner" element={<RequireAuth roles={['organizer', 'staff', 'superadmin']}><GateScannerPage /></RequireAuth>} />
                 <Route path="gates" element={organizer(<GatesPage />)} />
                 <Route path="tickets" element={organizer(<TicketsPage />)} />
+                <Route path="printed-tickets" element={organizer(<PrintedTicketsPage />)} />
                 <Route path="payments" element={organizer(<PaymentsPage />)} />
                 <Route path="team" element={organizer(<TeamPage />)} />
                 <Route path="voting" element={organizer(<VotingPage />)} />
@@ -270,6 +274,8 @@ export const App: React.FC = () => {
                 <Route path="billing" element={<AdminBillingPage />} />
                 <Route path="segments" element={<SegmentsPage />} />
                 <Route path="modules" element={<ModulesPage />} />
+                <Route path="catalog" element={<CatalogPage />} />
+                <Route path="banners" element={<BannersPage />} />
                 <Route path="activity" element={<ActivityPage />} />
                 <Route path="blog" element={<BlogAdminPage />} />
                 <Route path="blog/new" element={<BlogEditorPage />} />

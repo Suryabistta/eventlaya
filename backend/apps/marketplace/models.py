@@ -13,12 +13,14 @@ class VendorCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     icon = models.CharField(max_length=50, blank=True, help_text="Lucide icon name")
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name_plural = "Vendor Categories"
-        ordering = ['name']
+        ordering = ['order', 'name']
 
     def __str__(self):
         return self.name
@@ -32,7 +34,8 @@ class VendorProfile(models.Model):
         related_name='vendor_profiles'
     )
     business_name = models.CharField(max_length=255)
-    category = models.ForeignKey(VendorCategory, on_delete=models.CASCADE, related_name='vendors')
+    logo = models.CharField(max_length=500, blank=True, help_text='Image URL from /api/uploads/')
+    category = models.ForeignKey(VendorCategory, on_delete=models.PROTECT, related_name='vendors')
     city = models.CharField(max_length=100, default='Itahari')
     address = models.CharField(max_length=255, blank=True)
     phone = models.CharField(max_length=30)
@@ -40,6 +43,8 @@ class VendorProfile(models.Model):
     description = models.TextField()
     starting_price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     portfolio_images = models.JSONField(default=list, blank=True)
+    # Cover photo on marketplace cards and the top of the page; falls back to the first portfolio photo
+    featured_image = models.CharField(max_length=500, blank=True)
     is_verified = models.BooleanField(default=False)
     is_featured = models.BooleanField(default=False)
     rating = models.DecimalField(max_digits=3, decimal_places=2, default=5.00)
@@ -84,7 +89,9 @@ class VenueListing(models.Model):
     
     amenities = models.JSONField(default=list, blank=True)
     images = models.JSONField(default=list, blank=True)
-    
+    # Cover photo on marketplace cards and the top of the page; falls back to the first photo
+    featured_image = models.CharField(max_length=500, blank=True)
+
     contact_person = models.CharField(max_length=100)
     contact_phone = models.CharField(max_length=30)
     contact_email = models.EmailField(blank=True)
@@ -177,6 +184,7 @@ class VenueInquiry(models.Model):
     slot = models.ForeignKey(
         'AvailabilitySlot', on_delete=models.SET_NULL, null=True, blank=True, related_name='venue_requests',
     )
+    package = models.ForeignKey('ServicePackage', on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
     owner_note = models.TextField(blank=True, help_text='Message from the owner when confirming/declining')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -207,6 +215,7 @@ class VendorInquiry(models.Model):
     slot = models.ForeignKey(
         'AvailabilitySlot', on_delete=models.SET_NULL, null=True, blank=True, related_name='vendor_requests',
     )
+    package = models.ForeignKey('ServicePackage', on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
     owner_note = models.TextField(blank=True, help_text='Message from the owner when confirming/declining')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -344,3 +353,45 @@ class MarketplaceAccessRequest(models.Model):
 
     def __str__(self):
         return f"{self.business_name} ({self.user.email}) [{self.status}]"
+
+
+class ServicePackage(models.Model):
+    """A priced package a vendor or venue offers, e.g. "Wedding gold: stage, lights, DJ" (module `packages`)."""
+
+    class PriceUnit(models.TextChoices):
+        EVENT = 'event', 'per event'
+        DAY = 'day', 'per day'
+        PLATE = 'plate', 'per plate'
+        HOUR = 'hour', 'per hour'
+        PERSON = 'person', 'per person'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    vendor = models.ForeignKey(VendorProfile, on_delete=models.CASCADE, null=True, blank=True, related_name='packages')
+    venue = models.ForeignKey(VenueListing, on_delete=models.CASCADE, null=True, blank=True, related_name='packages')
+    name = models.CharField(max_length=120)
+    price = models.DecimalField(max_digits=12, decimal_places=2)
+    price_unit = models.CharField(max_length=10, choices=PriceUnit.choices, default=PriceUnit.EVENT)
+    description = models.TextField(blank=True)
+    inclusions = models.JSONField(default=list, blank=True, help_text="What's included, one short line each")
+    max_guests = models.PositiveIntegerField(null=True, blank=True)
+    image = models.CharField(max_length=500, blank=True)
+    is_active = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['order', 'price']
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(vendor__isnull=False, venue__isnull=True) | models.Q(vendor__isnull=True, venue__isnull=False),
+                name='package_belongs_to_one_listing',
+            ),
+        ]
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def owner_id(self):
+        return self.vendor.user_id if self.vendor_id else self.venue.owner_id

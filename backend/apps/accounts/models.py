@@ -44,6 +44,12 @@ class User(AbstractUser):
     # ("By continuing you agree…"). Null for accounts created before consent was recorded or by an admin.
     terms_accepted_at = models.DateTimeField(null=True, blank=True)
     terms_version = models.CharField(max_length=20, blank=True)
+    # Blue tick on the organization's name; set only by a platform admin
+    is_verified = models.BooleanField(default=False)
+    # Set when a platform admin gives out a temporary password; cleared when the user picks their own
+    must_change_password = models.BooleanField(default=False)
+    # Tokens issued before this moment are rejected (admin password reset signs the user out everywhere)
+    sessions_valid_after = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     USERNAME_FIELD = 'email'
@@ -59,6 +65,13 @@ class User(AbstractUser):
         self.terms_version = settings.TERMS_VERSION
         if save and self.pk:
             self.save(update_fields=['terms_accepted_at', 'terms_version', 'updated_at'])
+
+    def revoke_sessions(self, save=True):
+        """Sign this user out on every device (see apps.accounts.authentication)."""
+        from django.utils import timezone
+        self.sessions_valid_after = timezone.now()
+        if save:
+            self.save(update_fields=['sessions_valid_after', 'updated_at'])
 
     @property
     def is_superadmin(self):

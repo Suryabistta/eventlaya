@@ -4,6 +4,7 @@ import { Layers, Save, Undo2 } from 'lucide-react'
 import { request } from '@/services/api'
 import { Badge, Button, Card, CardHeader, EmptyState, ErrorState, PageHeader, Skeleton, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
+import { Switch } from './shared'
 
 interface RolePermission {
   role: string
@@ -65,37 +66,6 @@ const rbacApi = {
       }),
     }),
 }
-
-const Switch: React.FC<{
-  checked: boolean
-  onChange: (v: boolean) => void
-  label: string
-  disabled?: boolean
-  size?: 'sm' | 'md'
-}> = ({ checked, onChange, label, disabled, size = 'md' }) => (
-  <button
-    type="button"
-    role="switch"
-    aria-checked={checked}
-    aria-label={label}
-    disabled={disabled}
-    onClick={() => onChange(!checked)}
-    className={cn(
-      'relative inline-flex shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2 disabled:opacity-50',
-      size === 'md' ? 'h-6 w-11' : 'h-5 w-9',
-      checked ? 'bg-brand-600' : 'bg-ink-300',
-    )}
-  >
-    <span
-      aria-hidden
-      className={cn(
-        'inline-block rounded-full bg-white shadow-xs transition-transform',
-        size === 'md' ? 'h-5 w-5' : 'h-4 w-4',
-        checked ? (size === 'md' ? 'translate-x-[22px]' : 'translate-x-[18px]') : 'translate-x-0.5',
-      )}
-    />
-  </button>
-)
 
 export const ModulesPage: React.FC = () => {
   const toast = useToast()

@@ -1,11 +1,13 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, CalendarDays, DoorOpen, ExternalLink, Globe, Mail, Phone, Ticket } from 'lucide-react'
-import { Badge, Button, Card, CardHeader, EmptyState, ErrorState, PageHeader, Skeleton, StatTile } from '@/components/ui'
-import { platformApi, type OrganizationDetail } from './api'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowLeft, CalendarDays, DoorOpen, ExternalLink, Globe, KeyRound, Mail, Phone, Ticket } from 'lucide-react'
+import { VerifiedBadge } from '@/components/VerifiedBadge'
+import { ResetPasswordModal } from './OrganizationActions'
+import { Badge, Button, Card, CardHeader, EmptyState, ErrorState, PageHeader, Skeleton, StatTile, useToast } from '@/components/ui'
+import { platformApi, type ListingKind, type OrganizationDetail } from './api'
 import { roleBadge, statusBadge, useOrgStatus } from './OrganizationsPage'
-import { PAGE, ReviewBadge, fmtDate, fmtNum } from './shared'
+import { PAGE, ReviewBadge, Switch, fmtDate, fmtNum, timeAgo } from './shared'
 
 const eventStatus: Record<OrganizationDetail['events_list'][number]['status'], { label: string; tone: 'neutral' | 'brand' | 'success' | 'danger' }> = {
   draft: { label: 'Draft', tone: 'neutral' },
@@ -22,6 +24,19 @@ export const OrganizationDetailPage: React.FC = () => {
     queryFn: () => platformApi.organization(id),
   })
   const orgStatus = useOrgStatus()
+  const [resetting, setResetting] = useState(false)
+  const toast = useToast()
+  const qc = useQueryClient()
+  const verify = useMutation({
+    mutationFn: (v: { kind: 'organization' | ListingKind; id: string; is_verified: boolean }) =>
+      v.kind === 'organization' ? platformApi.verifyOrganization(v.id, v.is_verified) : platformApi.verifyListing(v.kind, v.id, v.is_verified),
+    onSuccess: (_r, v) => {
+      void qc.invalidateQueries({ queryKey: ['platform', 'organization', id] })
+      void qc.invalidateQueries({ queryKey: ['platform', 'organizations'] })
+      toast.success(v.is_verified ? 'Verified' : 'Verification removed')
+    },
+    onError: (err: Error) => toast.error('Couldn’t change verification', err.message),
+  })
 
   const back = (
     <Link to="/admin/organizations" className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-600 hover:text-ink-900">
@@ -57,7 +72,12 @@ export const OrganizationDetailPage: React.FC = () => {
     <div className={PAGE}>
       {back}
       <PageHeader
-        title={o.name}
+        title={
+          <>
+            {o.name}
+            {o.is_verified && <VerifiedBadge />}
+          </>
+        }
         description={
           <span className="flex flex-wrap items-center gap-2">
             {roleBadge(o)}
@@ -65,16 +85,22 @@ export const OrganizationDetailPage: React.FC = () => {
           </span>
         }
         actions={
-          <Button
-            variant={o.is_active ? 'secondary' : 'primary'}
-            className={o.is_active ? 'text-red-700 hover:text-red-800' : undefined}
-            loading={orgStatus.busyId === o.id}
-            onClick={() => void orgStatus.toggle(o)}
-          >
-            {o.is_active ? 'Suspend account' : 'Activate account'}
-          </Button>
+          <>
+            <Button variant="secondary" icon={<KeyRound className="h-4 w-4" />} onClick={() => setResetting(true)}>
+              Reset password
+            </Button>
+            <Button
+              variant={o.is_active ? 'secondary' : 'primary'}
+              className={o.is_active ? 'text-red-700 hover:text-red-800' : undefined}
+              loading={orgStatus.busyId === o.id}
+              onClick={() => void orgStatus.toggle(o)}
+            >
+              {o.is_active ? 'Suspend account' : 'Activate account'}
+            </Button>
+          </>
         }
       />
+      <ResetPasswordModal open={resetting} onClose={() => setResetting(false)} org={o} />
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatTile label="Events" value={fmtNum(o.events)} icon={<CalendarDays className="h-5 w-5" />} tone="brand" />
@@ -170,6 +196,48 @@ export const OrganizationDetailPage: React.FC = () => {
               </div>
             </dl>
           </Card>
+
+          <Card>
+            <CardHeader title="Verification" description="The blue tick on their name, event pages and listings" />
+            <ul className="divide-y divide-ink-100">
+              {[
+                { kind: 'organization' as const, id: o.id, name: o.name, sub: 'Organization', is_verified: o.is_verified },
+                ...o.listings.map((l) => ({ ...l, sub: l.kind === 'venue' ? 'Venue listing' : 'Vendor listing' })),
+              ].map((row) => (
+                <li key={`${row.kind}-${row.id}`} className="flex items-center gap-3 px-5 py-3">
+                  <div className="min-w-0 flex-1 text-sm">
+                    <p className="truncate font-medium text-ink-900">{row.name}</p>
+                    <p className="text-ink-500">{row.sub}</p>
+                  </div>
+                  <Switch
+                    size="sm"
+                    checked={row.is_verified}
+                    disabled={verify.isPending}
+                    label={`Verified: ${row.name}`}
+                    onChange={(is_verified) => verify.mutate({ kind: row.kind, id: row.id, is_verified })}
+                  />
+                </li>
+              ))}
+            </ul>
+          </Card>
+
+          {o.admin_actions.length > 0 && (
+            <Card>
+              <CardHeader title="Admin history" />
+              <ul className="divide-y divide-ink-100 text-sm">
+                {o.admin_actions.map((a) => (
+                  <li key={`${a.kind}-${a.at}`} className="px-5 py-3">
+                    <p className="font-medium text-ink-900">{a.label}</p>
+                    <p className="text-ink-500" title={new Date(a.at).toLocaleString()}>
+                      {timeAgo(a.at)}
+                      {a.actor && ` · ${a.actor}`}
+                      {a.note && ` · ${a.note}`}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
 
           {o.role === 'organizer' && (
             <Card>

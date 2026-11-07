@@ -25,6 +25,7 @@ import { categoryLabel, eventPageApi, fmtClock, type EventCategory, type EventPa
 import { eventPriceLabel, priceText, ticketKeys, ticketsApi } from '@/lib/tickets'
 import { Button, ButtonLink, Card, EmptyState, ErrorState, IconButton, ImageUpload, Input, PageHeader, Select, Skeleton, Textarea, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
+import { useModuleEnabled } from '@/lib/modules'
 
 /* ---------- draft shape ---------- */
 
@@ -44,6 +45,12 @@ interface EventDraft {
   status: Event['status']
   allow_registration: boolean
   show_spots_left: boolean
+  show_managed_by: boolean
+  ticket_layout: 'vertical' | 'landscape'
+  show_seat_number: boolean
+  parent: string
+  managed_by: string
+  managed_by_logo: string
   registration_deadline: string // datetime-local value
   is_paid: boolean
   ticket_price: string
@@ -104,6 +111,12 @@ const emptyDraft: EventDraft = {
   status: 'published',
   allow_registration: true,
   show_spots_left: true,
+  show_managed_by: false,
+  ticket_layout: 'vertical',
+  show_seat_number: false,
+  parent: '',
+  managed_by: '',
+  managed_by_logo: '',
   registration_deadline: '',
   is_paid: false,
   ticket_price: '',
@@ -158,6 +171,12 @@ function fromEvent(ev: Event, page?: EventPageContent): EventDraft {
     status: ev.status,
     allow_registration: ev.allow_registration,
     show_spots_left: ev.show_spots_left ?? true,
+    show_managed_by: ev.show_managed_by ?? false,
+    ticket_layout: ev.ticket_layout ?? 'vertical',
+    show_seat_number: ev.show_seat_number ?? false,
+    parent: ev.parent ?? '',
+    managed_by: ev.managed_by ?? '',
+    managed_by_logo: ev.managed_by_logo ?? '',
     registration_deadline: toLocalInput(ev.registration_deadline),
     is_paid: ev.is_paid,
     ticket_price: ev.is_paid ? String(Number(ev.ticket_price)) : '',
@@ -216,9 +235,10 @@ const localToday = () => {
 
 /** Which step holds a field, so server errors can send the user there. */
 const FIELD_STEP: Record<string, StepId> = {
-  title: 'basics', tagline: 'basics', category: 'basics', description: 'basics', banner: 'basics', banner_url: 'basics',
+  title: 'basics', tagline: 'basics', parent: 'basics', category: 'basics', description: 'basics', banner: 'basics', banner_url: 'basics',
   start_date: 'when', start_time: 'when', end_date: 'when', end_time: 'when', location: 'when', map_query: 'when',
-  capacity: 'registration', show_spots_left: 'registration', status: 'registration', registration_deadline: 'registration', ticket_price: 'registration', is_paid: 'registration', allow_registration: 'registration',
+  capacity: 'registration', show_spots_left: 'registration', status: 'registration', registration_deadline: 'registration', ticket_price: 'registration', is_paid: 'registration', allow_registration: 'registration', ticket_layout: 'registration', show_seat_number: 'registration',
+  managed_by: 'page', managed_by_logo: 'page', show_managed_by: 'page',
 }
 
 function validateStep(id: StepId, d: EventDraft, p: PageDraft, isNew = false): Errors {
@@ -249,6 +269,7 @@ function validateStep(id: StepId, d: EventDraft, p: PageDraft, isNew = false): E
   }
   if (id === 'page') {
     if (p.contact_email.trim() && !EMAIL_RE.test(p.contact_email.trim())) e.contact_email = 'Enter an email like hello@example.com.'
+    if (d.show_managed_by && !d.managed_by.trim()) e.managed_by = 'Enter who manages the event, or turn this off.'
     p.highlights.forEach((h) => h.text.length > 120 && (e[`highlight.${h.key}`] = 'Keep each highlight to 120 characters or fewer.'))
   }
   if (id === 'schedule') {
@@ -342,6 +363,11 @@ export const EventFormPage: React.FC = () => {
 }
 
 const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ event, page }) => {
+  const seatsOn = useModuleEnabled('seat_numbers')
+  const subEventsOn = useModuleEnabled('sub_events')
+  const { events: myEvents } = useCurrentEvent()
+  // Main events this one can sit under: the organizer's own top-level events, not itself
+  const parentChoices = myEvents.filter((e) => !e.parent && e.id !== event?.id)
   const toast = useToast()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -447,6 +473,12 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
         status: draft.status,
         allow_registration: draft.allow_registration,
         show_spots_left: draft.show_spots_left,
+        show_managed_by: draft.show_managed_by,
+        ticket_layout: draft.ticket_layout,
+        show_seat_number: draft.show_seat_number,
+        ...(subEventsOn ? { parent: draft.parent || null } : {}),
+        managed_by: draft.managed_by.trim(),
+        managed_by_logo: draft.managed_by_logo,
         registration_deadline: draft.registration_deadline ? new Date(draft.registration_deadline).toISOString() : isEdit ? null : undefined,
         // On create the server makes a first ticket type from this. After that, prices live on the Tickets page.
         ...(isEdit ? {} : { is_paid: draft.is_paid, ticket_price: draft.is_paid ? Number(draft.ticket_price).toFixed(2) : '0.00' }),
@@ -717,6 +749,20 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                         ))}
                       </Select>
                     </div>
+                    {subEventsOn && parentChoices.length > 0 && (
+                      <Select
+                        label="Part of"
+                        hint="Optional. Make this a sub-event (a session, workshop or screening) of a main event. It keeps its own registration form and tickets."
+                        {...bind('parent')}
+                      >
+                        <option value="">Not part of another event</option>
+                        {parentChoices.map((e) => (
+                          <option key={e.id} value={e.id}>
+                            {e.title}
+                          </option>
+                        ))}
+                      </Select>
+                    )}
                     <Textarea label="Description" rows={5} placeholder="What the event is about, who it’s for, what to expect" hint="Optional" {...bind('description')} />
                     <ImageUpload
                       label="Banner image"
@@ -758,6 +804,23 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                         ))}
                       </Select>
                     </div>
+                    <Select
+                      label="Ticket layout"
+                      hint="Shape of the pass people download, print and see in the app."
+                      value={draft.ticket_layout}
+                      onChange={(e) => set('ticket_layout', e.target.value as EventDraft['ticket_layout'])}
+                    >
+                      <option value="vertical">Vertical (phone screen)</option>
+                      <option value="landscape">Landscape (wide)</option>
+                    </Select>
+                    {seatsOn && (
+                      <Checkbox
+                        label="Show seat numbers to attendees"
+                        hint="Assign seats from the attendee list on the dashboard. Gate staff always see them."
+                        checked={draft.show_seat_number}
+                        onChange={(v) => set('show_seat_number', v)}
+                      />
+                    )}
                     <Checkbox
                       label="Show how many spots are left"
                       hint="Attendees still see Fully booked / Sold out."
@@ -839,6 +902,20 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                         onChange={(e) => setPage('contact_email', e.target.value)}
                       />
                       <Input label="Contact phone" type="tel" hint="Optional" value={content.contact_phone} onChange={(e) => setPage('contact_phone', e.target.value)} />
+                    </div>
+                    <div className="space-y-4 border-t border-ink-100 pt-5">
+                      <Checkbox
+                        label="Show “Managed by”"
+                        hint="Credit the agency or team running the event, next to your organization’s name."
+                        checked={draft.show_managed_by}
+                        onChange={(v) => set('show_managed_by', v)}
+                      />
+                      {draft.show_managed_by && (
+                        <div className="grid gap-4 sm:grid-cols-[1fr_200px]">
+                          <Input label="Managed by" required placeholder="Eastern Events Pvt. Ltd." {...bind('managed_by')} />
+                          <ImageUpload label="Logo" kind="logo" shape="square" hint="Optional" value={draft.managed_by_logo || null} onChange={(url) => set('managed_by_logo', url ?? '')} />
+                        </div>
+                      )}
                     </div>
                   </>
                 )}

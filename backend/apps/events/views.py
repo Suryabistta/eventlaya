@@ -82,6 +82,11 @@ class EventViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         event = self.get_object()
+        if EventTicket.objects.filter(event__parent=event).exists():
+            return Response(
+                {'error': 'People registered for its sub-events. Cancel the event instead of deleting, so their passes are kept.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if event.tickets.exists():
             return Response(
                 {'error': f'{event.registered_count} people registered for this event. Cancel it instead of deleting, so their passes and scan history are kept.'},
@@ -130,6 +135,11 @@ class PublicEventListView(APIView):
         if city:
             events = events.filter(location__icontains=city)
 
+        # Sub-events are listed on their main event's page, not on their own here
+        from apps.accounts.modules import module_enabled
+        if module_enabled('sub_events'):
+            events = events.filter(parent__isnull=True)
+
         events = list(events)
         data = EventSerializer(events, many=True, context={'request': request}).data
         return Response([public_event_data(e, d) for e, d in zip(events, data)])
@@ -164,7 +174,15 @@ class PublicEventDetailView(APIView):
         data['organizer_info'] = {
             'name': (branding.brand_name if branding and branding.brand_name else None) or org.organization_name or org.get_full_name() or org.username,
             'logo': branding.brand_logo if branding and branding.brand_logo else None,
+            'verified': org.is_verified,
         }
+        from .sub_events import parent_card, sub_event_cards
+        data['sub_events'] = sub_event_cards(event)
+        data['parent'] = parent_card(event)
+        data['managed_by_info'] = (
+            {'name': event.managed_by, 'logo': event.managed_by_logo or None}
+            if event.show_managed_by and event.managed_by.strip() else None
+        )
 
         # Also return dynamic form schema if attached
         form_schema = None
@@ -339,7 +357,7 @@ class GateScanView(APIView):
                     'status': 'wrong_event',
                     'result': 'wrong_event',
                     'message': f"⛔ Wrong Event Checkpoint: Ticket is issued for '{other_ticket.event.title}', NOT '{event.title}'. Please redirect attendee.",
-                    'ticket': EventTicketSerializer(other_ticket).data,
+                    'ticket': EventTicketSerializer(other_ticket, context={'staff': True}).data,
                     'attendee_name': other_ticket.attendee_name,
                     'expected_event': other_ticket.event.title,
                     'gate_name': gate_name,
@@ -370,7 +388,7 @@ class GateScanView(APIView):
                 'message': ('⛔ Entry Denied: Online payment not completed. This ticket is only held while the buyer pays.'
                             if ticket.status == EventTicket.Status.RESERVED else
                             "⛔ Entry Denied: The online payment for this ticket wasn't completed, so it was released."),
-                'ticket': EventTicketSerializer(ticket).data,
+                'ticket': EventTicketSerializer(ticket, context={'staff': True}).data,
                 'attendee_name': ticket.attendee_name,
                 'gate_name': gate_name,
                 'scan_type': scan_type,
@@ -382,7 +400,7 @@ class GateScanView(APIView):
                 'result': 'cancelled',
                 'message': ('⛔ Entry Denied: This ticket was refunded and cancelled.' if order is not None and order.payment_status == 'refunded'
                             else '⛔ Entry Denied: This ticket was cancelled or revoked.'),
-                'ticket': EventTicketSerializer(ticket).data,
+                'ticket': EventTicketSerializer(ticket, context={'staff': True}).data,
                 'attendee_name': ticket.attendee_name,
                 'gate_name': gate_name,
                 'scan_type': scan_type,
@@ -424,7 +442,7 @@ class GateScanView(APIView):
                     'gate_name': gate_name,
                     'scan_type': scan_type,
                     'scanned_at': now.isoformat(),
-                    'ticket': EventTicketSerializer(ticket).data
+                    'ticket': EventTicketSerializer(ticket, context={'staff': True}).data
                 }, status=status.HTTP_200_OK)
 
             type_msg = ticket_type_gate_error(ticket, gate)
@@ -437,7 +455,7 @@ class GateScanView(APIView):
                     'gate_name': gate_name,
                     'scan_type': scan_type,
                     'scanned_at': now.isoformat(),
-                    'ticket': EventTicketSerializer(ticket).data
+                    'ticket': EventTicketSerializer(ticket, context={'staff': True}).data
                 }, status=status.HTTP_200_OK)
 
             # Check capacity if limited
@@ -452,7 +470,7 @@ class GateScanView(APIView):
                         'gate_name': gate_name,
                         'scan_type': scan_type,
                         'scanned_at': now.isoformat(),
-                        'ticket': EventTicketSerializer(ticket).data
+                        'ticket': EventTicketSerializer(ticket, context={'staff': True}).data
                     }, status=status.HTTP_200_OK)
 
             # Handle Pass-Back / Re-entry vs First Check-in
@@ -490,7 +508,7 @@ class GateScanView(APIView):
                 'gate_name': gate_name,
                 'scan_type': scan_type,
                 'scanned_at': now.isoformat(),
-                'ticket': EventTicketSerializer(ticket).data
+                'ticket': EventTicketSerializer(ticket, context={'staff': True}).data
             }, status=status.HTTP_200_OK)
 
         elif scan_type == GateScanLog.ScanType.GATE_OUT:
@@ -513,7 +531,7 @@ class GateScanView(APIView):
                     'gate_name': gate_name,
                     'scan_type': scan_type,
                     'scanned_at': now.isoformat(),
-                    'ticket': EventTicketSerializer(ticket).data
+                    'ticket': EventTicketSerializer(ticket, context={'staff': True}).data
                 }, status=status.HTTP_200_OK)
 
             ticket.status = EventTicket.Status.CHECKED_OUT
@@ -539,7 +557,7 @@ class GateScanView(APIView):
                 'gate_name': gate_name,
                 'scan_type': scan_type,
                 'scanned_at': now.isoformat(),
-                'ticket': EventTicketSerializer(ticket).data
+                'ticket': EventTicketSerializer(ticket, context={'staff': True}).data
             }, status=status.HTTP_200_OK)
 
         return Response({'error': 'Invalid scan_type'}, status=status.HTTP_400_BAD_REQUEST)
@@ -591,7 +609,7 @@ class EventTicketListView(APIView):
                 models.Q(ticket_number__icontains=search)
             )
 
-        return Response(EventTicketSerializer(tickets, many=True).data)
+        return Response(EventTicketSerializer(tickets, many=True, context={'staff': True}).data)
 
 
 class MyGateAssignmentView(APIView):
@@ -1096,11 +1114,12 @@ class PublicPassView(APIView):
             scope_events(EventTicket.objects.select_related('event', 'order', 'ticket_type'), request, 'event__organizer'),
             qr_token=token,
         )
+        from .sub_events import display_title
         e = ticket.event
         return Response({
             'ticket': EventTicketSerializer(ticket).data,
             'event': {
-                'id': str(e.id), 'title': e.title, 'slug': e.slug, 'location': e.location,
+                'id': str(e.id), 'title': display_title(e), 'slug': e.slug, 'location': e.location,
                 'start_date': e.start_date, 'start_time': e.start_time, 'end_date': e.end_date, 'end_time': e.end_time,
                 'banner': request.build_absolute_uri(e.banner.url) if e.banner else None, 'phase': e.phase(),
             },

@@ -128,6 +128,13 @@ class PublicEvent {
   final String? bannerUrl;
   final String organizerName;
   final String? organizerLogo;
+  final bool organizerVerified;
+
+  /// Main event (title, slug) when this is a sub-event.
+  final (String, String)? parent;
+
+  /// Published sub-events of a main event: (title, slug, date, registration open).
+  final List<SubEventSummary> subEvents;
   final List<PublicTicketType> ticketTypes;
   final bool hasPromoCodes;
   /// Null when unlimited — or when the organizer hides the count
@@ -165,6 +172,9 @@ class PublicEvent {
     this.bannerUrl,
     this.organizerName = '',
     this.organizerLogo,
+    this.organizerVerified = false,
+    this.parent,
+    this.subEvents = const [],
     this.ticketTypes = const [],
     this.hasPromoCodes = false,
     this.spotsLeft,
@@ -192,6 +202,9 @@ class PublicEvent {
       bannerUrl: mediaUrl(_str(j['banner']) ?? j['banner_absolute']),
       organizerName: _str(org?['name']) ?? _str(j['organizer_name']) ?? '',
       organizerLogo: mediaUrl(org?['logo']),
+      organizerVerified: org?['verified'] == true || j['organizer_verified'] == true,
+      parent: j['parent'] is Map ? (j['parent']['title'].toString(), j['parent']['slug'].toString()) : null,
+      subEvents: [for (final s in _maps(j['sub_events'])) SubEventSummary.fromJson(s)],
       ticketTypes: [for (final t in _maps(j['ticket_types'])) PublicTicketType.fromJson(t)],
       hasPromoCodes: j['has_promo_codes'] == true,
       spotsLeft: j['spots_left'] == null ? null : int.tryParse(j['spots_left'].toString()),
@@ -346,4 +359,23 @@ class PromoResult {
   final String label;
   final List<PublicTicketType> ticketTypes;
   const PromoResult({required this.code, required this.label, required this.ticketTypes});
+}
+
+/// One sub-event card on a main event's page (module `sub_events`).
+class SubEventSummary {
+  final String title;
+  final String slug;
+  final String? startDate;
+  final String location;
+  final bool registrationOpen;
+
+  const SubEventSummary({required this.title, required this.slug, this.startDate, this.location = '', this.registrationOpen = false});
+
+  factory SubEventSummary.fromJson(Map<String, dynamic> j) => SubEventSummary(
+        title: _str(j['title']) ?? 'Sub-event',
+        slug: _str(j['slug']) ?? '',
+        startDate: _str(j['start_date']),
+        location: _str(j['location']) ?? '',
+        registrationOpen: j['registration_open'] == true,
+      );
 }

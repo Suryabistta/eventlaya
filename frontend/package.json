@@ -18,6 +18,7 @@
     "framer-motion": "12.42.2",
     "html5-qrcode": "^2.3.8",
     "lucide-react": "^0.468.0",
+    "nepali-date-converter": "3.4.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.0.0",
     "react-chartjs-2": "^5.3.1",

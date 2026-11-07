@@ -1,7 +1,13 @@
-from django.urls import path
+from django.urls import include, path
+from rest_framework.routers import DefaultRouter
 from . import billing_views as billing
 from . import segments
-from . import views
+from . import org_admin, views
+from .catalog import BannerViewSet, CityViewSet
+
+router = DefaultRouter()
+router.register(r'cities', CityViewSet, basename='platform-cities')
+router.register(r'banners', BannerViewSet, basename='platform-banners')
 
 urlpatterns = [
     # White-label
@@ -22,6 +28,8 @@ urlpatterns = [
     path('organizations/<uuid:pk>/', views.OrganizationDetailView.as_view(), name='platform_organization_detail'),
     path('organizations/<uuid:pk>/suspend/', views.OrganizationSuspendView.as_view(), name='platform_organization_suspend'),
     path('organizations/<uuid:pk>/activate/', views.OrganizationActivateView.as_view(), name='platform_organization_activate'),
+    path('organizations/<uuid:pk>/reset-password/', org_admin.OrganizationResetPasswordView.as_view(), name='platform_organization_reset_password'),
+    path('organizations/<uuid:pk>/verify/', org_admin.OrganizationVerifyView.as_view(), name='platform_organization_verify'),
     path('activity/', views.ActivityView.as_view(), name='platform_activity'),
     path('segments/', segments.SegmentsView.as_view(), name='platform_segments'),
     # Billing
@@ -37,4 +45,5 @@ urlpatterns = [
     path('billing/upgrade-requests/<uuid:pk>/approve/', billing.UpgradeRequestReviewView.as_view(decision='approve'), name='platform_billing_upgrade_approve'),
     path('billing/upgrade-requests/<uuid:pk>/decline/', billing.UpgradeRequestReviewView.as_view(decision='decline'), name='platform_billing_upgrade_decline'),
     path('billing/mine/', billing.MyBillingView.as_view(), name='platform_billing_mine'),
+    path('', include(router.urls)),
 ]

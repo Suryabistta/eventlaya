@@ -1,5 +1,6 @@
 import React from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { BS_MONTHS, calendarSystem, toBs } from '@/lib/calendar'
 import type { VenueSpace } from '@/services/api'
 import { addDays, apiWeekday, isoDate, parseIso, SLOT_STATUS, WEEKDAYS, type SlotStatus, type SlotTarget } from '@/lib/availability'
 import { cn } from '@/lib/utils'
@@ -34,7 +35,21 @@ export const shiftMonth = (month: string, n: number) => {
   const [y, m] = month.split('-').map(Number)
   return isoDate(new Date(y, m - 1 + n, 1)).slice(0, 7)
 }
-export const monthLabel = (month: string) => parseIso(`${month}-01`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+/** "November 2026"; with BS on, the BS months it spans: "Kartik – Mangsir 2083". */
+export const monthLabel = (month: string) => {
+  const first = parseIso(`${month}-01`)
+  const ad = first.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+  if (calendarSystem() !== 'bs') return ad
+  const a = toBs(first)
+  const b = toBs(new Date(first.getFullYear(), first.getMonth() + 1, 0))
+  if (!a || !b) return ad
+  return a.year === b.year
+    ? `${BS_MONTHS[a.month]} – ${BS_MONTHS[b.month]} ${b.year}`
+    : `${BS_MONTHS[a.month]} ${a.year} – ${BS_MONTHS[b.month]} ${b.year}`
+}
+
+/** The BS day of the month for an ISO date when BS is on, else null (shown small beside the AD day). */
+export const bsDayOf = (iso: string) => (calendarSystem() === 'bs' ? (toBs(parseIso(iso))?.day ?? null) : null)
 
 export const MonthNav: React.FC<{ month: string; onChange: (m: string) => void; min?: string; className?: string }> = ({ month, onChange, min, className }) => (
   <div className={cn('flex items-center gap-1', className)}>

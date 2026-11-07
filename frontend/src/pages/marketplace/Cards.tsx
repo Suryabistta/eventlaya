@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 import { MapPin, Store, Users } from 'lucide-react'
 import type { Vendor, VenueWithSpaces } from '@/services/api'
 import { Badge, ButtonLink, Card } from '@/components/ui'
-import { Photo, Rating, Verified, formatRs, spaceCountLabel } from './shared'
+import { BusinessLogo, Photo, Rating, Verified, formatRs, spaceCountLabel } from './shared'
+import { mediaUrl } from '@/lib/account'
 
 // The title link stretches over the whole card (after:inset-0); the button sits above it.
 const stretchedLink = 'after:absolute after:inset-0 after:rounded-2xl after:content-[""] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-brand-500'
@@ -13,7 +14,7 @@ export const VenueCard: React.FC<{ venue: VenueWithSpaces; to: string }> = ({ ve
   return (
   <Card className="relative flex flex-col overflow-hidden transition-shadow hover:shadow-md">
     <div className="relative h-48 shrink-0 sm:h-60">
-      <Photo src={venue.images?.[0]} className="h-full w-full" />
+      <Photo src={venue.featured_image || venue.images?.[0]} className="h-full w-full" />
       <div className="absolute left-3 top-3 flex gap-1.5">
         <Badge className="bg-white/95 text-ink-800 shadow-2xs">{venue.venue_type_display || venue.venue_type}</Badge>
         {venue.is_featured && <Badge tone="warning" className="shadow-2xs">Featured</Badge>}
@@ -84,23 +85,29 @@ export const VenueCard: React.FC<{ venue: VenueWithSpaces; to: string }> = ({ ve
 }
 
 export const VendorCard: React.FC<{ vendor: Vendor; to: string }> = ({ vendor, to }) => (
-  <Card className="relative flex flex-col transition-shadow hover:shadow-md">
+  <Card className="relative flex flex-col overflow-hidden transition-shadow hover:shadow-md">
+    {(vendor.featured_image || vendor.portfolio_images?.[0]) && (
+      <Photo src={vendor.featured_image || vendor.portfolio_images[0]} icon={Store} className="h-40 w-full shrink-0" />
+    )}
     <div className="flex flex-1 flex-col gap-3 p-5">
       <div className="flex items-start justify-between gap-3">
         <Badge>{vendor.category_name}</Badge>
         <Rating value={vendor.review_average ?? vendor.rating} count={vendor.review_total || undefined} />
       </div>
-      <div className="min-w-0">
-        <h3 className="text-base font-bold leading-snug text-ink-900">
-          <Link to={to} className={`hover:text-brand-700 ${stretchedLink}`}>
-            {vendor.business_name}
-          </Link>
-          {vendor.is_verified && <Verified label="Verified business" />}
-        </h3>
-        <p className="mt-0.5 flex items-center gap-1 text-sm text-ink-500">
-          <MapPin className="h-4 w-4 shrink-0 text-ink-400" aria-hidden />
-          {vendor.city}
-        </p>
+      <div className="flex min-w-0 items-center gap-3">
+        <BusinessLogo src={mediaUrl(vendor.logo) ?? undefined} />
+        <div className="min-w-0">
+          <h3 className="text-base font-bold leading-snug text-ink-900">
+            <Link to={to} className={`hover:text-brand-700 ${stretchedLink}`}>
+              {vendor.business_name}
+            </Link>
+            {vendor.is_verified && <Verified label="Verified business" />}
+          </h3>
+          <p className="mt-0.5 flex items-center gap-1 text-sm text-ink-500">
+            <MapPin className="h-4 w-4 shrink-0 text-ink-400" aria-hidden />
+            {vendor.city}
+          </p>
+        </div>
       </div>
       <p className="line-clamp-3 text-sm leading-relaxed text-ink-600">{vendor.description}</p>
     </div>

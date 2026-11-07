@@ -882,6 +882,7 @@ class _ResultPanel extends StatelessWidget {
         copy.title,
         if (name != null && name.isNotEmpty) name,
         if (type.hasName) '${type.name} ticket',
+        if (result.seatNumber.isNotEmpty) 'Seat ${result.seatNumber}',
         if (note) type.gateNote,
         if (collect) 'Collect ${type.priceLabel}',
       ].join('. '),
@@ -947,12 +948,16 @@ class _ResultPanel extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: AppType.mono(18, weight: FontWeight.w600, color: fg)),
                       ],
-                      if (type.hasName) ...[
+                      if (type.hasName || result.seatNumber.isNotEmpty) ...[
                         const SizedBox(height: 12),
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
-                          children: [_TypePill(label: type.name.toUpperCase(), onWarning: onWarning)],
+                          children: [
+                            if (type.hasName) _TypePill(label: type.name.toUpperCase(), onWarning: onWarning),
+                            if (result.seatNumber.isNotEmpty)
+                              _TypePill(label: 'SEAT ${result.seatNumber.toUpperCase()}', onWarning: onWarning),
+                          ],
                         ),
                       ],
                       if (collect) ...[

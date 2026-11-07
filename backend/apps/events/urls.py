@@ -1,3 +1,5 @@
+from . import batches
+from .seats import EventSeatsView
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
@@ -24,6 +26,12 @@ urlpatterns = [
     path('public/', PublicEventListView.as_view(), name='public_event_list'),
     path('public/<slug:slug>/', PublicEventDetailView.as_view(), name='public_event_detail'),
     path('passes/<str:token>/', PublicPassView.as_view(), name='public_pass'),
+    path('<uuid:pk>/seats/', EventSeatsView.as_view(), name='event_seats'),
+    path('<uuid:pk>/ticket-batches/', batches.TicketBatchListView.as_view(), name='ticket_batches'),
+    path('<uuid:pk>/ticket-batches/preview/', batches.TicketBatchPreviewView.as_view(), name='ticket_batch_preview'),
+    path('<uuid:pk>/ticket-batches/<uuid:batch_id>/pdf/', batches.TicketBatchPdfView.as_view(), name='ticket_batch_pdf'),
+    path('<uuid:pk>/ticket-batches/<uuid:batch_id>/csv/', batches.TicketBatchCsvView.as_view(), name='ticket_batch_csv'),
+    path('<uuid:pk>/ticket-batches/<uuid:batch_id>/void/', batches.TicketBatchVoidView.as_view(), name='ticket_batch_void'),
     path('public/<slug:slug>/promo/', PublicPromoCheckView.as_view(), name='public_promo_check'),
     path('<uuid:event_id>/ticket-types/', TicketTypeListView.as_view(), name='ticket_types'),
     path('<uuid:event_id>/ticket-types/preset/', TicketPresetView.as_view(), name='ticket_type_preset'),

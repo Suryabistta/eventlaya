@@ -84,6 +84,9 @@ export function useAuth() {
 
 export const isSuperadmin = (user: AuthUser | null) => user?.role === 'superadmin'
 
+/** Where an account with a temporary password is sent to choose its own. */
+const PROFILE_PATH = '/app/profile'
+
 /** Gate for /app and /admin routes. Optionally restrict to roles. */
 export const RequireAuth: React.FC<{ roles?: AuthUser['role'][]; children: React.ReactNode }> = ({ roles, children }) => {
   const { user, status } = useAuth()
@@ -98,6 +101,9 @@ export const RequireAuth: React.FC<{ roles?: AuthUser['role'][]; children: React
   }
   if (status === 'anonymous') {
     return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
+  }
+  if (user?.must_change_password && location.pathname !== PROFILE_PATH) {
+    return <Navigate to={PROFILE_PATH} replace />
   }
   if (roles && user && !roles.includes(user.role)) {
     return <Navigate to="/app" replace />

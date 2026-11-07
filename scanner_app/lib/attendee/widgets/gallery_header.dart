@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../ui/ui.dart';
 import 'attendee_widgets.dart';
+import 'photo_viewer.dart';
 
 /// Collapsing image header with a swipeable gallery and a glass back button.
 class GalleryHeader extends StatefulWidget {
@@ -47,14 +48,17 @@ class _GalleryHeaderState extends State<GalleryHeader> {
       flexibleSpace: FlexibleSpaceBar(
         stretchModes: const [StretchMode.zoomBackground],
         background: Stack(fit: StackFit.expand, children: [
-          if (imgs.length <= 1)
-            NetImage(url: imgs.firstOrNull, icon: widget.icon)
-          else
-            PageView.builder(
-              itemCount: imgs.length,
-              onPageChanged: (i) => setState(() => _page = i),
-              itemBuilder: (_, i) => NetImage(url: imgs[i], icon: widget.icon),
-            ),
+          // Tap a photo to see it full screen
+          GestureDetector(
+            onTap: imgs.isEmpty ? null : () => openPhotoViewer(context, imgs, initial: _page),
+            child: imgs.length <= 1
+                ? NetImage(url: imgs.firstOrNull, icon: widget.icon)
+                : PageView.builder(
+                    itemCount: imgs.length,
+                    onPageChanged: (i) => setState(() => _page = i),
+                    itemBuilder: (_, i) => NetImage(url: imgs[i], icon: widget.icon),
+                  ),
+          ),
           const IgnorePointer(
             child: DecoratedBox(
               decoration: BoxDecoration(

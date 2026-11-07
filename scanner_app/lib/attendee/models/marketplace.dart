@@ -15,6 +15,12 @@ List<String> _strings(Object? v) => [
 
 List<String> _images(Object? v) => [for (final s in _strings(v)) if (mediaUrl(s) != null) mediaUrl(s)!];
 
+/// The cover photo (`featured_image`) first, then the other photos without repeating it.
+List<String> _withCover(Object? cover, List<String> images) {
+  final c = mediaUrl(cover?.toString().trim().isEmpty ?? true ? null : cover.toString());
+  return c == null ? images : [c, ...images.where((i) => i != c)];
+}
+
 int? _int(Object? v) => v == null ? null : int.tryParse(v.toString());
 
 class VendorCategory {
@@ -85,7 +91,7 @@ class Vendor {
         email: _s(j['email']) ?? '',
         description: _s(j['description']) ?? '',
         startingPrice: parseMoney(j['starting_price']),
-        images: _images(j['portfolio_images']),
+        images: _withCover(j['featured_image'], _images(j['portfolio_images'])),
         isVerified: j['is_verified'] == true,
         isFeatured: j['is_featured'] == true,
         rating: j['rating'] == null ? null : parseMoney(j['rating']),
@@ -196,7 +202,7 @@ class Venue {
         capacityMax: _int(j['capacity_max']) ?? 0,
         priceFrom: parseMoney(j['price_from'] ?? j['price_per_day']),
         amenities: _strings(j['amenities']),
-        images: _images(j['images']),
+        images: _withCover(j['featured_image'], _images(j['images'])),
         contactPerson: _s(j['contact_person']) ?? '',
         contactPhone: _s(j['contact_phone']) ?? '',
         contactEmail: _s(j['contact_email']) ?? '',
@@ -228,4 +234,39 @@ class Venue {
     'open_ground': 'Open ground',
     'community': 'Community center',
   };
+}
+
+
+/// A priced package a vendor or venue offers (module `packages`).
+class ServicePackage {
+  final String id;
+  final String name;
+  final double price;
+  final String priceUnitLabel;
+  final String description;
+  final List<String> inclusions;
+  final int? maxGuests;
+  final String? imageUrl;
+
+  const ServicePackage({
+    required this.id,
+    required this.name,
+    required this.price,
+    this.priceUnitLabel = '',
+    this.description = '',
+    this.inclusions = const [],
+    this.maxGuests,
+    this.imageUrl,
+  });
+
+  factory ServicePackage.fromJson(Map<String, dynamic> j) => ServicePackage(
+        id: j['id']?.toString() ?? '',
+        name: _s(j['name']) ?? 'Package',
+        price: parseMoney(j['price']),
+        priceUnitLabel: _s(j['price_unit_display']) ?? '',
+        description: _s(j['description']) ?? '',
+        inclusions: _strings(j['inclusions']),
+        maxGuests: _int(j['max_guests']),
+        imageUrl: mediaUrl(_s(j['image'])),
+      );
 }
