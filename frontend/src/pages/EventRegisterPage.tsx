@@ -817,6 +817,7 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
                         onEdit={(id) => goTo(steps.indexOf(id))}
                         onConsent={(k, v) => setAnswer(k, v)}
                         organizer={event.organizer_info?.name || event.organizer_name || 'the organizer'}
+                        eventTermsHref={event.terms ? `/e/${event.slug}#terms` : undefined}
                       />
                     )}
                   </div>
@@ -1002,7 +1003,9 @@ const Review: React.FC<{
   onConsent: (key: string, v: boolean) => void
   /** Who receives the registration (shown in the agreement line) */
   organizer: string
-}> = ({ totalLabel, payment, pricing, slots, draft, questions, consents, errors, serverError, onEdit, onConsent, organizer }) => {
+  /** The event's own terms & conditions, when the organizer wrote some */
+  eventTermsHref?: string
+}> = ({ totalLabel, payment, pricing, slots, draft, questions, consents, errors, serverError, onEdit, onConsent, organizer, eventTermsHref }) => {
   const paid = pricing.total > 0
   const buyer = draft.name.trim()
   return (
@@ -1076,6 +1079,14 @@ const Review: React.FC<{
       })}
       <p className="text-xs leading-relaxed text-ink-500">
         By registering you agree to the{' '}
+        {eventTermsHref && (
+          <>
+            <a href={eventTermsHref} target="_blank" rel="noreferrer" className="font-medium text-ink-700 underline underline-offset-2 hover:text-ink-900">
+              event’s terms & conditions
+            </a>
+            , the Eventlaya{' '}
+          </>
+        )}
         <LegalLink path={LEGAL_PATHS.terms} newTab className="font-medium text-ink-700 underline underline-offset-2 hover:text-ink-900">
           Terms
         </LegalLink>{' '}

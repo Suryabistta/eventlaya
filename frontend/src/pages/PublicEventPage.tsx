@@ -22,7 +22,7 @@ import {
   Users,
 } from 'lucide-react'
 import { VerifiedBadge } from '@/components/VerifiedBadge'
-import { Badge, Button, ButtonLink, Card, EmptyState, ErrorState, Skeleton, useToast } from '@/components/ui'
+import { Badge, Button, ButtonLink, Card, CardHeader, EmptyState, ErrorState, Skeleton, useToast } from '@/components/ui'
 import {
   categoryLabel,
   downloadIcs,
@@ -121,7 +121,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
 
   const sections = useMemo(() => {
     const s: SectionId[] = []
-    if (event.description || event.highlights?.length) s.push('about')
+    if (event.description || event.highlights?.length || event.terms) s.push('about')
     if (event.sub_events?.length) s.push('sessions')
     const tt = event.ticket_types ?? []
     if (tt.length > 1 || tt.some((t) => Number(t.price) > 0 || t.remaining !== null || t.description)) s.push('tickets')
@@ -247,18 +247,23 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
         <div className="min-w-0 space-y-14">
           {sections.includes('about') && (
             <Section id="about" title="About this event">
-              {event.description && <p className="whitespace-pre-line text-base leading-relaxed text-ink-700">{event.description}</p>}
+              {event.terms ? (
+                <AboutTabs description={event.description} terms={event.terms} />
+              ) : (
+                event.description && <p className="whitespace-pre-line text-base leading-relaxed text-ink-700">{event.description}</p>
+              )}
               {event.highlights?.length > 0 && (
-                <ul className="mt-5 grid gap-3 sm:grid-cols-2">
-                  {event.highlights.map((h) => (
-                    <li key={h} className="flex items-start gap-3 rounded-xl border border-ink-200 bg-white p-4 text-sm text-ink-800">
-                      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
-                        <Check className="h-3.5 w-3.5" aria-hidden />
-                      </span>
-                      {h}
-                    </li>
-                  ))}
-                </ul>
+                <Card className="mt-5">
+                  <CardHeader title="Highlights" />
+                  <ul className="grid gap-x-6 gap-y-2.5 p-5 sm:grid-cols-2">
+                    {event.highlights.map((h) => (
+                      <li key={h} className="flex items-start gap-2.5 text-sm text-ink-700">
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" aria-hidden />
+                        {h}
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
               )}
             </Section>
           )}
@@ -918,5 +923,58 @@ const RegistrationCard: React.FC<{ event: PublicEvent; state: ReturnType<typeof 
         state.open && <p className="mt-3 text-center text-xs text-ink-500">Takes about a minute. Your QR pass appears right away.</p>
       )}
     </Card>
+  )
+}
+
+/** One term per line; numbering the organizer typed ("1.", "2)", "-") is dropped because the list numbers them. */
+const termLines = (terms: string) =>
+  terms
+    .split('\n')
+    .map((l) => l.replace(/^\s*(\d+[.)]|[-*•])\s*/, '').trim())
+    .filter(Boolean)
+
+/** About: Description and the event's own Terms and Conditions as tabs. */
+const AboutTabs: React.FC<{ description: string; terms: string }> = ({ description, terms }) => {
+  const [tab, setTab] = useState<'description' | 'terms'>(description ? 'description' : 'terms')
+  const id = useId()
+  const tabs = [
+    ...(description ? [{ key: 'description' as const, label: 'Description' }] : []),
+    { key: 'terms' as const, label: 'Terms and Conditions' },
+  ]
+  return (
+    <div>
+      <div role="tablist" className="flex gap-1 border-b border-ink-200">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            id={`${id}-${t.key}`}
+            aria-selected={tab === t.key}
+            aria-controls={`${id}-${t.key}-panel`}
+            onClick={() => setTab(t.key)}
+            className={cn(
+              '-mb-px border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors',
+              tab === t.key ? 'border-brand-600 text-brand-700' : 'border-transparent text-ink-500 hover:text-ink-800',
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <div role="tabpanel" id={`${id}-${tab}-panel`} aria-labelledby={`${id}-${tab}`} className="pt-5">
+        {tab === 'description' ? (
+          <p className="whitespace-pre-line text-base leading-relaxed text-ink-700">{description}</p>
+        ) : (
+          <ol className="list-decimal space-y-2 pl-5 text-base leading-relaxed text-ink-700 marker:text-ink-500">
+            {termLines(terms).map((line, i) => (
+              <li key={i} className="pl-1">
+                {line}
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+    </div>
   )
 }

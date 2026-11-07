@@ -89,6 +89,7 @@ interface PageDraft {
   agenda: AgendaRow[]
   speakers: SpeakerRow[]
   faqs: FaqRow[]
+  terms: string
 }
 
 type Errors = Record<string, string>
@@ -121,7 +122,7 @@ const emptyDraft: EventDraft = {
   is_paid: false,
   ticket_price: '',
 }
-const emptyPage: PageDraft = { highlights: [], contact_email: '', contact_phone: '', agenda: [], speakers: [], faqs: [] }
+const emptyPage: PageDraft = { highlights: [], contact_email: '', contact_phone: '', agenda: [], speakers: [], faqs: [], terms: '' }
 
 const fieldNames: Record<string, string> = {
   title: 'Event name',
@@ -189,6 +190,7 @@ function pageFromContent(p?: EventPageContent): PageDraft {
     highlights: (p.highlights ?? []).map((text) => ({ key: newKey(), text })),
     contact_email: p.contact_email ?? '',
     contact_phone: p.contact_phone ?? '',
+    terms: p.terms ?? '',
     agenda: (p.agenda ?? []).map((a) => ({
       key: a.id ?? newKey(),
       day: a.day ?? '',
@@ -223,7 +225,7 @@ const STEPS: { id: StepId; label: string; description: string; required?: boolea
   { id: 'page', label: 'Event page', description: 'Highlights and contact details for attendees. Optional.' },
   { id: 'schedule', label: 'Schedule', description: 'The running order. Shown as a timeline, by day. Optional.' },
   { id: 'speakers', label: 'Speakers', description: 'Speakers, performers or guests. Optional.' },
-  { id: 'faqs', label: 'FAQs', description: 'Answer common questions before people ask. Optional.' },
+  { id: 'faqs', label: 'FAQs & terms', description: 'Common questions, and the terms & conditions attendees agree to. Optional.' },
   { id: 'review', label: 'Review & publish', description: 'Check everything, then save.' },
 ]
 const REQUIRED: StepId[] = ['basics', 'when', 'registration']
@@ -492,6 +494,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
           highlights: content.highlights.map((h) => h.text.trim()).filter(Boolean),
           contact_email: content.contact_email.trim(),
           contact_phone: content.contact_phone.trim(),
+          terms: content.terms.trim(),
           agenda: content.agenda.map((a) => ({
             day: a.day || null,
             start_time: a.start_time,
@@ -1003,6 +1006,18 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                     )}
                   />
                 )}
+                {step.id === 'faqs' && (
+                  <Textarea
+                    label="Terms & conditions"
+                    rows={6}
+                    maxLength={10000}
+                    className="mt-6"
+                    placeholder="Refund policy, entry rules, age limits, photography consent…"
+                    hint="Optional. One term per line; shown as a numbered list in the Terms and Conditions tab of the event page."
+                    value={content.terms}
+                    onChange={(e) => setPage('terms', e.target.value)}
+                  />
+                )}
 
                 {step.id === 'review' && <Review draft={draft} content={content} event={event} onEdit={(id) => goTo(STEPS.findIndex((s) => s.id === id))} />}
               </div>
@@ -1068,7 +1083,7 @@ function hasContent(id: StepId, d: EventDraft, p: PageDraft) {
   if (id === 'page') return p.highlights.length > 0 || Boolean(p.contact_email || p.contact_phone)
   if (id === 'schedule') return p.agenda.length > 0
   if (id === 'speakers') return p.speakers.length > 0
-  if (id === 'faqs') return p.faqs.length > 0
+  if (id === 'faqs') return p.faqs.length > 0 || Boolean(p.terms.trim())
   return Boolean(d)
 }
 
@@ -1199,7 +1214,7 @@ const Review: React.FC<{ draft: EventDraft; content: PageDraft; event?: Event; o
     },
     { id: 'schedule', rows: [['Schedule', content.agenda.length ? `${content.agenda.length} items` : 'Not added']] },
     { id: 'speakers', rows: [['Speakers', content.speakers.length ? content.speakers.map((s) => s.name || 'Unnamed').join(', ') : 'Not added']] },
-    { id: 'faqs', rows: [['FAQs', content.faqs.length ? `${content.faqs.length} questions` : 'Not added']] },
+    { id: 'faqs', rows: [['FAQs', content.faqs.length ? `${content.faqs.length} questions` : 'Not added'], ['Terms & conditions', content.terms.trim() ? 'Added' : 'Not added']] },
   ]
   return (
     <div className="space-y-4">

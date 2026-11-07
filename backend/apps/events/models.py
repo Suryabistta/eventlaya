@@ -69,6 +69,7 @@ class Event(models.Model):
     contact_email = models.EmailField(blank=True)
     contact_phone = models.CharField(max_length=30, blank=True)
     map_query = models.CharField(max_length=255, blank=True, help_text='Overrides the location for the map embed')
+    terms = models.TextField(blank=True, max_length=10000, help_text='Terms & conditions shown on the event page and agreed to at registration')
     # "Managed by" line next to the organizer's name (e.g. the event agency running it); shown only when switched on
     managed_by = models.CharField(max_length=120, blank=True)
     managed_by_logo = models.CharField(max_length=500, blank=True, help_text='Image URL from /api/uploads/')

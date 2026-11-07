@@ -52,6 +52,7 @@ export interface EventPageContent {
   contact_email: string
   contact_phone: string
   map_query: string
+  terms?: string
   agenda: AgendaItem[]
   speakers: Speaker[]
   faqs: Faq[]
