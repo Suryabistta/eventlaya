@@ -153,13 +153,13 @@ export function registrationState(e: PublicEvent): { open: boolean; reason?: str
     if (e.registration_open) return { open: true, phase }
     const reason = e.registration_closed_reason || 'Registration is closed.'
     const full = /full|capacity|sold out|spots/i.test(reason)
-    return { open: false, phase, label: full ? 'Fully booked' : 'Registration closed', reason }
+    return { open: false, phase, label: full ? 'Fully booked' : 'Bookings closed', reason }
   }
   // Older API without registration_open: guess from the event fields
   if (phase === 'draft') return { open: false, phase, label: 'Not published', reason: 'The organizer hasn’t published this event yet.' }
-  if (!e.allow_registration) return { open: false, phase, label: 'Registration closed', reason: 'The organizer has closed registration.' }
+  if (!e.allow_registration) return { open: false, phase, label: 'Bookings closed', reason: 'The organizer has closed registration.' }
   if (e.registration_deadline && new Date(e.registration_deadline) < new Date())
-    return { open: false, phase, label: 'Registration closed', reason: 'The registration deadline has passed.' }
+    return { open: false, phase, label: 'Bookings closed', reason: 'The registration deadline has passed.' }
   if (e.capacity > 0 && (e.spots_left ?? e.capacity - e.registered_count) <= 0) return { open: false, phase, label: 'Fully booked', reason: 'Every spot has been taken.' }
   return { open: true, phase }
 }
@@ -297,3 +297,6 @@ export interface PublicPass {
 
 /** Public: one pass by its QR token (the link in the confirmation email). */
 export const getPublicPass = (token: string) => request<PublicPass>(`/events/passes/${encodeURIComponent(token)}/`)
+
+/** Call to action on an event: "Get tickets" when any ticket costs money, otherwise "Book a spot". */
+export const bookLabel = (e: Pick<Event, 'is_paid' | 'ticket_price' | 'ticket_types'>) => (hasPaidTickets(e) ? 'Get tickets' : 'Book a spot')

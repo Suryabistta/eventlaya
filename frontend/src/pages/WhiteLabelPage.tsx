@@ -393,7 +393,7 @@ const Preview: React.FC<{ branding: TenantBranding; host: string; secure: boolea
             <span className="truncate text-sm font-bold text-ink-900">{branding.brand_name || 'Your organization'}</span>
           </div>
           <span className="shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold text-white" style={{ backgroundColor: primary }}>
-            Register
+            Get tickets
           </span>
         </div>
 

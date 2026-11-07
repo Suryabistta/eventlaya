@@ -122,7 +122,7 @@ class EventDetailScreen extends ConsumerWidget {
                               subtitle: [
                                 if (s.startDate != null) Fmt.date(s.startDate),
                                 if (s.location.isNotEmpty) s.location,
-                                s.registrationOpen ? 'Registration open' : 'Registration closed',
+                                s.registrationOpen ? 'Bookings open' : 'Bookings closed',
                               ].join(' · '),
                               chevron: true,
                               onTap: () => Navigator.of(context).push(
@@ -629,7 +629,7 @@ class _RegisterBar extends StatelessWidget {
         const Icon(Icons.info_outline_rounded, color: AppColors.ink500, size: 20),
         const SizedBox(width: 8),
         Expanded(
-          child: Text(event.registrationClosedReason ?? 'Registration is closed.',
+          child: Text(event.registrationClosedReason ?? 'Bookings are closed.',
               style: AppType.body(14, weight: FontWeight.w500, color: AppColors.ink700)),
         ),
       ]);
@@ -644,7 +644,7 @@ class _RegisterBar extends StatelessWidget {
           ]),
         ),
         PrimaryButton(
-          label: soldOut ? 'Full' : 'Register',
+          label: soldOut ? 'Full' : (event.priceSummary == 'Free' ? 'Book a spot' : 'Get tickets'),
           expand: false,
           loading: detail == null && loading,
           onPressed: detail == null || soldOut

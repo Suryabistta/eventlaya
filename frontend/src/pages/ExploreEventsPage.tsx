@@ -10,7 +10,7 @@ import { api, type Event } from '@/services/api'
 import { buttonClass } from '@/components/ui/Button'
 import { Badge, EmptyState, ErrorState, Skeleton } from '@/components/ui'
 import { eventPhase } from '@/lib/phase'
-import { spotsInfo } from '@/lib/event-page'
+import { bookLabel, spotsInfo } from '@/lib/event-page'
 import { cn } from '@/lib/utils'
 
 type PublicEvent = Event & { organizer_name?: string }
@@ -216,7 +216,7 @@ export const EventCard: React.FC<{ event: PublicEvent; past: boolean }> = ({ eve
             Fully booked
           </p>
         )}
-        {capacity !== null && !over && (
+        {capacity !== null && open && (
           <div className="mt-3 flex items-center gap-3">
             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-ink-100" aria-hidden>
               <div className={cn('h-full rounded-full', pct >= 90 ? 'bg-red-500' : 'bg-emerald-500')} style={{ width: `${Math.max(pct, 2)}%` }} />
@@ -231,11 +231,11 @@ export const EventCard: React.FC<{ event: PublicEvent; past: boolean }> = ({ eve
         <div className="relative z-[1] mt-auto pt-5">
           {open ? (
             <Link to={`/e/${e.slug}`} className={buttonClass('primary', 'md', 'w-full')}>
-              Register
+              {bookLabel(e)}
             </Link>
           ) : (
             <span className="inline-flex h-10 w-full items-center justify-center rounded-[10px] bg-ink-100 px-4 text-sm font-semibold text-ink-600">
-              {phase === 'cancelled' ? 'Cancelled' : over ? 'Ended' : full ? 'Fully booked' : 'Registration closed'}
+              {phase === 'cancelled' ? 'Cancelled' : over ? 'Ended' : full ? 'Fully booked' : 'Bookings closed'}
             </span>
           )}
         </div>

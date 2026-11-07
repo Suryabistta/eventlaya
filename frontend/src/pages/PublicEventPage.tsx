@@ -42,6 +42,7 @@ import {
   type AgendaItem,
   type PublicEvent,
   type Speaker,
+  bookLabel,
 } from '@/lib/event-page'
 import { paymentNote, type PaymentOptions } from '@/lib/payments'
 import { availabilityText, fmtShortDate, money, priceText, type PublicTicketType } from '@/lib/tickets'
@@ -279,10 +280,10 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
                     <div className="mt-auto pt-1">
                       {s.registration_open ? (
                         <ButtonLink to={`/e/${s.slug}/register`} size="sm">
-                          Register
+                          Book a spot
                         </ButtonLink>
                       ) : (
-                        <Badge tone="neutral">{s.allow_registration ? (s.registration_closed_reason ?? 'Registration closed') : 'No registration needed'}</Badge>
+                        <Badge tone="neutral">{s.allow_registration ? (s.registration_closed_reason ?? 'Bookings closed') : 'No registration needed'}</Badge>
                       )}
                     </div>
                   </li>
@@ -359,7 +360,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
             <p className="font-display text-lg font-bold leading-tight text-ink-900">{price}</p>
             <p className="truncate text-xs text-ink-500">{state.open ? spotsText(event) : state.reason}</p>
           </div>
-          <CtaButtons state={state} hasPass={Boolean(storedPass)} registerHref={registerHref} slug={event.slug} compact />
+          <CtaButtons label={bookLabel(event)} state={state} hasPass={Boolean(storedPass)} registerHref={registerHref} slug={event.slug} compact />
         </div>
       </div>
       )}
@@ -828,12 +829,13 @@ function useCountdown(iso?: string | null) {
   return d > 0 ? `${d} ${d === 1 ? 'day' : 'days'} ${h} h` : h > 0 ? `${h} h ${m} min` : `${m} min`
 }
 
-const CtaButtons: React.FC<{ state: ReturnType<typeof registrationState>; hasPass: boolean; registerHref: string; slug: string; compact?: boolean }> = ({
+const CtaButtons: React.FC<{ label: string; state: ReturnType<typeof registrationState>; hasPass: boolean; registerHref: string; slug: string; compact?: boolean }> = ({
   state,
   hasPass,
   registerHref,
   slug,
   compact,
+  label,
 }) => {
   if (hasPass) {
     return (
@@ -851,7 +853,7 @@ const CtaButtons: React.FC<{ state: ReturnType<typeof registrationState>; hasPas
   }
   return (
     <ButtonLink to={registerHref} size={compact ? 'md' : 'lg'} className={compact ? 'px-6' : 'w-full'}>
-      Register
+      {label}
     </ButtonLink>
   )
 }
@@ -872,7 +874,7 @@ const RegistrationCard: React.FC<{ event: PublicEvent; state: ReturnType<typeof 
         <p className="mt-2 text-sm text-ink-600">{state.reason}</p>
         {hasPass && (
           <div className="mt-4">
-            <CtaButtons state={state} hasPass registerHref={registerHref} slug={event.slug} />
+            <CtaButtons label={bookLabel(event)} state={state} hasPass registerHref={registerHref} slug={event.slug} />
           </div>
         )}
         <Link to="/events" className="mt-4 inline-block text-sm font-medium text-brand-700 hover:underline">
@@ -896,7 +898,7 @@ const RegistrationCard: React.FC<{ event: PublicEvent; state: ReturnType<typeof 
         </p>
       )}
       <div className="mt-5">
-        <CtaButtons state={state} hasPass={hasPass} registerHref={registerHref} slug={event.slug} />
+        <CtaButtons label={bookLabel(event)} state={state} hasPass={hasPass} registerHref={registerHref} slug={event.slug} />
       </div>
       {!state.open && !hasPass && (
         <p id="reg-closed-reason" className="mt-2 text-sm text-ink-500">
