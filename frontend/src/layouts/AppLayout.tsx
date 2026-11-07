@@ -39,6 +39,7 @@ import {
   Receipt,
   MapPin,
   GalleryHorizontal,
+  Image as ImageIcon,
   Printer,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
@@ -204,6 +205,7 @@ function buildNav(user: ShellUser | null, pending: PendingApprovals = noPending,
           { label: 'Modules & permissions', to: '/admin/modules', icon: SlidersHorizontal },
           { label: 'Cities & categories', to: '/admin/catalog', icon: MapPin },
           { label: 'Banners', to: '/admin/banners', icon: GalleryHorizontal },
+          { label: 'Site logo', to: '/admin/site-logo', icon: ImageIcon },
           { label: 'Activity', to: '/admin/activity', icon: Activity },
           { label: 'Blog', to: '/admin/blog', icon: Newspaper },
           { label: 'Analytics', to: '/admin/analytics', icon: LineChart },

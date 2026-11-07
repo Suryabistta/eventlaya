@@ -119,3 +119,17 @@ class ManagedByTests(PlatformTestBase):
         self.assertTrue(r.data['show_managed_by'])
         r = self.client.patch(f'/api/events/{ev.id}/', {'managed_by_logo': 'javascript:x'}, format='json')
         self.assertEqual(r.status_code, 400)
+
+
+class SiteBrandingTests(PlatformTestBase):
+    URL = '/api/platform/site-branding/'
+
+    def test_public_read_superadmin_write(self):
+        self.assertEqual(self.client.get(self.URL).data['logo'], '')
+        self.as_(self.org)
+        self.assertEqual(self.client.patch(self.URL, {'logo': '/media/x.png'}, format='json').status_code, status.HTTP_403_FORBIDDEN)
+        self.as_(self.admin)
+        self.assertEqual(self.client.patch(self.URL, {'logo': 'javascript:alert(1)'}, format='json').status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.client.patch(self.URL, {'logo': '/media/x.png'}, format='json').data['logo'], '/media/x.png')
+        self.client.force_authenticate(None)
+        self.assertEqual(self.client.get(self.URL).data['logo'], '/media/x.png')

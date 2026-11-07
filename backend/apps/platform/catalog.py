@@ -2,8 +2,10 @@
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import permissions, serializers, viewsets
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from .models import Banner, City
+from .models import Banner, City, SiteBranding
 from .views import IsSuperadmin
 
 
@@ -87,3 +89,31 @@ class BannerViewSet(viewsets.ModelViewSet):
         return qs.filter(is_active=True).filter(Q(starts_at__isnull=True) | Q(starts_at__lte=now)).filter(
             Q(ends_at__isnull=True) | Q(ends_at__gt=now)
         )
+
+
+class SiteBrandingSerializer(serializers.ModelSerializer):
+    def validate_logo(self, value):
+        return safe_url(value, 'Logo')
+
+    def validate_logo_white(self, value):
+        return safe_url(value, 'Logo')
+
+    class Meta:
+        model = SiteBranding
+        fields = ['logo', 'logo_white', 'updated_at']
+        read_only_fields = ['updated_at']
+
+
+class SiteBrandingView(APIView):
+    """GET (public) / PATCH (superadmin) /api/platform/site-branding/: the site logo."""
+
+    permission_classes = [ReadPublicWriteSuperadmin]
+
+    def get(self, request):
+        return Response(SiteBrandingSerializer(SiteBranding.load()).data)
+
+    def patch(self, request):
+        s = SiteBrandingSerializer(SiteBranding.load(), data=request.data, partial=True)
+        s.is_valid(raise_exception=True)
+        s.save()
+        return Response(s.data)

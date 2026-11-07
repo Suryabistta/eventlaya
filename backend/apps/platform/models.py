@@ -248,3 +248,18 @@ class Banner(models.Model):
 
     def __str__(self):
         return self.title or self.image
+
+
+class SiteBranding(models.Model):
+    """Eventlaya's own logo on the landing pages and the app (one row, superadmin edits it). Blank = the built-in logo."""
+
+    logo = models.CharField(max_length=500, blank=True, help_text='Image URL from /api/uploads/ (wide, transparent PNG works best)')
+    logo_white = models.CharField(max_length=500, blank=True, help_text='Optional light version for dark backgrounds')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = 'Site branding'
+
+    @classmethod
+    def load(cls):
+        return cls.objects.get_or_create(pk=1)[0]
