@@ -34,18 +34,12 @@ export const ExploreEventsPage: React.FC = () => {
   })
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pb-24 pt-12 sm:px-6 sm:pt-16">
-      <div className="max-w-2xl">
-        <h1 className="font-display text-4xl font-extrabold tracking-[-0.03em] text-ink-900 sm:text-5xl">
-          Events in Eastern Nepal
-        </h1>
-        <p className="mt-3 text-lg text-ink-600">
-          Fests, hackathons, concerts and conferences run on Eventlaya. Register in a minute and get your pass straight away.
-        </p>
-      </div>
+    <div className="mx-auto max-w-6xl px-4 pb-24 pt-8 sm:px-6 sm:pt-10">
+      {/* No intro text on the page; the heading stays for screen readers and search engines */}
+      <h1 className="sr-only">Events in Eastern Nepal</h1>
 
       {/* Filters */}
-      <div className="mt-10 flex flex-col gap-4 border-b border-ink-200 pb-5 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-4 border-b border-ink-200 pb-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div role="radiogroup" aria-label="Show" className="inline-flex shrink-0 self-start rounded-[10px] bg-ink-100 p-1">
             {(['upcoming', 'past'] as const).map((w) => (
