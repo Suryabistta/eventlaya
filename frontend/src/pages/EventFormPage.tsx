@@ -405,6 +405,10 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
   const canReach = (i: number) => isEdit || i <= maxReached || (requiredValid && maxReached >= 2)
   const stepIdx = canReach(requestedIdx) ? requestedIdx : Math.min(requestedIdx, maxReached)
   const step = STEPS[stepIdx]
+  // The Speakers step takes the section title the organizer picked (Performers, Line-up, ...)
+  const peoplePlural = content.speakers_label.trim() || 'Speakers'
+  const personSingular = singularOf(peoplePlural)
+  const stepLabel = (s: (typeof STEPS)[number]) => (s.id === 'speakers' ? peoplePlural : s.label)
 
   useEffect(() => {
     if (stepParam !== step.id) setParams((p) => (p.set('step', step.id), p), { replace: true })
@@ -653,7 +657,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
       {/* Phones and tablets: compact progress + scrollable step list */}
       <div className="space-y-3 lg:hidden">
         <p className="flex items-baseline justify-between text-sm">
-          <span className="font-semibold text-ink-900">{step.label}</span>
+          <span className="font-semibold text-ink-900">{stepLabel(step)}</span>
           <span className="text-ink-500">
             Step {stepIdx + 1} of {STEPS.length}
           </span>
@@ -688,7 +692,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                 ) : (
                   <span className="tabular text-ink-400">{i + 1}</span>
                 )}
-                {s.label}
+                {stepLabel(s)}
               </button>
             </li>
           ))}
@@ -724,7 +728,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                         {errs ? <AlertCircle className="h-3.5 w-3.5" aria-hidden /> : done ? <Check className="h-3.5 w-3.5" aria-hidden /> : i + 1}
                       </span>
                       <span className="min-w-0 flex-1">
-                        {s.label}
+                        {stepLabel(s)}
                         {!s.required && s.id !== 'review' && <span className="block text-xs font-normal text-ink-500">Optional</span>}
                       </span>
                       {errs > 0 && <span className="sr-only">{errs} problems</span>}
@@ -750,7 +754,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
             <section aria-labelledby="step-heading">
               <div className="border-b border-ink-100 px-5 py-4 sm:px-6">
                 <h2 id="step-heading" ref={headingRef} tabIndex={-1} className="text-lg font-bold text-ink-900 outline-none focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0">
-                  {step.label}
+                  {stepLabel(step)}
                 </h2>
                 <p className="mt-0.5 text-sm text-ink-500">{step.description}</p>
               </div>
@@ -1023,11 +1027,11 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                 {step.id === 'speakers' && (
                   <RepeatList
                     items={content.speakers}
-                    empty="No speakers yet. Add speakers, performers or chief guests."
-                    addLabel="Add speaker"
+                    empty={`No ${peoplePlural.toLowerCase()} yet. Add them here; this section is called “${peoplePlural}” on the event page.`}
+                    addLabel={`Add ${personSingular.toLowerCase()}`}
                     onAdd={() => setPage('speakers', [...content.speakers, { key: newKey(), name: '', role: '', organization: '', photo_url: null, bio: '' }])}
                     onChange={(items) => setPage('speakers', items)}
-                    title={(s, i) => s.name.trim() || `Speaker ${i + 1}`}
+                    title={(s, i) => s.name.trim() || `${personSingular} ${i + 1}`}
                     render={(s, update) => (
                       <div className="grid gap-4 xl:grid-cols-[200px_minmax(0,1fr)]">
                         <ImageUpload label="Photo" kind="avatar" shape="square" value={s.photo_url} onChange={(url) => update({ photo_url: url })} hint="Optional. Square works best." />
@@ -1541,4 +1545,11 @@ const CreditLabel: React.FC<{ value: string; onChange: (v: string) => void }> = 
       )}
     </div>
   )
+}
+
+/** "Performers" → "Performer"; titles without a plain plural (Line-up, Chief guest panel) → "Person". */
+const SINGULAR: Record<string, string> = { 'Line-up': 'Act' }
+function singularOf(plural: string) {
+  if (SINGULAR[plural]) return SINGULAR[plural]
+  return /[^s]s$/i.test(plural) ? plural.slice(0, -1) : 'Person'
 }
