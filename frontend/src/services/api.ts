@@ -10,6 +10,8 @@ export interface Event {
   /** Event type slug and its display name ('' for none/other) */
   category?: string
   category_name?: string
+  /** Picked by the superadmin: listed first, with a badge */
+  is_featured?: boolean
   title: string
   slug: string
   description: string

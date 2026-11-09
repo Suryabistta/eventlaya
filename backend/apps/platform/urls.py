@@ -2,7 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 from . import billing_views as billing
 from . import segments
-from . import org_admin, views
+from . import featured_events, org_admin, views
 from .catalog import BannerViewSet, CityViewSet, EventCategoryViewSet, SiteBrandingView
 
 router = DefaultRouter()
@@ -32,6 +32,8 @@ urlpatterns = [
     path('organizations/<uuid:pk>/reset-password/', org_admin.OrganizationResetPasswordView.as_view(), name='platform_organization_reset_password'),
     path('organizations/<uuid:pk>/verify/', org_admin.OrganizationVerifyView.as_view(), name='platform_organization_verify'),
     path('site-branding/', SiteBrandingView.as_view(), name='platform_site_branding'),
+    path('events/', featured_events.FeaturedEventListView.as_view(), name='platform_events'),
+    path('events/<uuid:pk>/feature/', featured_events.FeatureEventView.as_view(), name='platform_event_feature'),
     path('activity/', views.ActivityView.as_view(), name='platform_activity'),
     path('segments/', segments.SegmentsView.as_view(), name='platform_segments'),
     # Billing

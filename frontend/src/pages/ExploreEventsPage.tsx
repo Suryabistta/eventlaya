@@ -192,6 +192,11 @@ export const EventCard: React.FC<{ event: PublicEvent; past: boolean }> = ({ eve
           />
         )}
         <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
+          {e.is_featured && !over && (
+            <Badge tone="warning" className="shadow-2xs">
+              Featured
+            </Badge>
+          )}
           {phase === 'live' && (
             <Badge tone="success" dot>
               Happening now

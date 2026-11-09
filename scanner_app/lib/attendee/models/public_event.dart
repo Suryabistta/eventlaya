@@ -133,6 +133,9 @@ class PublicEvent {
   final String? tagline;
   final String? category;
 
+  /// Picked by the superadmin: listed first on Explore, with a badge.
+  final bool isFeatured;
+
   /// Server display name of [category] ('' for none/other).
   final String? categoryName;
 
@@ -186,6 +189,7 @@ class PublicEvent {
     this.tagline,
     this.category,
     this.categoryName,
+    this.isFeatured = false,
     this.bannerUrl,
     this.organizerName = '',
     this.organizerLogo,
@@ -218,6 +222,7 @@ class PublicEvent {
       tagline: _str(j['tagline']),
       category: _str(j['category']),
       categoryName: _str(j['category_name']),
+      isFeatured: j['is_featured'] == true,
       bannerUrl: mediaUrl(_str(j['banner']) ?? j['banner_absolute']),
       organizerName: _str(org?['name']) ?? _str(j['organizer_name']) ?? '',
       organizerLogo: mediaUrl(org?['logo']),

@@ -210,6 +210,8 @@ class AdminAction(models.Model):
         PASSWORD_TEMPORARY = 'password_temporary', 'Set a temporary password'
         VERIFIED = 'verified', 'Verified'
         UNVERIFIED = 'unverified', 'Removed verification'
+        FEATURED_EVENT = 'featured_event', 'Featured an event'
+        UNFEATURED_EVENT = 'unfeatured_event', 'Stopped featuring an event'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='+')

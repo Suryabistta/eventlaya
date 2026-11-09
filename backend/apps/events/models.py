@@ -75,6 +75,8 @@ class Event(models.Model):
     managed_by = models.CharField(max_length=120, blank=True)
     managed_by_logo = models.CharField(max_length=500, blank=True, help_text='Image URL from /api/uploads/')
     show_managed_by = models.BooleanField(default=False)
+    # Set by the superadmin (Admin → Featured events): listed first on the events page, with a badge
+    is_featured = models.BooleanField(default=False, db_index=True)
 
     class PassLayout(models.TextChoices):
         VERTICAL = 'vertical', 'Vertical (phone)'

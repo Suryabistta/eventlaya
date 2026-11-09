@@ -179,6 +179,8 @@ class EventCard extends StatelessWidget {
                       Positioned(left: 12, top: 12, child: EventPhaseChip(e.base)),
                       if (e.category != null && e.category != 'other')
                         Positioned(right: 12, top: 12, child: GlassChip(e.categoryLabel)),
+                      if (e.isFeatured && e.phase != EventPhase.ended && e.phase != EventPhase.cancelled)
+                        const Positioned(left: 12, bottom: 12, child: GlassChip('Featured', dot: AppColors.marigold)),
                     ],
                   ),
                 ),

@@ -173,3 +173,25 @@ class EventCategoryTests(PlatformTestBase):
         self.assertEqual(self.client.post('/api/events/', body, format='json').status_code, status.HTTP_400_BAD_REQUEST)
         body['category'] = 'concert'
         self.assertEqual(self.client.post('/api/events/', body, format='json').status_code, status.HTTP_201_CREATED)
+
+
+class FeaturedEventTests(PlatformTestBase):
+    def test_superadmin_features_event_listed_first(self):
+        from apps.events.models import Event
+        early = Event.objects.create(organizer=self.org, title='Early', slug='early', location='Dharan',
+                                     start_date='2030-01-01', status='published')
+        late = Event.objects.create(organizer=self.org, title='Late', slug='late', location='Dharan',
+                                    start_date='2030-06-01', status='published')
+        url = f'/api/platform/events/{late.id}/feature/'
+        self.as_(self.org)
+        self.assertEqual(self.client.post(url, {'is_featured': True}, format='json').status_code, status.HTTP_403_FORBIDDEN)
+        # Organizers can't feature their own event through the event API either
+        self.client.patch(f'/api/events/{early.id}/', {'is_featured': True}, format='json')
+        early.refresh_from_db()
+        self.assertFalse(early.is_featured)
+        self.as_(self.admin)
+        self.assertTrue(self.client.post(url, {'is_featured': True}, format='json').data['is_featured'])
+        self.assertEqual([e['title'] for e in self.client.get('/api/platform/events/?featured=1').data], ['Late'])
+        self.client.force_authenticate(None)
+        r = self.client.get('/api/events/public/')
+        self.assertEqual([(e['title'], e['is_featured']) for e in r.data], [('Late', True), ('Early', False)])

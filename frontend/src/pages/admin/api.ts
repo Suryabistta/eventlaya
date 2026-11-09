@@ -1,4 +1,18 @@
 import type { EventCategoryItem } from '@/lib/event-page'
+
+/** Superadmin → Featured events row */
+export interface FeaturedEventRow {
+  id: string
+  title: string
+  slug: string
+  status: string
+  is_featured: boolean
+  start_date: string | null
+  location: string
+  organizer: string
+  /** The event has already happened */
+  over: boolean
+}
 import { request, type Banner, type City, type DomainCheckResult, type TenantDomainStatus, type VendorCategory } from '@/services/api'
 
 export type ReviewStatus = 'pending' | 'approved' | 'rejected'
@@ -207,6 +221,9 @@ export const platformApi = {
   saveCategory: (c: Partial<VendorCategory>) =>
     c.id ? request<VendorCategory>(`/marketplace/categories/${c.id}/`, json('PATCH', c)) : request<VendorCategory>('/marketplace/categories/', json('POST', c)),
   deleteCategory: (id: string) => request<void>(`/marketplace/categories/${id}/`, json('DELETE')),
+  featuredEvents: (search: string, onlyFeatured: boolean) =>
+    request<FeaturedEventRow[]>(`/platform/events/?${new URLSearchParams({ search, ...(onlyFeatured ? { featured: '1' } : {}) })}`),
+  featureEvent: (id: string, is_featured: boolean) => request<FeaturedEventRow>(`/platform/events/${id}/feature/`, json('POST', { is_featured })),
   eventTypes: () => request<EventCategoryItem[]>('/platform/event-categories/?all=1'),
   saveEventType: (c: Partial<EventCategoryItem>) =>
     c.id ? request<EventCategoryItem>(`/platform/event-categories/${c.id}/`, json('PATCH', c)) : request<EventCategoryItem>('/platform/event-categories/', json('POST', c)),

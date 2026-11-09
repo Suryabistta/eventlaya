@@ -119,7 +119,7 @@ class PublicEventListView(APIView):
         if when == 'upcoming':
             # Includes events happening today; finished ones drop off on their own.
             events = events.filter(not_over).exclude(status__in=[Event.Status.COMPLETED, Event.Status.CANCELLED])
-            events = events.order_by('start_date', 'start_time')
+            events = events.order_by('-is_featured', 'start_date', 'start_time')
         elif when == 'past':
             events = events.filter(~not_over | models.Q(status=Event.Status.COMPLETED)).order_by('-start_date')
 

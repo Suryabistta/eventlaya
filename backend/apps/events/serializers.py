@@ -96,12 +96,12 @@ class EventSerializer(serializers.ModelSerializer):
             'capacity', 'status', 'allow_registration', 'registration_deadline',
             'is_paid', 'ticket_price', 'registration_form', 'registration_form_title',
             'registered_count', 'checked_in_count', 'created_at', 'updated_at',
-            'tagline', 'category', 'category_name', 'phase', 'registration_open', 'registration_closed_reason',
+            'tagline', 'category', 'category_name', 'is_featured', 'phase', 'registration_open', 'registration_closed_reason',
             'max_tickets_per_order', 'show_spots_left',
             'managed_by', 'managed_by_logo', 'show_managed_by', 'ticket_layout', 'show_seat_number',
             'parent', 'parent_title',
         ]
-        read_only_fields = ['id', 'organizer', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'organizer', 'is_featured', 'created_at', 'updated_at']
 
     def validate_parent(self, parent):
         """A sub-event hangs under one of the organizer's own main events, one level deep."""
