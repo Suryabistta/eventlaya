@@ -154,7 +154,7 @@ const FormMock: React.FC = () => (
         </div>
       </div>
       <motion.div initial={{ scale: 0.98 }} animate={{ scale: [1, 0.97, 1] }} transition={{ delay: 1.8, duration: 0.3 }} className="flex h-10 items-center justify-center rounded-lg bg-brand-600 text-sm font-semibold text-white">
-        Register and get my pass
+        Register
       </motion.div>
     </div>
   </div>

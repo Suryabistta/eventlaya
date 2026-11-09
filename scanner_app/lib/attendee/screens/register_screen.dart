@@ -894,7 +894,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   Widget _detailsBar() {
     final e = _event;
-    final n = _ticketed ? _total : 1;
     final String price;
     final String caption;
     if (_ticketed) {
@@ -912,7 +911,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         ]),
       ),
       PrimaryButton(
-        label: _payOnline ? 'Pay ${formatRupees(_due)}' : (n > 1 ? 'Get $n passes' : 'Get my pass'),
+        label: _payOnline ? 'Pay ${formatRupees(_due)}' : 'Register',
         icon: _payOnline ? Icons.lock_rounded : null,
         expand: false,
         loading: _submitting,

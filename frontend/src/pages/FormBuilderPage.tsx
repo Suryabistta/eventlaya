@@ -522,7 +522,7 @@ const Preview: React.FC<{ event: Event; fields: FormField[]; highlightId: string
           ))}
         </fieldset>
         <Button className="w-full" size="lg" icon={<TicketIcon className="h-4 w-4" />} disabled>
-          Register and get my pass
+          Register
         </Button>
         <p className="text-center text-xs text-ink-500">Preview only. Submitting is turned off here.</p>
       </div>

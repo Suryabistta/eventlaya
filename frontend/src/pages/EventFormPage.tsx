@@ -42,6 +42,8 @@ interface EventDraft {
   location: string
   map_query: string
   capacity: string
+  /** Off: no spot limit (capacity 0 on the server) */
+  limit_spots: boolean
   status: Event['status']
   allow_registration: boolean
   show_spots_left: boolean
@@ -112,6 +114,7 @@ const emptyDraft: EventDraft = {
   location: '',
   map_query: '',
   capacity: '200',
+  limit_spots: true,
   status: 'published',
   allow_registration: true,
   show_spots_left: true,
@@ -173,7 +176,8 @@ function fromEvent(ev: Event, page?: EventPageContent): EventDraft {
     end_time: ev.end_time?.slice(0, 5) ?? '',
     location: ev.location,
     map_query: page?.map_query ?? '',
-    capacity: String(ev.capacity),
+    capacity: ev.capacity > 0 ? String(ev.capacity) : '200',
+    limit_spots: ev.capacity > 0,
     status: ev.status,
     allow_registration: ev.allow_registration,
     show_spots_left: ev.show_spots_left ?? true,
@@ -247,7 +251,7 @@ const localToday = () => {
 const FIELD_STEP: Record<string, StepId> = {
   title: 'basics', tagline: 'basics', parent: 'basics', category: 'basics', description: 'basics', banner: 'basics', banner_url: 'basics',
   start_date: 'when', start_time: 'when', end_date: 'when', end_time: 'when', location: 'when', map_query: 'when',
-  capacity: 'registration', show_spots_left: 'registration', status: 'registration', registration_deadline: 'registration', ticket_price: 'registration', is_paid: 'registration', allow_registration: 'registration', ticket_layout: 'registration', show_seat_number: 'registration', registration_mode: 'registration',
+  capacity: 'registration', limit_spots: 'registration', show_spots_left: 'registration', status: 'registration', registration_deadline: 'registration', ticket_price: 'registration', is_paid: 'registration', allow_registration: 'registration', ticket_layout: 'registration', show_seat_number: 'registration', registration_mode: 'registration',
   managed_by: 'page', managed_by_label: 'page', managed_by_logo: 'page', show_managed_by: 'page',
 }
 
@@ -267,7 +271,7 @@ function validateStep(id: StepId, d: EventDraft, p: PageDraft, isNew = false): E
   }
   if (id === 'registration') {
     const cap = Number(d.capacity)
-    if (!d.capacity || !Number.isInteger(cap) || cap <= 0) e.capacity = 'Enter a whole number greater than 0.'
+    if (d.limit_spots && (!d.capacity || !Number.isInteger(cap) || cap <= 0)) e.capacity = 'Enter a whole number greater than 0.'
     if (d.registration_deadline) {
       const last = d.end_date || d.start_date
       if (last && d.registration_deadline.slice(0, 10) > last) e.registration_deadline = 'The deadline must be on or before the last day of the event.'
@@ -480,7 +484,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
         start_time: optional(draft.start_time),
         end_date: optional(draft.end_date),
         end_time: optional(draft.end_time),
-        capacity: Number(draft.capacity),
+        capacity: draft.limit_spots ? Number(draft.capacity) : 0,
         status: draft.status,
         allow_registration: draft.allow_registration,
         show_spots_left: draft.show_spots_left,
@@ -814,8 +818,16 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
 
                 {step.id === 'registration' && (
                   <>
+                    <Checkbox
+                      label="Limit the number of spots"
+                      hint={draft.limit_spots ? 'Registration closes when this many people sign up.' : 'No limit: anyone can register until you close registration. No spot count is shown.'}
+                      checked={draft.limit_spots}
+                      onChange={(v) => set('limit_spots', v)}
+                    />
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <Input label="Capacity" type="number" inputMode="numeric" min={1} required hint="Registration closes when this many people sign up" {...bind('capacity')} />
+                      {draft.limit_spots && (
+                        <Input label="Capacity" type="number" inputMode="numeric" min={1} required hint="Most people who can register" {...bind('capacity')} />
+                      )}
                       <Select label="Status" hint="Only published events accept registrations" {...bind('status')}>
                         {statuses.map((s) => (
                           <option key={s.value} value={s.value}>
@@ -856,12 +868,14 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                         onChange={(v) => set('show_seat_number', v)}
                       />
                     )}
+                    {draft.limit_spots && (
                     <Checkbox
                       label="Show how many spots are left"
                       hint="Attendees still see Fully booked / Sold out."
                       checked={draft.show_spots_left}
                       onChange={(v) => set('show_spots_left', v)}
                     />
+                    )}
                     <Checkbox
                       label="Accept registrations"
                       hint="Turn off to close sign-ups without unpublishing the event."
@@ -1238,7 +1252,7 @@ const Review: React.FC<{ draft: EventDraft; content: PageDraft; event?: Event; o
     {
       id: 'registration',
       rows: [
-        ['Capacity', draft.capacity ? `${draft.capacity} people` : 'Not set'],
+        ['Capacity', !draft.limit_spots ? 'No limit' : draft.capacity ? `${draft.capacity} people` : 'Not set'],
         ['Status', statusOptions.find((s) => s.value === draft.status)?.label ?? draft.status],
         ['Registration', draft.allow_registration ? (draft.registration_deadline ? `Open until ${new Date(draft.registration_deadline).toLocaleString()}` : 'Open') : 'Closed'],
         ['Price', event ? ticketSummary ?? 'Set on the Tickets page' : draft.is_paid ? `Rs ${draft.ticket_price || '?'}, paid at the venue` : 'Free'],
@@ -1310,7 +1324,7 @@ const Summary: React.FC<{ draft: EventDraft; content: PageDraft; event?: Event }
         </li>
         <li className="flex gap-2">
           <Users className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" aria-hidden />
-          {cap > 0 ? `Up to ${cap} people` : 'Capacity not set'}
+          {!draft.limit_spots ? 'No spot limit' : cap > 0 ? `Up to ${cap} people` : 'Capacity not set'}
         </li>
         <li className="flex gap-2">
           <TicketIcon className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" aria-hidden />

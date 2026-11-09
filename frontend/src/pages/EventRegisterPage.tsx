@@ -644,12 +644,8 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
         : `Pay Rs ${money(pricing.total)} with ${payName}`
       : step === 'review'
       ? register.isPending
-        ? pricing.count > 1
-          ? 'Getting your passes'
-          : 'Getting your pass'
-        : pricing.count > 1
-          ? `Register and get ${pricing.count} passes`
-          : 'Register and get my pass'
+        ? 'Registering'
+        : 'Register'
       : 'Continue'
   const finalLabel = formOnly && step === 'review' ? (register.isPending ? 'Registering' : 'Register') : submitLabel
   const submitDisabled = step === 'tickets' && pricing.count < 1
