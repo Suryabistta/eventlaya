@@ -452,23 +452,29 @@ const OrganizerLine: React.FC<{ event: PublicEvent; className?: string; large?: 
   return (
     <div className={cn('flex items-center gap-3', className)}>
       {logo && !logoFailed ? (
-        <img src={logo} alt="" onError={() => setLogoFailed(true)} className={cn(size, 'rounded-full border border-ink-200 bg-white object-cover')} />
+        <img src={logo} alt="" onError={() => setLogoFailed(true)} className={cn(size, 'shrink-0 rounded-full border border-ink-200 bg-white object-cover')} />
       ) : (
-        <span aria-hidden className={cn(size, 'flex items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700')}>
+        <span aria-hidden className={cn(size, 'flex shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700')}>
           {initials(name)}
         </span>
       )}
-      <p className="text-sm text-ink-600">
-        {large ? '' : 'Organised by '}
-        <span className="font-semibold text-ink-900">{name}</span>
-        {event.organizer_info?.verified && <VerifiedBadge />}
+      {/* Managed by sits to the right of Organised by. Phones: two side-by-side columns, label above each name */}
+      <p className="flex min-w-0 items-center gap-3 text-sm text-ink-600">
+        <span className="flex min-w-0 flex-col sm:block">
+          {!large && <span className="text-xs sm:text-sm">Organised by </span>}
+          <span>
+            <span className="font-semibold text-ink-900">{name}</span>
+            {event.organizer_info?.verified && <VerifiedBadge />}
+          </span>
+        </span>
         {managed && (
-          <span className="mt-0.5 flex items-center gap-1.5">
+          <span className="flex min-w-0 items-center gap-1.5 self-stretch border-l border-ink-200 pl-3">
             {managed.logo && !managedLogoFailed && (
-              <img src={managed.logo} alt="" onError={() => setManagedLogoFailed(true)} className="h-5 w-5 rounded border border-ink-200 bg-white object-contain" />
+              <img src={managed.logo} alt="" onError={() => setManagedLogoFailed(true)} className="h-5 w-5 shrink-0 rounded border border-ink-200 bg-white object-contain" />
             )}
-            <span>
-              Managed by <span className="font-semibold text-ink-900">{managed.name}</span>
+            <span className="flex min-w-0 flex-col sm:block">
+              <span className="text-xs sm:text-sm">Managed by </span>
+              <span className="font-semibold text-ink-900">{managed.name}</span>
             </span>
           </span>
         )}
