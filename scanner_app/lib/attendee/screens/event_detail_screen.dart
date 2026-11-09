@@ -147,7 +147,7 @@ class EventDetailScreen extends ConsumerWidget {
                         children: [
                           for (final h in event.highlights)
                             ListRow(
-                              leading: const Icon(Icons.auto_awesome_rounded, color: AppColors.marigold, size: 20),
+                              leading: const Icon(Icons.check_rounded, color: AppColors.brand, size: 20),
                               title: h,
                             ),
                         ],
@@ -191,6 +191,16 @@ class EventDetailScreen extends ConsumerWidget {
                                 children: [Text(f.answer, style: AppType.body(14, color: AppColors.textSecondary))],
                               ),
                             ),
+                        ],
+                      ),
+                    if (event.terms != null)
+                      GroupedSection(
+                        header: 'Terms & conditions',
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Text(event.terms!, style: AppType.body(14, height: 1.55, color: AppColors.textSecondary)),
+                          ),
                         ],
                       ),
                     if (event.phase == EventPhase.live || event.phase == EventPhase.ended)
