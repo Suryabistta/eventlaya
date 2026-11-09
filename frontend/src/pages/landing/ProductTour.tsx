@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useInView, useReducedMotion } from 'framer-motion'
 import { FileText, QrCode, ScanLine, BarChart3, Check, CheckCircle2 } from 'lucide-react'
-import { QRCodeSVG } from 'qrcode.react'
+import { ModernQr } from '@/components/ModernQr'
 import { cn } from '@/lib/utils'
 
 const ease = [0.22, 1, 0.36, 1] as const
@@ -174,7 +174,7 @@ const PassMock: React.FC = () => (
       <div className="w-px border-l-2 border-dashed border-ink-200" />
       <div className="flex w-32 items-center justify-center bg-brand-600 p-3">
         <motion.div initial={{ rotate: -8, scale: 0.8, opacity: 0 }} animate={{ rotate: 0, scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 18, delay: 0.2 }} className="rounded-lg bg-white p-2">
-          <QRCodeSVG value="eventlaya:TKT-ETF26-0313" size={80} fgColor="#1C1724" />
+          <ModernQr value="eventlaya:TKT-ETF26-0313" size={80} color="#1C1724" margin={1} />
         </motion.div>
       </div>
     </div>

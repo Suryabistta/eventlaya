@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react'
 import { passPaymentLine } from '@/lib/payments'
-import { QRCodeCanvas } from 'qrcode.react'
+import { ModernQrCanvas } from './ModernQr'
 import { Download } from 'lucide-react'
 import type { Ticket } from '@/services/api'
 import { Button } from '@/components/ui'
@@ -319,7 +319,7 @@ export const DownloadPassButton: React.FC<Props> = (props) => {
     <>
       {/* High-resolution QR used only for the image */}
       <div ref={qrWrap} className="hidden" aria-hidden>
-        <QRCodeCanvas value={props.ticket.qr_token} size={528} level="H" fgColor={INK} marginSize={0} />
+        <ModernQrCanvas value={props.ticket.qr_token} size={528} level="H" color={INK} margin={0} />
       </div>
       <Button
         variant={props.variant ?? 'secondary'}
@@ -360,7 +360,7 @@ export const DownloadAllPassesButton: React.FC<Omit<Props, 'ticket' | 'label'> &
     <>
       <div ref={qrWrap} className="hidden" aria-hidden>
         {tickets.map((t) => (
-          <QRCodeCanvas key={t.id} value={t.qr_token} size={528} level="H" fgColor={INK} marginSize={0} />
+          <ModernQrCanvas key={t.id} value={t.qr_token} size={528} level="H" color={INK} margin={0} />
         ))}
       </div>
       <Button

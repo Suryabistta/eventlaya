@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import '../../ui/modern_qr.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../ui/ui.dart';
 import '../models/contest.dart';
@@ -240,13 +241,8 @@ Future<Uint8List> renderShareCard(Contest contest, Contestant c) async {
       Paint()..color = Colors.white);
   canvas.save();
   canvas.translate(qrX, qrY);
-  QrPainter(
-    data: contest.contestantUrl(c.ref),
-    version: QrVersions.auto,
-    errorCorrectionLevel: QrErrorCorrectLevel.M,
-    eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: AppColors.ink900),
-    dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: AppColors.ink900),
-  ).paint(canvas, const Size(qrSize, qrSize));
+  ModernQrPainter(data: contest.contestantUrl(c.ref), color: AppColors.ink900, errorCorrectLevel: QrErrorCorrectLevel.M)
+      .paint(canvas, const Size(qrSize, qrSize));
   canvas.restore();
 
   const left = 56.0;

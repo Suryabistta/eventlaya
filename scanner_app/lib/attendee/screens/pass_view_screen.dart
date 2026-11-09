@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:qr_flutter/qr_flutter.dart';
+import '../../ui/modern_qr.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../providers/modules_provider.dart';
 import '../../reviews/review_models.dart';
@@ -386,16 +386,7 @@ class _FullScreenQrState extends State<FullScreenQr> {
                     const SizedBox(height: 4),
                     Text(p.attendeeName, style: AppType.body(15, color: AppColors.textSecondary)),
                     const SizedBox(height: 20),
-                    QrImageView(
-                      data: p.qrToken,
-                      size: size,
-                      padding: EdgeInsets.zero,
-                      backgroundColor: Colors.white,
-                      eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Colors.black),
-                      dataModuleStyle:
-                          const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: Colors.black),
-                      semanticsLabel: 'Ticket QR code',
-                    ),
+                    ModernQr(data: p.qrToken, size: size, semanticsLabel: 'Ticket QR code'),
                     const SizedBox(height: 20),
                     Text(p.ticketNumber, style: AppType.mono(18, weight: FontWeight.w700)),
                     if (p.ticketTypeName.isNotEmpty) ...[

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
-import { QRCodeSVG } from 'qrcode.react'
+import { ModernQr } from '@/components/ModernQr'
 
 const ease = [0.22, 1, 0.36, 1] as const
 
@@ -70,7 +70,7 @@ export const GatePassDemo: React.FC<{ compact?: boolean }> = ({ compact }) => {
             <div className="w-px shrink-0 border-l-2 border-dashed border-ink-200" aria-hidden />
             <div className="relative flex w-[132px] shrink-0 flex-col items-center justify-center gap-2 bg-brand-600 p-4 sm:w-[148px]">
               <div className="relative overflow-hidden rounded-lg bg-white p-2">
-                <QRCodeSVG value="eventlaya:TKT-ETF26-0312" size={92} level="M" fgColor="#1C1724" />
+                <ModernQr value="eventlaya:TKT-ETF26-0312" size={92} level="M" color="#1C1724" margin={1} />
                 {!reduce && (
                   <motion.span
                     className="absolute inset-x-0 h-0.5 bg-marigold-400 shadow-[0_0_12px_2px] shadow-marigold-400/70"

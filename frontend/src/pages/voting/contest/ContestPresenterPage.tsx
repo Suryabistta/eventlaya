@@ -6,7 +6,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { QRCodeSVG } from 'qrcode.react'
+import { ModernQr } from '@/components/ModernQr'
 import { ArrowLeft, ChevronLeft, ChevronRight, Clock, Crown, ListOrdered, Maximize, Minimize, QrCode, Sparkles, Trophy } from 'lucide-react'
 import { ErrorState, Logo, Skeleton } from '@/components/ui'
 import { brandPalette, hexToRgb } from '@/lib/tenant'
@@ -450,7 +450,7 @@ const VoteQr: React.FC<{ voteUrl: string; contest: Contest; roundName?: string }
 const QrCard: React.FC<{ voteUrl: string; large?: boolean }> = ({ voteUrl, large }) => (
   <div className="rounded-3xl border border-ink-200 bg-white p-6 text-center shadow-sm lg:p-8">
     <div className={cn('mx-auto w-full', large ? 'max-w-[440px]' : 'max-w-[300px]')}>
-      <QRCodeSVG value={voteUrl} size={440} marginSize={1} fgColor="#1C1724" className="h-auto w-full" aria-label="QR code to vote" role="img" />
+      <ModernQr value={voteUrl} size={440} margin={4} brackets color="#1C1724" className="h-auto w-full" aria-label="QR code to vote" />
     </div>
     {!large && <p className="mt-4 break-all font-mono text-base text-ink-700">{voteUrl.replace(/^https?:\/\//, '')}</p>}
   </div>

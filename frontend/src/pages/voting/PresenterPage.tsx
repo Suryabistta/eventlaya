@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
-import { QRCodeSVG } from 'qrcode.react'
+import { ModernQr } from '@/components/ModernQr'
 import { ArrowLeft, Clock, Maximize, Minimize } from 'lucide-react'
 import { ErrorState, Logo, Skeleton } from '@/components/ui'
 import { votingApi } from './api'
@@ -125,7 +125,7 @@ export const PresenterPage: React.FC = () => {
               <div className="rounded-3xl border border-ink-200 bg-white p-6 text-center shadow-sm lg:p-8">
                 <p className="text-2xl font-semibold lg:text-3xl">Scan to vote</p>
                 <div className="mx-auto mt-5 w-full max-w-[320px]">
-                  <QRCodeSVG value={publicVoteUrl(poll.event_slug, poll.id)} size={320} marginSize={1} fgColor="#1C1724" className="h-auto w-full" aria-label="QR code to vote" role="img" />
+                  <ModernQr value={publicVoteUrl(poll.event_slug, poll.id)} size={320} margin={4} brackets color="#1C1724" className="h-auto w-full" aria-label="QR code to vote" />
                 </div>
                 <p className="mt-4 break-all font-mono text-base text-ink-700 lg:text-lg">{poll.show_on_public_page ? shortVoteLink(poll.event_slug) : shortVoteLink(poll.event_slug, poll.id)}</p>
               </div>

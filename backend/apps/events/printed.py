@@ -56,11 +56,31 @@ def _wrap(draw, text, font, width, max_lines):
     return lines
 
 
+def _qr_parts(token):
+    """Eventlaya QR style (same as the website): module grid size, round dots and the three corner squares."""
+    m = _qr_modules(token)
+    n = len(m)
+    finders = [(0, 0), (0, n - 7), (n - 7, 0)]
+    inside = lambda r, c: any(fr <= r < fr + 7 and fc <= c < fc + 7 for fr, fc in finders)  # noqa: E731
+    dots = [(r, c) for r in range(n) for c in range(n) if m[r][c] and not inside(r, c)]
+    return n, dots, finders
+
+
 def _qr(token, size):
-    q = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, border=1, box_size=10)
-    q.add_data(token)
-    q.make(fit=True)
-    return q.make_image(fill_color='black', back_color='white').convert('RGB').resize((size, size), Image.NEAREST)
+    """The QR as a Pillow image (preview): dots and rounded corner squares, drawn 4x and scaled down smooth."""
+    n, dots, finders = _qr_parts(token)
+    k = 4
+    u = size * k / (n + 2)  # one module of white around the code
+    img = Image.new('RGB', (size * k, size * k), WHITE)
+    d = ImageDraw.Draw(img)
+    at = lambda v: (v + 1) * u  # noqa: E731
+    for r, c in dots:
+        d.ellipse((at(c), at(r), at(c + 1), at(r + 1)), fill=INK)
+    for r, c in finders:
+        d.rounded_rectangle((at(c), at(r), at(c + 7), at(r + 7)), radius=2.3 * u, fill=INK)
+        d.rounded_rectangle((at(c + 1), at(r + 1), at(c + 6), at(r + 6)), radius=1.3 * u, fill=WHITE)
+        d.rounded_rectangle((at(c + 2), at(r + 2), at(c + 5), at(r + 5)), radius=0.9 * u, fill=INK)
+    return img.resize((size, size), Image.LANCZOS)
 
 
 def _artwork(url, size):
@@ -214,7 +234,7 @@ def preview_png(design):
 
 
 def _qr_modules(token):
-    q = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, border=1)
+    q = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_Q, border=0)
     q.add_data(token)
     q.make(fit=True)
     return q.get_matrix()
@@ -228,17 +248,19 @@ def _draw_ticket(c, design, base, number, token, x, y, w, h):
     side_pt = side * px
     left = x + qx * px
     top = y + h - qy * px
-    m = _qr_modules(token)
-    cell = side_pt / len(m)
-    c.setFillColorRGB(0, 0, 0)
-    for r, row in enumerate(m):
-        run = None
-        for col, on in enumerate(row + [False]):
-            if on and run is None:
-                run = col
-            elif not on and run is not None:
-                c.rect(left + run * cell, top - (r + 1) * cell, (col - run) * cell, cell, stroke=0, fill=1)
-                run = None
+    # Eventlaya QR style: round dots and rounded corner squares, one module of white around the code
+    n, dots, finders = _qr_parts(token)
+    cell = side_pt / (n + 2)
+    c.setFillColorRGB(*[v / 255 for v in INK])
+    for r, col in dots:
+        c.circle(left + (col + 1.5) * cell, top - (r + 1.5) * cell, cell / 2, stroke=0, fill=1)
+    for r, col in finders:
+        x0, y0 = left + (col + 1) * cell, top - (r + 8) * cell
+        c.roundRect(x0, y0, 7 * cell, 7 * cell, 2.3 * cell, stroke=0, fill=1)
+        c.setFillColorRGB(1, 1, 1)
+        c.roundRect(x0 + cell, y0 + cell, 5 * cell, 5 * cell, 1.3 * cell, stroke=0, fill=1)
+        c.setFillColorRGB(*[v / 255 for v in INK])
+        c.roundRect(x0 + 2 * cell, y0 + 2 * cell, 3 * cell, 3 * cell, 0.9 * cell, stroke=0, fill=1)
     font = min(max(side_pt * 0.1, 6), 11)  # ticket number, sized to the QR
     tw = c.stringWidth(number, 'Helvetica', font)
     # Below the white tile around the QR (16 design px) on ready-made designs

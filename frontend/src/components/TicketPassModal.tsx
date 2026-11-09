@@ -1,6 +1,6 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
-import { QRCodeSVG } from 'qrcode.react'
+import { ModernQr } from './ModernQr'
 import { Printer } from 'lucide-react'
 import type { Ticket } from '@/services/api'
 import { Button, Modal } from '@/components/ui'
@@ -148,11 +148,12 @@ const PassBody: React.FC<PassProps & { payLine: ReturnType<typeof passPaymentLin
 
         <div className="el-pass-stub flex flex-col items-center justify-center gap-2 bg-brand-600 p-5 text-white">
           <div className="rounded-xl bg-white p-2.5">
-            <QRCodeSVG
+            <ModernQr
               value={ticket.qr_token}
               size={168}
               level="H"
-              fgColor="#1C1724"
+              margin={0}
+              color="#1C1724"
               className="el-pass-qr"
               aria-label={`QR code for ticket ${ticket.ticket_number}`}
             />

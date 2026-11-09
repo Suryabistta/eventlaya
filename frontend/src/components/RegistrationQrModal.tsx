@@ -95,7 +95,7 @@ export const RegistrationQrModal: React.FC<{ open: boolean; onClose: () => void;
     >
       <div className="flex flex-col items-center gap-3 text-center">
         <div className="rounded-xl border border-ink-200 bg-white p-2">
-          <ModernQr value={url} size={240} />
+          <ModernQr value={url} size={240} margin={5} brackets />
         </div>
         <p className="font-semibold text-ink-900">{title}</p>
         <p className="break-all text-sm text-ink-500">{url}</p>
@@ -103,7 +103,7 @@ export const RegistrationQrModal: React.FC<{ open: boolean; onClose: () => void;
       {/* Full-size copies used for the downloads */}
       <div className="hidden" aria-hidden>
         <div ref={svgHolder}>
-          <ModernQr value={url} size={SIZE} />
+          <ModernQr value={url} size={SIZE} margin={5} brackets />
         </div>
       </div>
     </Modal>

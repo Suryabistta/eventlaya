@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react'
 import { shareClickTracker } from '@/lib/analytics'
-import { QRCodeCanvas } from 'qrcode.react'
+import { ModernQrCanvas } from '@/components/ModernQr'
 import { Copy, Download, Facebook, MessageCircle, Send, Share2 } from 'lucide-react'
 import { Button, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
@@ -250,7 +250,7 @@ const ShareCardButton: React.FC<ShareTarget & { contestant: NonNullable<ShareTar
   return (
     <>
       <div ref={qrWrap} className="hidden" aria-hidden>
-        <QRCodeCanvas value={pageUrl} size={600} level="M" fgColor={INK} marginSize={0} />
+        <ModernQrCanvas value={pageUrl} size={600} level="M" color={INK} margin={0} />
       </div>
       <Button variant="secondary" className="w-full" loading={busy} icon={<Download className="h-4 w-4" aria-hidden />} onClick={download}>
         Download share card

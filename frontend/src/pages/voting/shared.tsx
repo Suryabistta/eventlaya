@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
-import { QRCodeCanvas } from 'qrcode.react'
+import { ModernQrCanvas } from '@/components/ModernQr'
 import { CalendarClock, Copy, Download, ExternalLink, Lock, Trophy } from 'lucide-react'
 import { Badge, Button, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
@@ -186,7 +186,7 @@ export const SharePanel: React.FC<{ slug: string; pollId: string; title: string;
   return (
     <div className={cn('flex gap-4', compact ? 'items-center' : 'flex-col items-center text-center sm:flex-row sm:text-left')}>
       <div ref={canvasWrap} className="shrink-0 rounded-xl border border-ink-200 bg-white p-2">
-        <QRCodeCanvas value={url} size={compact ? 96 : 144} marginSize={1} fgColor="#1C1724" aria-label={`QR code for ${url}`} role="img" />
+        <ModernQrCanvas value={url} size={compact ? 96 : 144} margin={compact ? 1 : 4} brackets={!compact} color="#1C1724" aria-label={`QR code for ${url}`} role="img" />
       </div>
       <div className="min-w-0 space-y-2">
         <p className="text-sm text-ink-600">Scan the code or open the link to vote.</p>

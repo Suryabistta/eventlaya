@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:qr_flutter/qr_flutter.dart';
+import 'modern_qr.dart';
 import 'logo.dart';
 import 'sheets.dart';
 import 'status.dart';
@@ -99,18 +99,7 @@ class TicketPass extends StatelessWidget {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(AppRadius.lg),
                 ),
-                child: QrImageView(
-                  data: qrData!,
-                  size: qrSize,
-                  padding: EdgeInsets.zero,
-                  backgroundColor: Colors.white,
-                  eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: AppColors.ink900),
-                  dataModuleStyle: const QrDataModuleStyle(
-                    dataModuleShape: QrDataModuleShape.square,
-                    color: AppColors.ink900,
-                  ),
-                  semanticsLabel: 'Ticket QR code',
-                ),
+                child: ModernQr(data: qrData!, size: qrSize, color: AppColors.ink900, semanticsLabel: 'Ticket QR code'),
               )
             else
               Container(
