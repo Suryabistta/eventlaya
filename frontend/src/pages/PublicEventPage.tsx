@@ -446,7 +446,8 @@ const OrganizerLine: React.FC<{ event: PublicEvent; className?: string; large?: 
   const logo = event.organizer_info?.logo
   const [logoFailed, setLogoFailed] = useState(false)
   const [managedLogoFailed, setManagedLogoFailed] = useState(false)
-  const managed = event.managed_by_info
+  // The Organizer card is about the organizer only; managing an event is a different role (shown under the title)
+  const managed = large ? null : event.managed_by_info
   const size = large ? 'h-12 w-12' : 'h-9 w-9'
   return (
     <div className={cn('flex items-center gap-3', className)}>
