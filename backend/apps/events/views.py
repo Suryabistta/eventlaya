@@ -177,7 +177,8 @@ class PublicEventDetailView(APIView):
         branding = getattr(org, 'tenant_branding', None) if approved and hasattr(org, 'tenant_branding') else None
         data['organizer_info'] = {
             'name': (branding.brand_name if branding and branding.brand_name else None) or org.organization_name or org.get_full_name() or org.username,
-            'logo': branding.brand_logo if branding and branding.brand_logo else None,
+            # White-label logo when approved, else the logo the organizer uploaded in their profile
+            'logo': (branding.brand_logo if branding and branding.brand_logo else None) or (org.avatar.url if org.avatar else None),
             'verified': org.is_verified,
         }
         from .sub_events import parent_card, sub_event_cards

@@ -106,7 +106,7 @@ const DetailsCard: React.FC = () => {
           shape="square"
           value={avatar}
           onChange={setAvatar}
-          hint="Shown in the top bar, chat and next to your name. Square images look best. Up to 5 MB."
+          hint={user.role === 'organizer' ? 'Shown on your event pages, in the top bar and in chat. Square images look best. Up to 5 MB.' : 'Shown in the top bar, chat and next to your name. Square images look best. Up to 5 MB.'}
         />
         {errors.avatar_url && <p className="text-xs font-medium text-red-600">{errors.avatar_url}</p>}
         <div className="grid gap-4 sm:grid-cols-2">

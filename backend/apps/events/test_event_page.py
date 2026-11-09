@@ -104,6 +104,13 @@ class EventPageTests(APITestCase):
         self.assertIsNone(ev['banner_absolute'])
         self.assertEqual(ev['map_query'], 'Purwanchal Campus, Dharan')
 
+    def test_organizer_profile_logo_shows_on_event_page(self):
+        self.assertIsNone(self.client.get('/api/events/public/page-fest/').data['event']['organizer_info']['logo'])
+        self.organizer.avatar.name = f'uploads/avatar/{self.organizer.id}/logo.png'
+        self.organizer.save(update_fields=['avatar'])
+        logo = self.client.get('/api/events/public/page-fest/').data['event']['organizer_info']['logo']
+        self.assertTrue(logo.endswith(f'uploads/avatar/{self.organizer.id}/logo.png'))
+
     def test_unpublished_event_page_is_hidden(self):
         self.event.status = Event.Status.DRAFT
         self.event.save()
