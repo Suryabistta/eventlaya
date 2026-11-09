@@ -187,7 +187,8 @@ export function registrationState(e: PublicEvent): { open: boolean; reason?: str
 }
 
 /** "Free", "Rs 500", or "From Rs 250" when the event has several ticket prices. */
-export const priceLabel = (e: Pick<Event, 'is_paid' | 'ticket_price' | 'ticket_types'>) => eventPriceLabel(e.ticket_types, e)
+export const priceLabel = (e: Pick<Event, 'is_paid' | 'ticket_price' | 'ticket_types' | 'registration_mode'>) =>
+  e.registration_mode === 'form' ? 'Free · Registration' : eventPriceLabel(e.ticket_types, e)
 
 /** True when anyone has to pay at the venue for some ticket. */
 export const hasPaidTickets = (e: Pick<Event, 'is_paid' | 'ticket_price' | 'ticket_types'>) =>

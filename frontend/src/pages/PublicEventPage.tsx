@@ -512,7 +512,7 @@ const PhaseBanner: React.FC<{ event: PublicEvent; state: ReturnType<typeof regis
         <Radio className="mt-0.5 h-6 w-6 shrink-0 text-emerald-600" aria-hidden />
         <div>
           <p className="text-lg font-bold">Happening now</p>
-          <p className="mt-0.5 text-sm">{state.open ? 'You can still register and get your pass, then head to the gate.' : state.reason}</p>
+          <p className="mt-0.5 text-sm">{state.open ? (event.registration_mode === 'form' ? 'You can still register.' : 'You can still register and get your pass, then head to the gate.') : state.reason}</p>
         </div>
       </div>
     )
@@ -927,7 +927,11 @@ const RegistrationCard: React.FC<{ event: PublicEvent; state: ReturnType<typeof 
           )}
         </p>
       ) : (
-        state.open && <p className="mt-3 text-center text-xs text-ink-500">Takes about a minute. Your QR pass appears right away.</p>
+        state.open && (
+          <p className="mt-3 text-center text-xs text-ink-500">
+            {event.registration_mode === 'form' ? 'Takes about a minute. You get a confirmation by email.' : 'Takes about a minute. Your QR pass appears right away.'}
+          </p>
+        )
       )}
     </Card>
   )

@@ -204,7 +204,7 @@ class EventCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            e.isFull ? 'Fully booked' : e.priceSummary,
+                            e.isFull ? 'Fully booked' : e.priceLabel,
                             style: AppType.body(13,
                                 weight: FontWeight.w600, color: e.isFull ? AppColors.ink500 : AppColors.textPrimary),
                           ),

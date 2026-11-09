@@ -103,6 +103,7 @@ export const DashboardPage: React.FC = () => {
   const { currentEvent, isLoading: eventsLoading, isError: eventsError, error, refetch } = useCurrentEvent()
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const isOrganizer = user?.role === 'organizer' || user?.role === 'superadmin'
+  const formOnly = currentEvent?.registration_mode === 'form'
 
   const eventId = currentEvent?.id
   const { data: gateStats } = useQuery({
@@ -230,7 +231,7 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* KPI band */}
+      {/* KPI band (registration-only events have no check-in, so no arrival figures) */}
       <Card className="grid grid-cols-2 divide-ink-100 overflow-hidden md:grid-cols-3 xl:grid-cols-5 xl:divide-x [&>*]:border-ink-100 max-xl:[&>*]:border-b max-md:[&>*:last-child:nth-child(odd)]:col-span-2">
         <Kpi
           icon={<Users className="h-4 w-4" />}
@@ -248,6 +249,7 @@ export const DashboardPage: React.FC = () => {
           }
           spark={growth && growth.counts.length > 1 ? cumulative(growth.counts) : undefined}
         />
+        {!formOnly && (
         <Kpi
           icon={<UserCheck className="h-4 w-4" />}
           tone="success"
@@ -256,6 +258,8 @@ export const DashboardPage: React.FC = () => {
           sub={`${checkedIn} of ${registered} arrived`}
           meter={{ value: att ? att.checkin_rate_pct : pct(checkedIn, registered), color: 'bg-emerald-500' }}
         />
+        )}
+        {!formOnly && (
         <Kpi
           icon={<DoorOpen className="h-4 w-4" />}
           tone="success"
@@ -265,6 +269,7 @@ export const DashboardPage: React.FC = () => {
           meter={capacity ? { value: pct(inside, capacity), color: pct(inside, capacity) >= 90 ? 'bg-red-500' : 'bg-emerald-500' } : undefined}
           live
         />
+        )}
         {isOrganizer && (
           <Kpi
             icon={<Wallet className="h-4 w-4" />}
@@ -357,6 +362,7 @@ export const DashboardPage: React.FC = () => {
             )}
           </ChartCard>
 
+          {!formOnly && (
           <Card className="xl:col-span-4">
             <CardHeader title="Attendance breakdown" description="Where every registration stands" />
             <div className="space-y-4 p-5">
@@ -379,6 +385,7 @@ export const DashboardPage: React.FC = () => {
               )}
             </div>
           </Card>
+          )}
         </div>
       )}
 
@@ -460,6 +467,7 @@ export const DashboardPage: React.FC = () => {
           eventId={currentEvent.id}
           tickets={tickets}
           loading={ticketsLoading}
+          formOnly={currentEvent.registration_mode === 'form'}
           onOpen={setSelectedTicket}
           onCopyLink={copyLink}
         />
@@ -728,9 +736,11 @@ const AttendeesCard: React.FC<{
   eventId: string
   tickets: Ticket[]
   loading: boolean
+  /** Registration-only event: no passes or check-in, so no pass column or arrival statuses */
+  formOnly?: boolean
   onOpen: (t: Ticket) => void
   onCopyLink: () => void
-}> = ({ className, eventId, tickets, loading, onOpen, onCopyLink }) => {
+}> = ({ className, eventId, tickets, loading, formOnly, onOpen, onCopyLink }) => {
   const toast = useToast()
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
@@ -772,8 +782,8 @@ const AttendeesCard: React.FC<{
   return (
     <Card className={cn('overflow-hidden', className)}>
       <CardHeader
-        title="Attendees"
-        description={`${tickets.length} registered. Open a pass to view or print it.`}
+        title={formOnly ? 'Registrations' : 'Attendees'}
+        description={formOnly ? `${tickets.length} registered.` : `${tickets.length} registered. Open a pass to view or print it.`}
         actions={
           <div className="flex gap-2">
             {seatsOn && tickets.length > 0 && (
@@ -790,6 +800,7 @@ const AttendeesCard: React.FC<{
       {seatsOpen && <SeatsModal open onClose={() => setSeatsOpen(false)} eventId={eventId} tickets={tickets} />}
       {tickets.length > 0 && (
         <div className="flex flex-col gap-3 border-b border-ink-100 px-5 py-3 md:flex-row md:items-center md:justify-between">
+          {!formOnly && (
           <div role="radiogroup" aria-label="Filter by status" className="-mx-1 flex gap-1 overflow-x-auto px-1">
             {filters.map((f) => {
               const count = f.key === 'all' ? tickets.length : tickets.filter((t) => t.status === f.key).length
@@ -810,13 +821,14 @@ const AttendeesCard: React.FC<{
               )
             })}
           </div>
+          )}
           <label className="relative block md:w-72">
             <span className="sr-only">Search attendees</span>
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" aria-hidden />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Name, email or ticket"
+              placeholder={formOnly ? 'Name, email or registration no.' : 'Name, email or ticket'}
               className="h-9 w-full rounded-[10px] border border-ink-200 bg-ink-50 pl-9 pr-3 text-sm placeholder:text-ink-400 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20"
             />
           </label>
@@ -833,7 +845,7 @@ const AttendeesCard: React.FC<{
         <EmptyState
           icon={<TicketIcon className="h-6 w-6" />}
           title="No one has registered yet"
-          description="Share the registration link. Each person who signs up gets a QR pass straight away and shows up here."
+          description={formOnly ? 'Share the registration link. Each person who registers shows up here.' : 'Share the registration link. Each person who signs up gets a QR pass straight away and shows up here.'}
           action={<Button variant="secondary" icon={<Link2 className="h-4 w-4" />} onClick={onCopyLink}>Copy registration link</Button>}
         />
       ) : filtered.length === 0 ? (
@@ -844,19 +856,21 @@ const AttendeesCard: React.FC<{
             <thead className="sticky top-0 z-[1] bg-ink-50 text-xs text-ink-500">
               <tr>
                 <th scope="col" className="px-5 py-2.5 font-medium">Attendee</th>
-                <th scope="col" className="hidden px-4 py-2.5 font-medium 2xl:table-cell">Ticket</th>
+                <th scope="col" className="hidden px-4 py-2.5 font-medium 2xl:table-cell">{formOnly ? 'Registration no.' : 'Ticket'}</th>
                 {hasSeats && <th scope="col" className="px-4 py-2.5 font-medium">Seat</th>}
                 <th scope="col" className="px-4 py-2.5 font-medium">Status</th>
-                <th scope="col" className="hidden whitespace-nowrap px-4 py-2.5 font-medium sm:table-cell">First in</th>
+                {!formOnly && <th scope="col" className="hidden whitespace-nowrap px-4 py-2.5 font-medium sm:table-cell">First in</th>}
                 <th scope="col" className="hidden px-4 py-2.5 font-medium md:table-cell">Registered</th>
-                <th scope="col" className="px-5 py-2.5 text-right font-medium">
-                  <span className="sr-only">Pass</span>
-                </th>
+                {!formOnly && (
+                  <th scope="col" className="px-5 py-2.5 text-right font-medium">
+                    <span className="sr-only">Pass</span>
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-100">
               {filtered.map((t) => {
-                const s = ticketStatus[t.status]
+                const s = formOnly && t.status !== 'cancelled' ? { label: 'Registered', tone: 'success' as const } : ticketStatus[t.status]
                 return (
                   <tr key={t.id} className="hover:bg-ink-50/70">
                     <td className="max-w-[280px] px-5 py-3">
@@ -885,16 +899,18 @@ const AttendeesCard: React.FC<{
                         {s.label}
                       </Badge>
                     </td>
-                    <td className="hidden whitespace-nowrap px-4 py-3 tabular text-ink-600 sm:table-cell">{t.first_check_in ? fmtTime(t.first_check_in) : '–'}</td>
+                    {!formOnly && <td className="hidden whitespace-nowrap px-4 py-3 tabular text-ink-600 sm:table-cell">{t.first_check_in ? fmtTime(t.first_check_in) : '–'}</td>}
                     <td className="hidden whitespace-nowrap px-4 py-3 tabular text-ink-600 md:table-cell">
                       {new Date(t.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
                     </td>
-                    <td className="whitespace-nowrap px-5 py-3 text-right">
-                      <Button variant="ghost" size="sm" onClick={() => onOpen(t)} aria-label={`View pass for ${t.attendee_name}`}>
-                        <TicketIcon className="h-4 w-4 text-brand-600" aria-hidden />
-                        <span className="hidden sm:inline">View pass</span>
-                      </Button>
-                    </td>
+                    {!formOnly && (
+                      <td className="whitespace-nowrap px-5 py-3 text-right">
+                        <Button variant="ghost" size="sm" onClick={() => onOpen(t)} aria-label={`View pass for ${t.attendee_name}`}>
+                          <TicketIcon className="h-4 w-4 text-brand-600" aria-hidden />
+                          <span className="hidden sm:inline">View pass</span>
+                        </Button>
+                      </td>
+                    )}
                   </tr>
                 )
               })}

@@ -152,7 +152,7 @@ class EventDetailScreen extends ConsumerWidget {
                             ),
                         ],
                       ),
-                    if (event.ticketTypes.isNotEmpty) _TicketsSection(event: event),
+                    if (event.ticketTypes.isNotEmpty && !event.registrationOnly) _TicketsSection(event: event),
                     if (event.agenda.isNotEmpty) _AgendaSection(items: event.agenda),
                     if (event.speakers.isNotEmpty)
                       GroupedSection(
@@ -363,7 +363,7 @@ class _InfoSection extends StatelessWidget {
           ),
         ListRow(
           leading: const RowIcon(Icons.payments_outlined, background: AppColors.ink600),
-          title: e.priceSummary,
+          title: e.priceLabel,
           subtitle: e.priceSummary == 'Free' ? null : e.paymentOptions.note,
         ),
       ],
@@ -648,7 +648,7 @@ class _RegisterBar extends StatelessWidget {
       content = Row(children: [
         Expanded(
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(event.priceSummary, style: AppType.heading(19)),
+            Text(event.priceLabel, style: AppType.heading(19)),
             Text(soldOut ? 'Fully booked' : (event.priceSummary == 'Free' ? 'Free' : event.paymentOptions.shortNote),
                 style: AppType.caption, maxLines: 1, overflow: TextOverflow.ellipsis),
           ]),

@@ -681,7 +681,7 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
             <p className="mb-5 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
               <Radio className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
               <span>
-                <span className="font-semibold">Happening now.</span> Register here and show your pass at the gate straight away.
+                <span className="font-semibold">Happening now.</span> {formOnly ? 'You can still register.' : 'Register here and show your pass at the gate straight away.'}
               </span>
             </p>
           )}

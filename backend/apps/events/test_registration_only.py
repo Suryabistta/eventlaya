@@ -53,3 +53,17 @@ class RegistrationOnlyTests(APITestCase):
         request.user = user
         data = my_ticket_data(EventTicket.objects.get(event=self.event), request)
         self.assertEqual((data['qr_token'], data['registration_only']), (None, True))
+
+    def test_export_lists_registrations_with_answers(self):
+        from apps.dynamic_forms.models import Form, FormField
+        form = Form.objects.create(organizer=self.organizer, event=self.event, title='Run form', slug='run-form', status='published')
+        size = FormField.objects.create(form=form, label='T-shirt size', field_type='select', order=1)
+        self.event.registration_form = form
+        self.event.save()
+        self.register('sita@x.com', answers={str(size.id): 'M'})
+        self.client.force_authenticate(self.organizer)
+        r = self.client.get(f'/api/events/{self.event.id}/export-attendees/')
+        rows = r.content.decode().splitlines()
+        self.assertIn('registrations', r['Content-Disposition'])
+        self.assertEqual(rows[0], 'Registration No.,Name,Email,Phone,Status,Registered At,T-shirt size')
+        self.assertTrue(rows[1].endswith(',registered,' + rows[1].split(',')[5] + ',M'))

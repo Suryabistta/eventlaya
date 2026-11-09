@@ -72,7 +72,7 @@ export const MyTicketsPage: React.FC = () => {
     <div className={ACCOUNT_PAGE}>
       <PageHeader
         title="My tickets"
-        description="Passes for events you registered for. Show the QR code at the gate."
+        description="Your registrations and passes. For events with a pass, show its QR code at the gate."
         actions={
           <ButtonLink to="/events" variant="secondary" icon={<CalendarDays className="h-4 w-4" aria-hidden />}>
             Find events

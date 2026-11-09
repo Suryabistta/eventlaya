@@ -304,6 +304,9 @@ class PublicEvent {
   String? get registrationClosedReason => base.registrationClosedReason;
 
   /// Cheapest on-sale price, for list cards: "Free", "Rs 500", "From Rs 300".
+  /// What to show as the price: registration-only events read "Free · Registration".
+  String get priceLabel => registrationOnly ? 'Free · Registration' : priceSummary;
+
   String get priceSummary {
     final onSale = ticketTypes.where((t) => t.onSale).toList();
     if (onSale.isEmpty) {
