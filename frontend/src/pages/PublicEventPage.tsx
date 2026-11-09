@@ -235,7 +235,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
                   active === id ? 'border-brand-600 text-brand-700' : 'border-transparent text-ink-600 hover:text-ink-900',
                 )}
               >
-                {SECTION_LABEL[id]}
+                {id === 'speakers' ? event.speakers_label || SECTION_LABEL.speakers : SECTION_LABEL[id]}
               </a>
             </li>
           ))}
@@ -305,7 +305,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
           )}
 
           {sections.includes('speakers') && (
-            <Section id="speakers" title="Speakers">
+            <Section id="speakers" title={event.speakers_label || 'Speakers'}>
               <ul className="grid gap-4 sm:grid-cols-2">
                 {event.speakers.map((s) => (
                   <SpeakerCard key={s.id ?? s.name} speaker={s} />

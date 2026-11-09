@@ -72,6 +72,8 @@ export interface EventPageContent {
   contact_phone: string
   map_query: string
   terms?: string
+  /** Heading of the speakers section ('' = Speakers) */
+  speakers_label?: string
   agenda: AgendaItem[]
   speakers: Speaker[]
   faqs: Faq[]

@@ -156,7 +156,7 @@ class EventDetailScreen extends ConsumerWidget {
                     if (event.agenda.isNotEmpty) _AgendaSection(items: event.agenda),
                     if (event.speakers.isNotEmpty)
                       GroupedSection(
-                        header: 'Speakers',
+                        header: event.speakersLabel ?? 'Speakers',
                         separatorInset: 68,
                         children: [
                           for (final s in event.speakers)

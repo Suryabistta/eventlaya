@@ -175,6 +175,9 @@ class PublicEvent {
 
   /// The event's own terms & conditions, as the organizer wrote them.
   final String? terms;
+
+  /// Heading of the speakers section (Performers, Line-up...); null = Speakers.
+  final String? speakersLabel;
   final String? contactEmail;
   final String? contactPhone;
 
@@ -212,6 +215,7 @@ class PublicEvent {
     this.speakers = const [],
     this.faqs = const [],
     this.terms,
+    this.speakersLabel,
     this.contactEmail,
     this.contactPhone,
     this.maxTicketsPerOrder = 10,
@@ -270,6 +274,7 @@ class PublicEvent {
         for (final f in _maps(j['faqs'])) FaqItem(_str(f['question']) ?? '', _str(f['answer']) ?? ''),
       ],
       terms: _str(j['terms']),
+      speakersLabel: _str(j['speakers_label']),
       contactEmail: _str(j['contact_email']),
       contactPhone: _str(j['contact_phone']),
       maxTicketsPerOrder: (int.tryParse(j['max_tickets_per_order']?.toString() ?? '') ?? 10).clamp(1, 50),

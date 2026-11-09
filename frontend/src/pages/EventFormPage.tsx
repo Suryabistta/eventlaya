@@ -91,6 +91,7 @@ interface PageDraft {
   speakers: SpeakerRow[]
   faqs: FaqRow[]
   terms: string
+  speakers_label: string
 }
 
 type Errors = Record<string, string>
@@ -124,7 +125,7 @@ const emptyDraft: EventDraft = {
   is_paid: false,
   ticket_price: '',
 }
-const emptyPage: PageDraft = { highlights: [], contact_email: '', contact_phone: '', agenda: [], speakers: [], faqs: [], terms: '' }
+const emptyPage: PageDraft = { highlights: [], contact_email: '', contact_phone: '', agenda: [], speakers: [], faqs: [], terms: '', speakers_label: '' }
 
 const fieldNames: Record<string, string> = {
   title: 'Event name',
@@ -194,6 +195,7 @@ function pageFromContent(p?: EventPageContent): PageDraft {
     contact_email: p.contact_email ?? '',
     contact_phone: p.contact_phone ?? '',
     terms: p.terms ?? '',
+    speakers_label: p.speakers_label ?? '',
     agenda: (p.agenda ?? []).map((a) => ({
       key: a.id ?? newKey(),
       day: a.day ?? '',
@@ -500,6 +502,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
           contact_email: content.contact_email.trim(),
           contact_phone: content.contact_phone.trim(),
           terms: content.terms.trim(),
+          speakers_label: content.speakers_label.trim(),
           agenda: content.agenda.map((a) => ({
             day: a.day || null,
             start_time: a.start_time,
@@ -994,6 +997,9 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                 )}
 
                 {step.id === 'speakers' && (
+                  <SpeakersTitle value={content.speakers_label} onChange={(v) => setPage('speakers_label', v)} />
+                )}
+                {step.id === 'speakers' && (
                   <RepeatList
                     items={content.speakers}
                     empty="No speakers yet. Add speakers, performers or chief guests."
@@ -1239,7 +1245,7 @@ const Review: React.FC<{ draft: EventDraft; content: PageDraft; event?: Event; o
       ],
     },
     { id: 'schedule', rows: [['Schedule', content.agenda.length ? `${content.agenda.length} items` : 'Not added']] },
-    { id: 'speakers', rows: [['Speakers', content.speakers.length ? content.speakers.map((s) => s.name || 'Unnamed').join(', ') : 'Not added']] },
+    { id: 'speakers', rows: [['Section title', content.speakers_label.trim() || 'Speakers'], [content.speakers_label.trim() || 'Speakers', content.speakers.length ? content.speakers.map((s) => s.name || 'Unnamed').join(', ') : 'Not added']] },
     { id: 'faqs', rows: [['FAQs', content.faqs.length ? `${content.faqs.length} questions` : 'Not added'], ['Terms & conditions', content.terms.trim() ? 'Added' : 'Not added']] },
   ]
   return (
@@ -1460,5 +1466,32 @@ const DangerZone: React.FC<{ event: Event }> = ({ event }) => {
         </div>
       </div>
     </Card>
+  )
+}
+
+const SPEAKER_TITLES = ['Speakers', 'Performers', 'Artists', 'Singers', 'Line-up', 'Guests', 'Judges']
+
+/** Heading of the speakers section on the event page; only the title changes, not the people. */
+const SpeakersTitle: React.FC<{ value: string; onChange: (v: string) => void }> = ({ value, onChange }) => {
+  const preset = value === '' ? 'Speakers' : SPEAKER_TITLES.includes(value) ? value : 'custom'
+  return (
+    <div className="mb-6 grid gap-4 sm:grid-cols-2">
+      <Select
+        label="Section title"
+        hint="What this section is called on the event page."
+        value={preset}
+        onChange={(e) => onChange(e.target.value === 'custom' ? ' ' : e.target.value === 'Speakers' ? '' : e.target.value)}
+      >
+        {SPEAKER_TITLES.map((t) => (
+          <option key={t} value={t}>
+            {t}
+          </option>
+        ))}
+        <option value="custom">Custom…</option>
+      </Select>
+      {preset === 'custom' && (
+        <Input label="Custom title" required maxLength={40} placeholder="Chief guests" value={value.trimStart()} onChange={(e) => onChange(e.target.value || ' ')} />
+      )}
+    </div>
   )
 }

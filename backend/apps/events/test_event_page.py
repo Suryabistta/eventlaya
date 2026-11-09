@@ -104,6 +104,12 @@ class EventPageTests(APITestCase):
         self.assertIsNone(ev['banner_absolute'])
         self.assertEqual(ev['map_query'], 'Purwanchal Campus, Dharan')
 
+    def test_speakers_section_title(self):
+        self.client.force_authenticate(self.organizer)
+        self.client.put(self.url, {**self.payload, 'speakers_label': 'Line-up'}, format='json')
+        self.client.force_authenticate(None)
+        self.assertEqual(self.client.get('/api/events/public/page-fest/').data['event']['speakers_label'], 'Line-up')
+
     def test_organizer_profile_logo_shows_on_event_page(self):
         self.assertIsNone(self.client.get('/api/events/public/page-fest/').data['event']['organizer_info']['logo'])
         self.organizer.avatar.name = f'uploads/avatar/{self.organizer.id}/logo.png'

@@ -366,7 +366,7 @@ class EventPageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Event
-        fields = ['tagline', 'category', 'highlights', 'contact_email', 'contact_phone', 'map_query', 'terms', 'agenda', 'speakers', 'faqs']
+        fields = ['tagline', 'category', 'highlights', 'contact_email', 'contact_phone', 'map_query', 'terms', 'speakers_label', 'agenda', 'speakers', 'faqs']
 
     def validate_category(self, value):
         return validate_event_category(value, self.instance)
