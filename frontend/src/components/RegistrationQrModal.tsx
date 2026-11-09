@@ -1,5 +1,5 @@
 import React, { useRef } from 'react'
-import { QRCodeCanvas, QRCodeSVG } from 'qrcode.react'
+import { ModernQr } from './ModernQr'
 import { Download, Printer } from 'lucide-react'
 import { Button, Modal } from '@/components/ui'
 
@@ -15,15 +15,21 @@ function download(href: string, name: string) {
   a.click()
 }
 
-/** Plain black-on-white QR code that opens the event's registration page, for posters and flyers. */
+/** Modern-style QR code (dots, rounded corners, scan brackets) that opens the event's registration page, for posters and flyers. */
 export const RegistrationQrModal: React.FC<{ open: boolean; onClose: () => void; url: string; title: string }> = ({ open, onClose, url, title }) => {
-  const canvasHolder = useRef<HTMLDivElement>(null)
   const svgHolder = useRef<HTMLDivElement>(null)
+  const svgText = () => {
+    const svg = svgHolder.current?.querySelector('svg')
+    return svg ? new XMLSerializer().serializeToString(svg) : null
+  }
 
   /** PNG with the QR, the event name and the link underneath, on white. */
-  const savePng = () => {
-    const qr = canvasHolder.current?.querySelector('canvas')
-    if (!qr) return
+  const savePng = async () => {
+    const text = svgText()
+    if (!text) return
+    const qr = new Image()
+    qr.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(text)}`
+    await qr.decode()
     const pad = 64
     const textH = 150
     const out = document.createElement('canvas')
@@ -45,9 +51,9 @@ export const RegistrationQrModal: React.FC<{ open: boolean; onClose: () => void;
   }
 
   const saveSvg = () => {
-    const svg = svgHolder.current?.querySelector('svg')
-    if (!svg) return
-    const blob = new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml' })
+    const text = svgText()
+    if (!text) return
+    const blob = new Blob([text], { type: 'image/svg+xml' })
     const href = URL.createObjectURL(blob)
     download(href, fileName(title, 'svg'))
     window.setTimeout(() => URL.revokeObjectURL(href), 1000)
@@ -88,19 +94,16 @@ export const RegistrationQrModal: React.FC<{ open: boolean; onClose: () => void;
       }
     >
       <div className="flex flex-col items-center gap-3 text-center">
-        <div className="rounded-xl border border-ink-200 bg-white p-4">
-          <QRCodeSVG value={url} size={220} level="M" bgColor="#ffffff" fgColor="#000000" />
+        <div className="rounded-xl border border-ink-200 bg-white p-2">
+          <ModernQr value={url} size={240} />
         </div>
         <p className="font-semibold text-ink-900">{title}</p>
         <p className="break-all text-sm text-ink-500">{url}</p>
       </div>
       {/* Full-size copies used for the downloads */}
       <div className="hidden" aria-hidden>
-        <div ref={canvasHolder}>
-          <QRCodeCanvas value={url} size={SIZE} level="M" bgColor="#ffffff" fgColor="#000000" />
-        </div>
         <div ref={svgHolder}>
-          <QRCodeSVG value={url} size={SIZE} level="M" bgColor="#ffffff" fgColor="#000000" marginSize={4} xmlns="http://www.w3.org/2000/svg" />
+          <ModernQr value={url} size={SIZE} />
         </div>
       </div>
     </Modal>

@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { CalendarDays, Check, ClipboardList, ExternalLink, Link2, MapPin, Pencil, Plus, LayoutTemplate } from 'lucide-react'
+import { CalendarDays, Check, ClipboardList, ExternalLink, Link2, MapPin, Pencil, Plus, LayoutTemplate, QrCode } from 'lucide-react'
+import { RegistrationQrModal } from '@/components/RegistrationQrModal'
 import { api, type Event } from '@/services/api'
 import { useCurrentEvent } from '@/lib/event-context'
 import { Badge, Button, ButtonLink, Card, EmptyState, ErrorState, IconButton, PageHeader, Skeleton, useToast } from '@/components/ui'
@@ -25,6 +26,7 @@ export const EventsPage: React.FC = () => {
 
   // Live first, then upcoming (soonest at the top), drafts, then ended and cancelled (most recent first)
   const sorted = useMemo(() => sortByPhase(events), [events])
+  const [qrEvent, setQrEvent] = useState<Event | null>(null)
 
   // Open crew tasks per event, shown on each row
   const { data: tasks } = useQuery({ queryKey: ['tasks', 'all'], queryFn: taskApi.list })
@@ -101,10 +103,14 @@ export const EventsPage: React.FC = () => {
                 onCopy={() => copyLink(ev)}
                 onEdit={() => navigate(`/app/events/${ev.id}/edit`)}
                 onEditPage={() => navigate(`/app/events/${ev.id}/edit?step=page`)}
+                onQr={() => setQrEvent(ev)}
               />
             ))}
           </ul>
         </Card>
+      )}
+      {qrEvent && (
+        <RegistrationQrModal open onClose={() => setQrEvent(null)} url={`${window.location.origin}/e/${qrEvent.slug}`} title={qrEvent.title} />
       )}
     </div>
   )
@@ -118,7 +124,8 @@ const EventRow: React.FC<{
   onCopy: () => void
   onEdit: () => void
   onEditPage: () => void
-}> = ({ event: ev, isCurrent, openTasks, onOpen, onCopy, onEdit, onEditPage }) => {
+  onQr: () => void
+}> = ({ event: ev, isCurrent, openTasks, onOpen, onCopy, onEdit, onEditPage, onQr }) => {
   const over = ['ended', 'cancelled'].includes(eventPhase(ev))
   const pct = ev.capacity ? Math.min(100, Math.round((ev.registered_count / ev.capacity) * 100)) : 0
   const full = ev.capacity > 0 && ev.registered_count >= ev.capacity
@@ -191,6 +198,9 @@ const EventRow: React.FC<{
         </IconButton>
         <IconButton label={`Edit event page for ${ev.title}`} onClick={onEditPage}>
           <LayoutTemplate className="h-4 w-4" aria-hidden />
+        </IconButton>
+        <IconButton label={`QR code for ${ev.title}`} onClick={onQr}>
+          <QrCode className="h-4 w-4" aria-hidden />
         </IconButton>
         <IconButton label={`Copy registration link for ${ev.title}`} onClick={onCopy}>
           <Link2 className="h-4 w-4" aria-hidden />
