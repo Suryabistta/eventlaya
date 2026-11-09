@@ -82,7 +82,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   List<PublicTicketType> get _types => _promo?.ticketTypes ?? _event.ticketTypes;
 
   /// The event sells ticket types: show the Tickets step.
-  bool get _ticketed => _types.isNotEmpty && !_event.registrationOnly;
+  /// No step for registration-only events or a single free ticket type (nothing to choose).
+  bool get _ticketed =>
+      _types.isNotEmpty &&
+      !_event.registrationOnly &&
+      !(_types.length == 1 && _types.first.price == 0 && _types.first.onSale && _promo == null);
 
   int get _orderMax => _event.maxTicketsPerOrder;
 

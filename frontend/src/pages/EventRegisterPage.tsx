@@ -236,7 +236,18 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
 
   // Registration-only events (no pass): no ticket step, nothing to pay, and a confirmation at the end
   const formOnly = event.registration_mode === 'form'
-  const steps: StepId[] = [...(formOnly ? [] : ['tickets' as const]), 'details', ...(questions.length ? ['questions' as const] : []), 'review', 'pass']
+  // Free event with nothing to choose (no ticket types, or a single free one): no ticket step;
+  // the group size is asked in Your details instead
+  const eventTypes = event.ticket_types ?? []
+  const simpleFreeId = formOnly || event.has_promo_codes
+    ? null
+    : !eventTypes.length
+      ? FREE_ID
+      : eventTypes.length === 1 && Number(eventTypes[0].price) === 0 && eventTypes[0].availability === 'on_sale'
+        ? eventTypes[0].id
+        : null
+  const simpleFree = simpleFreeId !== null
+  const steps: StepId[] = [...(formOnly || simpleFree ? [] : ['tickets' as const]), 'details', ...(questions.length ? ['questions' as const] : []), 'review', 'pass']
   const labels: Record<StepId, string> = formOnly ? { ...STEP_LABEL, pass: 'Done' } : STEP_LABEL
   const passIdx = steps.length - 1
 
@@ -296,6 +307,10 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
     const others = pricing.count - (draft.quantities[t.id] ?? 0)
     return Math.max(0, Math.min(t.remaining ?? Infinity, cap - others))
   }
+  // No ticket step: always at least one person (an old saved draft may hold 0)
+  useEffect(() => {
+    if (simpleFreeId && !(draft.quantities[simpleFreeId] > 0)) setDraft((d) => ({ ...d, quantities: { [simpleFreeId]: 1 } }))
+  }, [simpleFreeId, draft.quantities])
   const setQty = (id: string, qty: number) => {
     setDraft((d) => ({ ...d, quantities: { ...d.quantities, [id]: Math.max(0, qty) } }))
     if (errors.tickets) setErrors(({ tickets: _, ...r }) => r)
@@ -804,6 +819,15 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
                             onChange={(e) => setField('phone', e.target.value)}
                           />
                         </div>
+                        {simpleFree && cap > 1 && (
+                          <div className="flex items-center justify-between gap-4 rounded-xl border border-ink-200 px-4 py-3">
+                            <div>
+                              <p className="text-sm font-semibold text-ink-900">How many people?</p>
+                              <p className="text-xs text-ink-500">Including you. Everyone gets their own pass. Up to {cap}.</p>
+                            </div>
+                            <QtyStepper name="people" value={Math.max(1, draft.quantities[simpleFreeId!] ?? 1)} max={cap} onChange={(v) => setQty(simpleFreeId!, Math.max(1, v))} />
+                          </div>
+                        )}
                         {slots.length > 1 && <GuestNames slots={slots} buyer={draft.name.trim()} names={draft.guestNames} onChange={setGuestName} />}
                       </>
                     )}
@@ -855,7 +879,7 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
                         Back
                       </Button>
                     ) : (
-                      <span className="text-sm text-ink-500">{formOnly ? 'Free registration' : pricing.count > 0 ? `${plural(pricing.count, 'ticket')} · ${totalText}` : 'Add a ticket to continue'}</span>
+                      <span className="text-sm text-ink-500">{formOnly ? 'Free registration' : simpleFree ? `${pricing.count === 1 ? '1 person' : `${pricing.count} people`} · Free` : pricing.count > 0 ? `${plural(pricing.count, 'ticket')} · ${totalText}` : 'Add a ticket to continue'}</span>
                     )}
                     <Button type="submit" size="lg" loading={busy} disabled={submitDisabled}>
                       {finalLabel}
@@ -869,7 +893,7 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
 
         <aside className="hidden space-y-4 lg:sticky lg:top-6 lg:block">
           <MiniEvent event={event} when={when.shortDate} detailed={step === 'pass' || step === 'tickets'} />
-          {step !== 'pass' && !formOnly && <OrderSummary pricing={pricing} note={payLine} card />}
+          {step !== 'pass' && !formOnly && !simpleFree && <OrderSummary pricing={pricing} note={payLine} card />}
           {step !== 'pass' && step !== 'tickets' && (draft.name.trim() || draft.email.trim()) && (
             <Card className="p-5">
               <h2 className="text-sm font-medium text-ink-500">Registering</h2>
