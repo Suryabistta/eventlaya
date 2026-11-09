@@ -84,34 +84,34 @@ export const MarketplacePage: React.FC = () => {
       {inApp ? (
         <PageHeader title="Vendors and venues" actions={listVenueAction} />
       ) : (
-        <div className="flex justify-end">
-          {/* The banner replaces the intro text; the heading stays for screen readers and search engines */}
-          <h1 className="sr-only">Vendors and venues in Eastern Nepal</h1>
-          {listVenueAction}
-        </div>
+        // The banner replaces the intro text; the heading stays for screen readers and search engines
+        <h1 className="sr-only">Vendors and venues in Eastern Nepal</h1>
       )}
       <BannerSlider placement="marketplace" />
 
       <div className="space-y-4">
-        <div role="tablist" aria-label="Browse" className="inline-flex rounded-xl bg-ink-100 p-1">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              role="tab"
-              id={`tab-${t.id}`}
-              aria-selected={tab === t.id}
-              aria-controls={`panel-${t.id}`}
-              onClick={() => setTab(t.id)}
-              className={cn(
-                'inline-flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors',
-                tab === t.id ? 'bg-white text-ink-900 shadow-xs' : 'text-ink-600 hover:text-ink-900',
-              )}
-            >
-              <t.icon className="h-4 w-4" aria-hidden />
-              {t.label}
-              {t.count !== undefined && <span className="tabular text-ink-500">{t.count}</span>}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div role="tablist" aria-label="Browse" className="inline-flex rounded-xl bg-ink-100 p-1">
+            {tabs.map((t) => (
+              <button
+                key={t.id}
+                role="tab"
+                id={`tab-${t.id}`}
+                aria-selected={tab === t.id}
+                aria-controls={`panel-${t.id}`}
+                onClick={() => setTab(t.id)}
+                className={cn(
+                  'inline-flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors',
+                  tab === t.id ? 'bg-white text-ink-900 shadow-xs' : 'text-ink-600 hover:text-ink-900',
+                )}
+              >
+                <t.icon className="h-4 w-4" aria-hidden />
+                {t.label}
+                {t.count !== undefined && <span className="tabular text-ink-500">{t.count}</span>}
+              </button>
+            ))}
+          </div>
+          {!inApp && listVenueAction}
         </div>
 
         {tab === 'venues' ? (
