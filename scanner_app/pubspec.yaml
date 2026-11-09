@@ -1,7 +1,7 @@
 name: eventlaya_scanner
 description: Eventlaya Gate Scanner & Organizer App — QR Ticketing, Attendance Management, Live Stats, Push Notifications
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -78,3 +78,7 @@ flutter:
     # Bundled Google Fonts (Bricolage Grotesque, Poppins, JetBrains Mono) so text
     # renders offline at the gate; google_fonts picks them up from here.
     - assets/google_fonts/
+
+dependency_overrides:
+  # image 4.11+ calls ZLibDecoder.decodeLazy (archive 4.1+), but pdf caps archive below 4.1; release builds fail
+  image: 4.10.1
