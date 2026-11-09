@@ -133,3 +133,43 @@ class SiteBrandingTests(PlatformTestBase):
         self.assertEqual(self.client.patch(self.URL, {'logo': '/media/x.png'}, format='json').data['logo'], '/media/x.png')
         self.client.force_authenticate(None)
         self.assertEqual(self.client.get(self.URL).data['logo'], '/media/x.png')
+
+
+class EventCategoryTests(PlatformTestBase):
+    URL = '/api/platform/event-categories/'
+
+    def test_seeded_public_and_superadmin_crud(self):
+        self.assertIn('concert', [c['slug'] for c in self.client.get(self.URL).data])
+        self.as_(self.org)
+        self.assertEqual(self.client.post(self.URL, {'name': 'Expo'}, format='json').status_code, status.HTTP_403_FORBIDDEN)
+        self.as_(self.admin)
+        r = self.client.post(self.URL, {'name': ' Trade Expo '}, format='json')
+        self.assertEqual((r.status_code, r.data['slug']), (status.HTTP_201_CREATED, 'trade-expo'))
+        r = self.client.patch(f"{self.URL}{r.data['id']}/", {'name': 'Expo', 'slug': 'changed'}, format='json')
+        self.assertEqual((r.data['name'], r.data['slug']), ('Expo', 'trade-expo'))  # slug never changes
+        self.assertEqual(self.client.post(self.URL, {'name': 'concert'}, format='json').status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_delete_blocked_while_events_use_it_and_filter(self):
+        from apps.events.models import Event
+        from apps.platform.models import EventCategory
+        Event.objects.create(organizer=self.org, title='Rock Night', slug='rock', location='Dharan',
+                             start_date='2030-01-01', status='published', category='concert')
+        Event.objects.create(organizer=self.org, title='Code Jam', slug='jam', location='Dharan',
+                             start_date='2030-01-01', status='published', category='hackathon')
+        r = self.client.get('/api/events/public/?category=concert')
+        self.assertEqual([e['title'] for e in r.data], ['Rock Night'])
+        self.assertEqual(r.data[0]['category_name'], 'Concert')
+        self.as_(self.admin)
+        concert = EventCategory.objects.get(slug='concert')
+        self.assertEqual(self.client.delete(f'{self.URL}{concert.id}/').status_code, status.HTTP_409_CONFLICT)
+        wedding = EventCategory.objects.get(slug='wedding')
+        self.assertEqual(self.client.delete(f'{self.URL}{wedding.id}/').status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_event_must_use_an_active_type(self):
+        from apps.platform.models import EventCategory
+        EventCategory.objects.filter(slug='sports').update(is_active=False)
+        self.as_(self.org)
+        body = {'title': 'Match', 'location': 'Dharan', 'start_date': '2030-01-01', 'category': 'sports'}
+        self.assertEqual(self.client.post('/api/events/', body, format='json').status_code, status.HTTP_400_BAD_REQUEST)
+        body['category'] = 'concert'
+        self.assertEqual(self.client.post('/api/events/', body, format='json').status_code, status.HTTP_201_CREATED)

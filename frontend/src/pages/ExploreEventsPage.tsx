@@ -10,7 +10,7 @@ import { api, type Event } from '@/services/api'
 import { buttonClass } from '@/components/ui/Button'
 import { Badge, EmptyState, ErrorState, Skeleton } from '@/components/ui'
 import { eventPhase } from '@/lib/phase'
-import { bookLabel, spotsInfo } from '@/lib/event-page'
+import { bookLabel, spotsInfo, useEventCategories } from '@/lib/event-page'
 import { cn } from '@/lib/utils'
 
 type PublicEvent = Event & { organizer_name?: string }
@@ -18,18 +18,26 @@ type PublicEvent = Event & { organizer_name?: string }
 export const ExploreEventsPage: React.FC = () => {
   const [when, setWhen] = useState<'upcoming' | 'past'>('upcoming')
   const cities = useCities()
-  // City lives in the URL so a filtered list can be shared
+  // City and event type live in the URL so a filtered list can be shared
   const [params, setParams] = useSearchParams()
   const city = params.get('city') ?? ''
-  const setCity = (v: string) => setParams(v ? { city: v } : {}, { replace: true })
+  const category = params.get('category') ?? ''
+  const setParam = (key: string, value: string) =>
+    setParams((p) => {
+      if (value) p.set(key, value)
+      else p.delete(key)
+      return p
+    }, { replace: true })
+  const setCity = (v: string) => setParam('city', v)
+  const eventTypes = useEventCategories()
   const [search, setSearch] = useState('')
   const deferredSearch = useDeferredValue(search.trim())
   useTrackSearch(deferredSearch, 'events')
 
   const { data: events = [], isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['public-events', when, city, deferredSearch],
+    queryKey: ['public-events', when, city, category, deferredSearch],
     queryFn: () =>
-      api.getPublicEvents({ when, search: deferredSearch || undefined, city: city || undefined }),
+      api.getPublicEvents({ when, search: deferredSearch || undefined, city: city || undefined, category: category || undefined }),
     placeholderData: (prev) => prev,
   })
 
@@ -79,6 +87,29 @@ export const ExploreEventsPage: React.FC = () => {
         </label>
       </div>
 
+      {/* Quick event types: one row, swiped sideways on phones */}
+      <div
+        role="radiogroup"
+        aria-label="Event type"
+        className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0 [&::-webkit-scrollbar]:hidden"
+      >
+        {[{ slug: '', name: 'All events' }, ...eventTypes].map((t) => (
+          <button
+            key={t.slug || 'all'}
+            type="button"
+            role="radio"
+            aria-checked={category === t.slug}
+            onClick={() => setParam('category', t.slug)}
+            className={cn(
+              'inline-flex h-9 shrink-0 items-center rounded-full border px-3.5 text-sm font-semibold transition-colors',
+              category === t.slug ? 'border-ink-900 bg-ink-900 text-white' : 'border-ink-200 bg-white text-ink-700 hover:border-ink-400',
+            )}
+          >
+            {t.name}
+          </button>
+        ))}
+      </div>
+
       {/* Results */}
       <div className="mt-6">
         {isError ? (
@@ -92,10 +123,10 @@ export const ExploreEventsPage: React.FC = () => {
         ) : events.length === 0 ? (
           <EmptyState
             icon={<CalendarX2 className="h-6 w-6" />}
-            title={deferredSearch || city ? 'No events match those filters' : when === 'upcoming' ? 'No upcoming events yet' : 'No past events'}
+            title={deferredSearch || city || category ? 'No events match those filters' : when === 'upcoming' ? 'No upcoming events yet' : 'No past events'}
             description={
-              deferredSearch || city
-                ? 'Try another city or a shorter search.'
+              deferredSearch || city || category
+                ? 'Try another city, event type or a shorter search.'
                 : 'Organizing something? Publish it on Eventlaya and it shows up here.'
             }
             action={

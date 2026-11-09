@@ -64,7 +64,8 @@ class Event(models.Model):
         OTHER = 'other', 'Other'
 
     tagline = models.CharField(max_length=160, blank=True)
-    category = models.CharField(max_length=20, choices=Category.choices, default=Category.OTHER)
+    # Slug of a platform EventCategory (superadmin-managed); Category holds the original slugs
+    category = models.CharField(max_length=40, default=Category.OTHER, db_index=True)
     highlights = models.JSONField(default=list, blank=True, help_text='Short bullet points shown on the event page')
     contact_email = models.EmailField(blank=True)
     contact_phone = models.CharField(max_length=30, blank=True)

@@ -53,6 +53,26 @@ class GateScanLogSerializer(serializers.ModelSerializer):
 from django.utils.text import slugify
 
 
+def validate_event_category(value, instance=None):
+    """An active event type from Admin → Cities & categories; an event may keep the type it already has."""
+    from apps.platform.models import EventCategory
+    value = (value or '').strip() or Event.Category.OTHER
+    if value == Event.Category.OTHER or (instance is not None and value == instance.category):
+        return value
+    if not EventCategory.objects.filter(slug=value, is_active=True).exists():
+        raise serializers.ValidationError('Pick an event type from the list.')
+    return value
+
+
+def category_labels(serializer):
+    """{slug: name} of every event type, loaded once per response (lists serialize many events)."""
+    from apps.platform.models import EventCategory
+    root = serializer.root
+    if not hasattr(root, '_category_labels'):
+        root._category_labels = dict(EventCategory.objects.values_list('slug', 'name'))
+    return root._category_labels
+
+
 class EventSerializer(serializers.ModelSerializer):
     registered_count = serializers.IntegerField(read_only=True)
     checked_in_count = serializers.IntegerField(read_only=True)
@@ -66,6 +86,7 @@ class EventSerializer(serializers.ModelSerializer):
     phase = serializers.SerializerMethodField()
     registration_open = serializers.SerializerMethodField()
     registration_closed_reason = serializers.SerializerMethodField()
+    category_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
@@ -75,7 +96,7 @@ class EventSerializer(serializers.ModelSerializer):
             'capacity', 'status', 'allow_registration', 'registration_deadline',
             'is_paid', 'ticket_price', 'registration_form', 'registration_form_title',
             'registered_count', 'checked_in_count', 'created_at', 'updated_at',
-            'tagline', 'category', 'phase', 'registration_open', 'registration_closed_reason',
+            'tagline', 'category', 'category_name', 'phase', 'registration_open', 'registration_closed_reason',
             'max_tickets_per_order', 'show_spots_left',
             'managed_by', 'managed_by_logo', 'show_managed_by', 'ticket_layout', 'show_seat_number',
             'parent', 'parent_title',
@@ -106,6 +127,14 @@ class EventSerializer(serializers.ModelSerializer):
         from apps.platform.catalog import safe_url
         return safe_url(value, 'Logo')
 
+
+    def validate_category(self, value):
+        return validate_event_category(value, self.instance)
+
+    def get_category_name(self, obj):
+        if not obj.category or obj.category == Event.Category.OTHER:
+            return ''
+        return category_labels(self).get(obj.category, obj.category.replace('-', ' ').title())
 
     def get_phase(self, obj):
         return obj.phase()
@@ -338,6 +367,9 @@ class EventPageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
         fields = ['tagline', 'category', 'highlights', 'contact_email', 'contact_phone', 'map_query', 'terms', 'agenda', 'speakers', 'faqs']
+
+    def validate_category(self, value):
+        return validate_event_category(value, self.instance)
 
     def validate_highlights(self, value):
         if not isinstance(value, list) or not all(isinstance(v, str) for v in value):

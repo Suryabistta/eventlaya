@@ -1,19 +1,38 @@
+import { useQuery } from '@tanstack/react-query'
 import { request, type DynamicForm, type Event, type Ticket } from '@/services/api'
 import { eventPriceLabel } from '@/lib/tickets'
 import { eventPhase, type EventPhase } from '@/lib/phase'
 
-export type EventCategory = 'conference' | 'hackathon' | 'concert' | 'festival' | 'workshop' | 'sports' | 'wedding' | 'meetup' | 'other'
+/** Slug of an event type managed by the superadmin (Admin → Cities & categories → Event types). */
+export type EventCategory = string
 
-export const categoryLabel: Record<EventCategory, string> = {
-  conference: 'Conference',
-  hackathon: 'Hackathon',
-  concert: 'Concert',
-  festival: 'Festival',
-  workshop: 'Workshop',
-  sports: 'Sports',
-  wedding: 'Wedding',
-  meetup: 'Meetup',
-  other: 'Other',
+export interface EventCategoryItem {
+  id: string
+  name: string
+  slug: string
+  order: number
+  is_active: boolean
+  /** Superadmin list only: events using it (blocks delete) */
+  events_count?: number | null
+}
+
+// Shown until the list loads, or if it fails; matches the types seeded on the server
+const FALLBACK_CATEGORIES = ['Conference', 'Hackathon', 'Concert', 'Festival', 'Workshop', 'Sports', 'Wedding', 'Meetup'].map((name, order) => ({
+  id: name,
+  name,
+  slug: name.toLowerCase(),
+  order,
+  is_active: true,
+}))
+
+/** Active event types, in the superadmin's order. */
+export function useEventCategories(): EventCategoryItem[] {
+  const { data } = useQuery({
+    queryKey: ['event-categories'],
+    queryFn: () => request<EventCategoryItem[]>('/platform/event-categories/'),
+    staleTime: 10 * 60_000,
+  })
+  return data?.length ? data : FALLBACK_CATEGORIES
 }
 
 export interface AgendaItem {

@@ -264,3 +264,30 @@ class SiteBranding(models.Model):
     @classmethod
     def load(cls):
         return cls.objects.get_or_create(pk=1)[0]
+
+
+class EventCategory(models.Model):
+    """A type of event (concert, festival, ...) offered in the event form and the public filters. Managed by the
+    superadmin. Events store the slug, so it never changes after creation; renaming only changes the label."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=60, unique=True)
+    slug = models.SlugField(max_length=40, unique=True)
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['order', 'name']
+        verbose_name_plural = 'Event categories'
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def label(cls, slug):
+        """Display name for an event's category slug ('' for none/other)."""
+        if not slug or slug == 'other':
+            return ''
+        return cls.objects.filter(slug=slug).values_list('name', flat=True).first() or slug.replace('-', ' ').title()

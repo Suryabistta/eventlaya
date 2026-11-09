@@ -135,6 +135,10 @@ class PublicEventListView(APIView):
         if city:
             events = events.filter(location__icontains=city)
 
+        category = request.query_params.get('category', '').strip()
+        if category:
+            events = events.filter(category=category)
+
         # Sub-events are listed on their main event's page, not on their own here
         from apps.accounts.modules import module_enabled
         if module_enabled('sub_events'):

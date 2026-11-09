@@ -1,13 +1,14 @@
 import React, { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { MapPin, Pencil, Plus, Tags, Trash2 } from 'lucide-react'
+import { CalendarDays, MapPin, Pencil, Plus, Tags, Trash2 } from 'lucide-react'
 import type { City, VendorCategory } from '@/services/api'
+import type { EventCategoryItem } from '@/lib/event-page'
 import { Badge, Button, Card, EmptyState, ErrorState, IconButton, Input, Modal, PageHeader, Skeleton, useToast } from '@/components/ui'
 import { platformApi } from './api'
 import { PAGE, Segmented, Switch } from './shared'
 
-type Kind = 'cities' | 'categories'
+type Kind = 'cities' | 'categories' | 'event-types'
 
 /** One row of either list, with the fields the form edits. */
 interface Item {
@@ -17,19 +18,28 @@ interface Item {
   is_active: boolean
   /** Cities: province. Categories: Lucide icon name. */
   extra: string
-  /** Categories only: vendors using it (blocks delete). */
+  /** Vendor categories: live vendors using it. Event types: events using it (blocks delete). */
   used?: number
 }
 
-const toItem = (kind: Kind, x: City | VendorCategory): Item =>
-  kind === 'cities'
-    ? { id: x.id, name: x.name, order: x.order, is_active: x.is_active, extra: (x as City).province }
-    : { id: x.id, name: x.name, order: x.order, is_active: x.is_active, extra: (x as VendorCategory).icon, used: (x as VendorCategory).vendors_count }
+const toItem = (kind: Kind, x: City | VendorCategory | EventCategoryItem): Item => {
+  const base = { id: x.id, name: x.name, order: x.order, is_active: x.is_active }
+  if (kind === 'cities') return { ...base, extra: (x as City).province }
+  if (kind === 'event-types') return { ...base, extra: '', used: (x as EventCategoryItem).events_count ?? 0 }
+  return { ...base, extra: (x as VendorCategory).icon, used: (x as VendorCategory).vendors_count }
+}
 
 const fromItem = (kind: Kind, i: Partial<Item>) => {
   const { extra, used: _used, ...rest } = i
+  if (kind === 'event-types') return rest
   return kind === 'cities' ? { ...rest, province: extra } : { ...rest, icon: extra }
 }
+
+const API = {
+  cities: { list: platformApi.cities, save: platformApi.saveCity, remove: platformApi.deleteCity },
+  categories: { list: platformApi.categories, save: platformApi.saveCategory, remove: platformApi.deleteCategory },
+  'event-types': { list: platformApi.eventTypes, save: platformApi.saveEventType, remove: platformApi.deleteEventType },
+} as const
 
 const COPY = {
   cities: {
@@ -47,12 +57,23 @@ const COPY = {
     empty: 'Vendors pick one of these when they list their business.',
     invalidate: ['marketplaceCategories'],
   },
+  'event-types': {
+    noun: 'event type',
+    extraLabel: '',
+    extraHint: '',
+    empty: 'Organizers pick one of these when they create an event; visitors filter the events page by them.',
+    invalidate: ['event-categories'],
+  },
 } as const
+
+const usedText = (kind: Kind, n: number) =>
+  kind === 'event-types' ? `${n} event${n === 1 ? '' : 's'}` : `${n} live vendor${n === 1 ? '' : 's'}`
 
 /** Superadmin → Cities & categories: the lists behind every city and vendor-category picker. */
 export const CatalogPage: React.FC = () => {
   const [params, setParams] = useSearchParams()
-  const kind: Kind = params.get('tab') === 'categories' ? 'categories' : 'cities'
+  const tab = params.get('tab')
+  const kind: Kind = tab === 'categories' || tab === 'event-types' ? tab : 'cities'
   const copy = COPY[kind]
   const toast = useToast()
   const qc = useQueryClient()
@@ -60,7 +81,7 @@ export const CatalogPage: React.FC = () => {
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-catalog', kind],
-    queryFn: async () => (kind === 'cities' ? await platformApi.cities() : await platformApi.categories()).map((x) => toItem(kind, x)),
+    queryFn: async () => (await API[kind].list()).map((x: City | VendorCategory | EventCategoryItem) => toItem(kind, x)),
   })
 
   const refresh = () => {
@@ -70,7 +91,7 @@ export const CatalogPage: React.FC = () => {
 
   const save = useMutation({
     mutationFn: (i: Partial<Item>): Promise<unknown> =>
-      kind === 'cities' ? platformApi.saveCity(fromItem(kind, i)) : platformApi.saveCategory(fromItem(kind, i)),
+      (API[kind].save as (b: object) => Promise<unknown>)(fromItem(kind, i)),
     onSuccess: (_r, i) => {
       refresh()
       setEditing(null)
@@ -80,7 +101,7 @@ export const CatalogPage: React.FC = () => {
   })
 
   const remove = useMutation({
-    mutationFn: (i: Item) => (kind === 'cities' ? platformApi.deleteCity(i.id!) : platformApi.deleteCategory(i.id!)),
+    mutationFn: (i: Item) => API[kind].remove(i.id!),
     onSuccess: (_r, i) => {
       refresh()
       toast.success(`Deleted ${i.name}`)
@@ -109,6 +130,7 @@ export const CatalogPage: React.FC = () => {
         options={[
           { value: 'cities', label: 'Cities' },
           { value: 'categories', label: 'Vendor categories' },
+          { value: 'event-types', label: 'Event types' },
         ]}
       />
 
@@ -122,8 +144,8 @@ export const CatalogPage: React.FC = () => {
         <ErrorState message="Couldn’t load the list." onRetry={() => refetch()} />
       ) : !data?.length ? (
         <EmptyState
-          icon={kind === 'cities' ? <MapPin className="h-6 w-6" /> : <Tags className="h-6 w-6" />}
-          title={`No ${kind === 'cities' ? 'cities' : 'categories'} yet`}
+          icon={kind === 'cities' ? <MapPin className="h-6 w-6" /> : kind === 'event-types' ? <CalendarDays className="h-6 w-6" /> : <Tags className="h-6 w-6" />}
+          title={`No ${kind === 'cities' ? 'cities' : kind === 'event-types' ? 'event types' : 'categories'} yet`}
           description={copy.empty}
           action={addButton}
         />
@@ -140,7 +162,7 @@ export const CatalogPage: React.FC = () => {
                     {i.name} {!i.is_active && <Badge tone="neutral">Hidden</Badge>}
                   </p>
                   <p className="truncate text-sm text-ink-500">
-                    {[i.extra, i.used !== undefined && `${i.used} live vendor${i.used === 1 ? '' : 's'}`].filter(Boolean).join(' · ') || ' '}
+                    {[i.extra, i.used !== undefined && usedText(kind, i.used)].filter(Boolean).join(' · ') || ' '}
                   </p>
                 </div>
                 <Switch
@@ -213,7 +235,9 @@ const ItemForm: React.FC<{ item: Item; kind: Kind; saving: boolean; onClose: () 
     >
       <form id="catalog-item-form" onSubmit={submit} className="space-y-4">
         <Input label="Name" required autoFocus value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-        <Input label={copy.extraLabel} hint={copy.extraHint} value={form.extra} onChange={(e) => setForm({ ...form, extra: e.target.value })} />
+        {copy.extraLabel && (
+          <Input label={copy.extraLabel} hint={copy.extraHint} value={form.extra} onChange={(e) => setForm({ ...form, extra: e.target.value })} />
+        )}
         <Input
           label="Sort order"
           hint="Lower numbers come first"

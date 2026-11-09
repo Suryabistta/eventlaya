@@ -21,7 +21,7 @@ import {
 import { api, request, type Event } from '@/services/api'
 import { eventPhase } from '@/lib/phase'
 import { useCurrentEvent } from '@/lib/event-context'
-import { categoryLabel, eventPageApi, fmtClock, type EventCategory, type EventPageContent } from '@/lib/event-page'
+import { eventPageApi, useEventCategories, fmtClock, type EventCategory, type EventPageContent } from '@/lib/event-page'
 import { eventPriceLabel, priceText, ticketKeys, ticketsApi } from '@/lib/tickets'
 import { Button, ButtonLink, Card, EmptyState, ErrorState, IconButton, ImageUpload, Input, PageHeader, Select, Skeleton, Textarea, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
@@ -365,6 +365,7 @@ export const EventFormPage: React.FC = () => {
 }
 
 const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ event, page }) => {
+  const eventCategories = useEventCategories()
   const seatsOn = useModuleEnabled('seat_numbers')
   const subEventsOn = useModuleEnabled('sub_events')
   const { events: myEvents } = useCurrentEvent()
@@ -745,11 +746,16 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                     <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_220px] lg:grid-cols-1 xl:grid-cols-[minmax(0,1fr)_220px]">
                       <Input label="Tagline" placeholder="One line that sells the event" hint="Optional. Shown under the title." maxLength={160} {...bind('tagline')} />
                       <Select label="Category" {...bind('category')}>
-                        {(Object.keys(categoryLabel) as EventCategory[]).map((c) => (
-                          <option key={c} value={c}>
-                            {categoryLabel[c]}
+                        {eventCategories.map((c) => (
+                          <option key={c.slug} value={c.slug}>
+                            {c.name}
                           </option>
                         ))}
+                        {/* An event keeps a type the superadmin has since hidden */}
+                        {draft.category !== 'other' && !eventCategories.some((c) => c.slug === draft.category) && (
+                          <option value={draft.category}>{event?.category_name || draft.category}</option>
+                        )}
+                        <option value="other">Other</option>
                       </Select>
                     </div>
                     {subEventsOn && parentChoices.length > 0 && (
@@ -1178,13 +1184,14 @@ const whenText = (d: EventDraft) =>
 
 const Review: React.FC<{ draft: EventDraft; content: PageDraft; event?: Event; onEdit: (id: StepId) => void }> = ({ draft, content, event, onEdit }) => {
   const ticketSummary = useTicketSummary(event?.id)
+  const categoryName = useEventCategories().find((c) => c.slug === draft.category)?.name ?? event?.category_name
   const groups: { id: StepId; rows: [string, string][] }[] = [
     {
       id: 'basics',
       rows: [
         ['Name', draft.title.trim() || 'Not set'],
         ['Tagline', draft.tagline.trim() || 'None'],
-        ['Category', categoryLabel[draft.category]],
+        ['Category', draft.category === 'other' ? 'Other' : (categoryName ?? draft.category)],
         ['Banner', draft.banner ? 'Uploaded' : 'None (a brand pattern is shown)'],
       ],
     },

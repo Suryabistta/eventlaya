@@ -24,7 +24,6 @@ import {
 import { VerifiedBadge } from '@/components/VerifiedBadge'
 import { Badge, Button, ButtonLink, Card, CardHeader, EmptyState, ErrorState, Skeleton, useToast } from '@/components/ui'
 import {
-  categoryLabel,
   downloadIcs,
   eventPageApi,
   eventWhen,
@@ -160,7 +159,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              {event.category && event.category !== 'other' && <Badge tone="brand">{categoryLabel[event.category]}</Badge>}
+              {event.category_name && <Badge tone="brand">{event.category_name}</Badge>}
               {state.phase === 'upcoming' && <Badge tone="info">{startsInText(event)}</Badge>}
               {state.phase === 'ended' && <Badge tone="neutral">Ended</Badge>}
               {state.phase === 'cancelled' && <Badge tone="danger">Cancelled</Badge>}

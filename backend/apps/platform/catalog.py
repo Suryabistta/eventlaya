@@ -5,7 +5,11 @@ from rest_framework import permissions, serializers, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Banner, City, SiteBranding
+from django.db.models import Count, OuterRef, Subquery
+from django.utils.text import slugify
+from rest_framework import status
+
+from .models import Banner, City, EventCategory, SiteBranding
 from .views import IsSuperadmin
 
 
@@ -120,3 +124,52 @@ class SiteBrandingView(APIView):
         s.is_valid(raise_exception=True)
         s.save()
         return Response(s.data)
+
+
+class EventCategorySerializer(serializers.ModelSerializer):
+    events_count = serializers.IntegerField(read_only=True, default=0)
+
+    def validate_name(self, value):
+        value = value.strip()
+        clash = EventCategory.objects.filter(name__iexact=value)
+        if self.instance:
+            clash = clash.exclude(pk=self.instance.pk)
+        if clash.exists():
+            raise serializers.ValidationError('That event type is already in the list.')
+        return value
+
+    def create(self, validated_data):
+        base = slugify(validated_data['name'])[:36] or 'type'
+        slug, n = base, 2
+        while slug == 'other' or EventCategory.objects.filter(slug=slug).exists():
+            slug, n = f'{base}-{n}', n + 1
+        return EventCategory.objects.create(slug=slug, **validated_data)
+
+    class Meta:
+        model = EventCategory
+        fields = ['id', 'name', 'slug', 'order', 'is_active', 'events_count']
+        read_only_fields = ['slug']
+
+
+class EventCategoryViewSet(viewsets.ModelViewSet):
+    """GET (public, active only; superadmin ?all=1) and superadmin CRUD of event types."""
+
+    serializer_class = EventCategorySerializer
+    permission_classes = [ReadPublicWriteSuperadmin]
+    pagination_class = None
+
+    def get_queryset(self):
+        from apps.events.models import Event
+        used = Event.objects.filter(category=OuterRef('slug')).values('category').annotate(n=Count('id')).values('n')
+        qs = EventCategory.objects.annotate(events_count=Subquery(used))
+        return qs if include_inactive(self.request) or self.action != 'list' else qs.filter(is_active=True)
+
+    def destroy(self, request, *args, **kwargs):
+        from apps.events.models import Event
+        cat = self.get_object()
+        n = Event.objects.filter(category=cat.slug).count()
+        if n:
+            return Response({'error': f'{n} event{"s" if n != 1 else ""} use this type. Hide it instead, or change those events first.'},
+                            status=status.HTTP_409_CONFLICT)
+        cat.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

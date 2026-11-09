@@ -23,6 +23,8 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
+from apps.platform.models import EventCategory
+
 from . import site
 
 log = logging.getLogger(__name__)
@@ -270,7 +272,7 @@ def render_card(title, line1='', line2='', eyebrow='', footer='', brand='', badg
 def for_event(ev, when, place, brand='', status_label='', host=''):
     """brand/host: the white-label site's name and domain (empty on eventlaya.com)."""
     card = {
-        'title': ev.title, 'line1': when, 'line2': place, 'eyebrow': ev.get_category_display() if ev.category != 'other' else 'Event',
+        'title': ev.title, 'line1': when, 'line2': place, 'eyebrow': EventCategory.label(ev.category) or 'Event',
         'footer': host or site.site_url().replace('https://', ''),
         'brand': brand, 'badge': status_label,
     }

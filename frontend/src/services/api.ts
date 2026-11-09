@@ -7,6 +7,9 @@ const API_BASE = '/api'
 
 export interface Event {
   id: string
+  /** Event type slug and its display name ('' for none/other) */
+  category?: string
+  category_name?: string
   title: string
   slug: string
   description: string
@@ -667,11 +670,12 @@ export const api = {
 
   // Events
   getEvents: () => request<Event[]>('/events/'),
-  getPublicEvents: (params?: { when?: 'upcoming' | 'past' | 'all'; search?: string; city?: string }) => {
+  getPublicEvents: (params?: { when?: 'upcoming' | 'past' | 'all'; search?: string; city?: string; category?: string }) => {
     const q = new URLSearchParams()
     if (params?.when) q.append('when', params.when)
     if (params?.search) q.append('search', params.search)
     if (params?.city) q.append('city', params.city)
+    if (params?.category) q.append('category', params.category)
     const str = q.toString()
     return request<(Event & { organizer_name?: string })[]>(`/events/public/${str ? `?${str}` : ''}`)
   },

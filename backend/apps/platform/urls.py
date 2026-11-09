@@ -3,11 +3,12 @@ from rest_framework.routers import DefaultRouter
 from . import billing_views as billing
 from . import segments
 from . import org_admin, views
-from .catalog import BannerViewSet, CityViewSet, SiteBrandingView
+from .catalog import BannerViewSet, CityViewSet, EventCategoryViewSet, SiteBrandingView
 
 router = DefaultRouter()
 router.register(r'cities', CityViewSet, basename='platform-cities')
 router.register(r'banners', BannerViewSet, basename='platform-banners')
+router.register(r'event-categories', EventCategoryViewSet, basename='platform-event-categories')
 
 urlpatterns = [
     # White-label

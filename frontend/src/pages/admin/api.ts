@@ -1,3 +1,4 @@
+import type { EventCategoryItem } from '@/lib/event-page'
 import { request, type Banner, type City, type DomainCheckResult, type TenantDomainStatus, type VendorCategory } from '@/services/api'
 
 export type ReviewStatus = 'pending' | 'approved' | 'rejected'
@@ -206,6 +207,10 @@ export const platformApi = {
   saveCategory: (c: Partial<VendorCategory>) =>
     c.id ? request<VendorCategory>(`/marketplace/categories/${c.id}/`, json('PATCH', c)) : request<VendorCategory>('/marketplace/categories/', json('POST', c)),
   deleteCategory: (id: string) => request<void>(`/marketplace/categories/${id}/`, json('DELETE')),
+  eventTypes: () => request<EventCategoryItem[]>('/platform/event-categories/?all=1'),
+  saveEventType: (c: Partial<EventCategoryItem>) =>
+    c.id ? request<EventCategoryItem>(`/platform/event-categories/${c.id}/`, json('PATCH', c)) : request<EventCategoryItem>('/platform/event-categories/', json('POST', c)),
+  deleteEventType: (id: string) => request<void>(`/platform/event-categories/${id}/`, json('DELETE')),
   banners: () => request<Banner[]>('/platform/banners/?all=1'),
   saveBanner: (b: Partial<Banner>) => (b.id ? request<Banner>(`/platform/banners/${b.id}/`, json('PATCH', b)) : request<Banner>('/platform/banners/', json('POST', b))),
   deleteBanner: (id: string) => request<void>(`/platform/banners/${id}/`, json('DELETE')),
