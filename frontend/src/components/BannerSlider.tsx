@@ -63,7 +63,12 @@ export const BannerSlider: React.FC<{ placement: Banner['placement']; className?
         className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {slides.map((s, i) => {
-          const img = <img src={s.image} alt={s.title} loading={i === 0 ? 'eager' : 'lazy'} className="h-full w-full object-cover" />
+          const img = (
+            <picture>
+              {s.image_mobile && <source media="(max-width: 639px)" srcSet={s.image_mobile} />}
+              <img src={s.image} alt={s.title} loading={i === 0 ? 'eager' : 'lazy'} className="h-full w-full object-cover" />
+            </picture>
+          )
           const external = s.link.startsWith('http')
           return (
             <div
@@ -71,7 +76,8 @@ export const BannerSlider: React.FC<{ placement: Banner['placement']; className?
               role="group"
               aria-roledescription="slide"
               aria-label={`${i + 1} of ${slides.length}`}
-              className="relative aspect-[5/2] w-full shrink-0 snap-start sm:aspect-[5/1]"
+              // Phones: the phone image at 2:1, or the main image at its own 5:1 so nothing gets cropped
+              className={cn('relative w-full shrink-0 snap-start sm:aspect-[5/1]', s.image_mobile ? 'aspect-[2/1]' : 'aspect-[5/1]')}
             >
               {s.link ? (
                 external ? (

@@ -58,7 +58,7 @@ export const BannersPage: React.FC = () => {
 
   const nextOrder = (data ?? []).reduce((m, b) => Math.max(m, b.order + 1), 0)
   const add = () =>
-    setEditing({ placement: 'marketplace', image: '', title: '', link: '', order: nextOrder, is_active: true, starts_at: null, ends_at: null })
+    setEditing({ placement: 'marketplace', image: '', image_mobile: '', title: '', link: '', order: nextOrder, is_active: true, starts_at: null, ends_at: null })
   const addButton = (
     <Button icon={<Plus className="h-4 w-4" />} onClick={add}>
       Add banner
@@ -166,6 +166,7 @@ const BannerForm: React.FC<{ draft: Draft; saving: boolean; onClose: () => void;
         }}
       >
         <ImageUpload label="Image" kind="banner" value={form.image} onChange={(url) => set('image', url ?? '')} hint="Wide image, about 5:1. JPG, PNG or WebP, up to 5 MB." />
+        <ImageUpload label="Phone image" kind="banner" value={form.image_mobile} onChange={(url) => set('image_mobile', url ?? '')} hint="Optional. About 2:1 (for example 1200 × 600) with larger text. Without it, phones show the main image, smaller." />
         <Input label="Title" hint="Describes the image for screen readers" value={form.title} onChange={(e) => set('title', e.target.value)} />
         <Input label="Link" hint="Optional. A page on the site (/marketplace/vendors/…) or https://…" value={form.link} onChange={(e) => set('link', e.target.value)} />
         <div className="grid gap-4 sm:grid-cols-3">

@@ -215,6 +215,8 @@ export interface Banner {
   id: string
   placement: 'marketplace'
   image: string
+  /** Optional phone version; without it phones show `image` uncropped */
+  image_mobile: string
   title: string
   link: string
   order: number

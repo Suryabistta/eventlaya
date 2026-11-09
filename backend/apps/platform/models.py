@@ -234,6 +234,7 @@ class Banner(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     placement = models.CharField(max_length=20, choices=Placement.choices, default=Placement.MARKETPLACE, db_index=True)
     image = models.CharField(max_length=500, help_text='Image URL from /api/uploads/ (wide, about 4:1)')
+    image_mobile = models.CharField(max_length=500, blank=True, help_text='Optional phone version (about 2:1); phones show the main image uncropped without it')
     title = models.CharField(max_length=120, blank=True, help_text='Alt text, and a caption when set')
     link = models.CharField(max_length=500, blank=True, help_text='Optional: where a tap goes (/marketplace/... or https://...)')
     order = models.PositiveIntegerField(default=0)

@@ -52,6 +52,9 @@ def safe_url(value, field):
 
 
 class BannerSerializer(serializers.ModelSerializer):
+    def validate_image_mobile(self, value):
+        return safe_url(value, 'Phone image')
+
     def validate_image(self, value):
         if not (value or '').strip():
             raise serializers.ValidationError('Upload an image.')
@@ -69,7 +72,7 @@ class BannerSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Banner
-        fields = ['id', 'placement', 'image', 'title', 'link', 'order', 'is_active', 'starts_at', 'ends_at']
+        fields = ['id', 'placement', 'image', 'image_mobile', 'title', 'link', 'order', 'is_active', 'starts_at', 'ends_at']
 
 
 class BannerViewSet(viewsets.ModelViewSet):
