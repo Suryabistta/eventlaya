@@ -3,7 +3,7 @@ import { useTrackSearch } from '@/lib/analytics'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { useCities } from '@/lib/cities'
-import { Building2, Plus, Search, Store } from 'lucide-react'
+import { Building2, Camera, Flower2, LayoutGrid, Mic2, Music, Palette, Plus, Search, Shirt, Sparkles, Store, Truck, Utensils, Video } from 'lucide-react'
 import { api } from '@/services/api'
 import { useAuth } from '@/lib/auth'
 import { Button, ButtonLink, Card, EmptyState, ErrorState, PageHeader, Skeleton, controlClass } from '@/components/ui'
@@ -12,14 +12,14 @@ import { FilterSelect, VENUE_TYPES, useErrorToast, useMarketplaceBase, vendorPat
 import { VenueCard, VendorCard } from './marketplace/Cards'
 import { BannerSlider } from '@/components/BannerSlider'
 
-type Tab = 'venues' | 'vendors'
+/** Category icons are lucide names set in Admin → Catalog; unknown names fall back to a shop. */
+const CATEGORY_ICONS: Record<string, React.ElementType> = { Building2, Camera, Flower2, Mic2, Music, Palette, Shirt, Sparkles, Truck, Utensils, Video }
 
 export const MarketplacePage: React.FC = () => {
   const { inApp, base } = useMarketplaceBase()
   const { status } = useAuth()
   const signedIn = status === 'authenticated'
 
-  const [tab, setTab] = useState<Tab>('venues')
   // City and category live in the URL so a filtered list can be shared
   const [params, setParams] = useSearchParams()
   const city = params.get('city') ?? ''
@@ -31,7 +31,19 @@ export const MarketplacePage: React.FC = () => {
       return p
     }, { replace: true })
   const setCity = (v: string) => setParam('city', v)
-  const setCategory = (v: string) => setParam('category', v)
+  // One chip row: All · Venues · each vendor category (show=venues, or category=<slug>)
+  const showVenues = params.get('show') === 'venues'
+  const chip = showVenues ? 'venues' : category ? `c:${category}` : 'all'
+  const pickChip = (value: string) => {
+    setVenueType('') // venue type only shows under Venues
+    setParams((p) => {
+      p.delete('show')
+      p.delete('category')
+      if (value === 'venues') p.set('show', 'venues')
+      else if (value.startsWith('c:')) p.set('category', value.slice(2))
+      return p
+    }, { replace: true })
+  }
   const cityOptions = [{ value: '', label: 'All cities' }, ...useCities().map((c) => ({ value: c, label: c }))]
   const [venueType, setVenueType] = useState('')
   const [search, setSearch] = useState('')
@@ -45,8 +57,8 @@ export const MarketplacePage: React.FC = () => {
   })
 
   const vendorsQuery = useQuery({
-    queryKey: ['vendors', category, city],
-    queryFn: () => api.getVendors({ category: category || undefined, city: city || undefined }),
+    queryKey: ['vendors', city],
+    queryFn: () => api.getVendors({ city: city || undefined }),
   })
 
   const venuesQuery = useQuery({
@@ -54,7 +66,7 @@ export const MarketplacePage: React.FC = () => {
     queryFn: () => api.getVenues({ city: city || undefined, type: venueType || undefined, search: deferredSearch || undefined }),
   })
 
-  const filtersActive = Boolean(city || (tab === 'vendors' ? category : venueType || deferredSearch))
+  const filtersActive = Boolean(city || chip !== 'all' || venueType || deferredSearch)
   const clearFilters = () => {
     setParams({}, { replace: true })
     setVenueType('')
@@ -74,9 +86,22 @@ export const MarketplacePage: React.FC = () => {
     </ButtonLink>
   )
 
-  const tabs: { id: Tab; label: string; icon: React.ElementType; count?: number }[] = [
-    { id: 'venues', label: 'Venues', icon: Building2, count: venuesQuery.data?.length },
-    { id: 'vendors', label: 'Vendors', icon: Store, count: vendorsQuery.data?.length },
+  // Vendors come in once per city; the category chip and the search filter them here
+  const q = deferredSearch.toLowerCase()
+  const allVendors = vendorsQuery.data ?? []
+  const vendors = allVendors.filter((v) => (!category || v.category_slug === category) && (!q || v.business_name.toLowerCase().includes(q)))
+  const vendorsResult = { ...vendorsQuery, data: vendorsQuery.data && vendors }
+  const showVenueList = chip === 'all' || chip === 'venues'
+  const showVendorList = chip !== 'venues'
+  const chips: { value: string; label: string; icon: React.ElementType; count?: number }[] = [
+    { value: 'all', label: 'All', icon: LayoutGrid },
+    { value: 'venues', label: 'Venues', icon: Building2, count: venuesQuery.data?.length },
+    ...categories.map((c) => ({
+      value: `c:${c.slug}`,
+      label: c.name,
+      icon: CATEGORY_ICONS[c.icon] ?? Store,
+      count: vendorsQuery.data ? allVendors.filter((v) => v.category_slug === c.slug).length : undefined,
+    })),
   ]
 
   return (
@@ -90,46 +115,50 @@ export const MarketplacePage: React.FC = () => {
       <BannerSlider placement="marketplace" />
 
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div role="tablist" aria-label="Browse" className="inline-flex rounded-xl bg-ink-100 p-1">
-            {tabs.map((t) => (
+        <div className="flex items-center gap-3">
+          {/* Quick categories: one row, swiped sideways on phones */}
+          <div
+            role="tablist"
+            aria-label="Browse by category"
+            className="-mx-4 flex min-w-0 flex-1 gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0 [&::-webkit-scrollbar]:hidden"
+          >
+            {chips.map((c) => (
               <button
-                key={t.id}
+                key={c.value}
+                type="button"
                 role="tab"
-                id={`tab-${t.id}`}
-                aria-selected={tab === t.id}
-                aria-controls={`panel-${t.id}`}
-                onClick={() => setTab(t.id)}
+                aria-selected={chip === c.value}
+                onClick={() => pickChip(c.value)}
                 className={cn(
-                  'inline-flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors',
-                  tab === t.id ? 'bg-white text-ink-900 shadow-xs' : 'text-ink-600 hover:text-ink-900',
+                  'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-sm font-semibold transition-colors',
+                  chip === c.value ? 'border-ink-900 bg-ink-900 text-white' : 'border-ink-200 bg-white text-ink-700 hover:border-ink-400',
                 )}
               >
-                <t.icon className="h-4 w-4" aria-hidden />
-                {t.label}
-                {t.count !== undefined && <span className="tabular text-ink-500">{t.count}</span>}
+                <c.icon className="h-4 w-4" aria-hidden />
+                {c.label}
+                {c.count !== undefined && <span className={cn('tabular', chip === c.value ? 'text-white/70' : 'text-ink-400')}>{c.count}</span>}
               </button>
             ))}
           </div>
-          {!inApp && listVenueAction}
+          {!inApp && <div className="hidden shrink-0 sm:block">{listVenueAction}</div>}
         </div>
 
-        {tab === 'venues' ? (
-          <div className="grid gap-3 sm:grid-cols-[1fr_200px_200px]">
-            <div className="relative">
-              <label htmlFor="venue-search" className="sr-only">
-                Search venues by name
-              </label>
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" aria-hidden />
-              <input
-                id="venue-search"
-                type="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search venues by name"
-                className={cn(controlClass, 'pl-9')}
-              />
-            </div>
+        <div className={cn('grid gap-3', chip === 'venues' ? 'sm:grid-cols-[1fr_200px_200px]' : 'sm:grid-cols-[1fr_200px]')}>
+          <div className="relative">
+            <label htmlFor="market-search" className="sr-only">
+              Search by name
+            </label>
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" aria-hidden />
+            <input
+              id="market-search"
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={chip === 'venues' ? 'Search venues by name' : chip === 'all' ? 'Search venues and vendors' : 'Search vendors by name'}
+              className={cn(controlClass, 'pl-9')}
+            />
+          </div>
+          {chip === 'venues' && (
             <div>
               <label htmlFor="venue-type" className="sr-only">
                 Venue type
@@ -143,24 +172,15 @@ export const MarketplacePage: React.FC = () => {
                 ))}
               </select>
             </div>
-            <FilterSelect id="venue-city" label="City" value={city} onChange={setCity} options={cityOptions} />
-          </div>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-[240px_200px]">
-            <FilterSelect
-              id="vendor-category"
-              label="Category"
-              value={category}
-              onChange={setCategory}
-              options={[{ value: '', label: 'All categories' }, ...categories.map((c) => ({ value: c.slug, label: c.name }))]}
-            />
-            <FilterSelect id="vendor-city" label="City" value={city} onChange={setCity} options={cityOptions} />
-          </div>
-        )}
+          )}
+          <FilterSelect id="market-city" label="City" value={city} onChange={setCity} options={cityOptions} />
+        </div>
+        {!inApp && <div className="sm:hidden">{listVenueAction}</div>}
       </div>
 
-      <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
-        {tab === 'venues' ? (
+      {showVenueList && (
+        <section aria-label="Venues" className="space-y-4">
+          {chip === 'all' && <h2 className="font-display text-lg font-bold text-ink-900">Venues</h2>}
           <Results
             query={venuesQuery}
             gridClass={inApp ? 'grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4' : 'grid gap-5 md:grid-cols-2'}
@@ -175,9 +195,14 @@ export const MarketplacePage: React.FC = () => {
             }
             render={(v) => <VenueCard key={v.id} venue={v} to={venuePath(base, v)} />}
           />
-        ) : (
+        </section>
+      )}
+
+      {showVendorList && (
+        <section aria-label="Vendors" className="space-y-4">
+          {chip === 'all' && <h2 className="font-display text-lg font-bold text-ink-900">Vendors</h2>}
           <Results
-            query={vendorsQuery}
+            query={vendorsResult}
             gridClass={inApp ? 'grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4' : 'grid gap-5 sm:grid-cols-2 lg:grid-cols-3'}
             skeletonClass="h-60"
             empty={
@@ -190,9 +215,8 @@ export const MarketplacePage: React.FC = () => {
             }
             render={(v) => <VendorCard key={v.id} vendor={v} to={vendorPath(base, v)} />}
           />
-        )}
-      </div>
-
+        </section>
+      )}
     </div>
   )
 }
