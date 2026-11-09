@@ -178,7 +178,7 @@ class EventCard extends StatelessWidget {
                       NetImage(url: e.bannerUrl, icon: categoryIcon(e.category)),
                       Positioned(left: 12, top: 12, child: EventPhaseChip(e.base)),
                       if (e.category != null && e.category != 'other')
-                        Positioned(right: 12, top: 12, child: GlassChip(EventCategories.label(e.category))),
+                        Positioned(right: 12, top: 12, child: GlassChip(e.categoryLabel)),
                     ],
                   ),
                 ),

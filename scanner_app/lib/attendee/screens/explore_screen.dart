@@ -43,6 +43,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
 
   Future<void> _refresh() async {
     ref.invalidate(publicEventsProvider(_query));
+    ref.invalidate(eventTypesProvider);
     try {
       await ref.read(publicEventsProvider(_query).future);
     } catch (_) {
@@ -58,8 +59,12 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
   Widget build(BuildContext context) {
     final async = ref.watch(publicEventsProvider(_query));
     final all = async.valueOrNull ?? const <PublicEvent>[];
-    final categories = {for (final e in all) if (e.category != null) e.category!}.toList()
-      ..sort((a, b) => EventCategories.label(a).compareTo(EventCategories.label(b)));
+    // Superadmin's event types; until they load (or offline), the types found in the list
+    final types = ref.watch(eventTypesProvider).valueOrNull ??
+        [
+          for (final c in {for (final e in all) if (e.category != null && e.category != 'other') e.category!})
+            EventType(c, EventCategories.label(c)),
+        ];
     final filtered = _category.isEmpty ? all : all.where((e) => e.category == _category).toList();
     final live = _when == 'upcoming' ? filtered.where((e) => e.isLive).toList() : const <PublicEvent>[];
     final rest = _when == 'upcoming' ? filtered.where((e) => !e.isLive).toList() : filtered;
@@ -106,7 +111,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                     ),
                   ),
                 )),
-                if (categories.length > 1)
+                if (types.isNotEmpty)
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.only(top: 12),
@@ -114,7 +119,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                         padding: EdgeInsets.symmetric(horizontal: gutter),
                         segments: [
                           const Segment('', 'All'),
-                          for (final c in categories) Segment(c, EventCategories.label(c)),
+                          for (final t in types) Segment(t.slug, t.name),
                         ],
                         selected: _category,
                         onChanged: (v) => setState(() => _category = v),
@@ -151,16 +156,20 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                       icon: _search.isNotEmpty ? Icons.search_off_rounded : Icons.event_available_outlined,
                       title: _search.isNotEmpty
                           ? 'No events match "$_search"'
-                          : (_when == 'past' ? 'No past events' : 'No upcoming events yet'),
+                          : _category.isNotEmpty
+                              ? 'No ${_when == 'past' ? 'past' : 'upcoming'} events of this type'
+                              : (_when == 'past' ? 'No past events' : 'No upcoming events yet'),
                       message: _search.isNotEmpty
                           ? 'Try another name, place or organizer.'
                           : 'New events show up here as organizers publish them. Pull down to refresh.',
-                      actionLabel: _search.isNotEmpty ? 'Clear search' : 'Refresh',
+                      actionLabel: _search.isNotEmpty ? 'Clear search' : (_category.isNotEmpty ? 'Show all events' : 'Refresh'),
                       actionIcon: _search.isNotEmpty ? Icons.close_rounded : Icons.refresh_rounded,
                       onAction: () {
                         if (_search.isNotEmpty) {
                           _searchCtrl.clear();
                           setState(() => _search = '');
+                        } else if (_category.isNotEmpty) {
+                          setState(() => _category = '');
                         } else {
                           _refresh();
                         }

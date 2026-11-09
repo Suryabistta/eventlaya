@@ -115,6 +115,15 @@ class AttendeeApi {
     return [for (final e in _list(resp.data)) if (e is Map) PublicEvent.fromJson(Map<String, dynamic>.from(e))];
   }
 
+  /// `GET /api/platform/event-categories/`: active event types in the superadmin's order.
+  Future<List<EventType>> eventTypes() async {
+    final resp = await _api.get('/api/platform/event-categories/');
+    return [
+      for (final c in _list(resp.data))
+        if (c is Map && c['slug'] != null) EventType(c['slug'].toString(), c['name']?.toString() ?? c['slug'].toString()),
+    ];
+  }
+
   /// `GET /api/events/public/<slug>/` → `{event, form}`.
   Future<EventDetail> event(String slug) async {
     final resp = await _api.get('/api/events/public/$slug/');

@@ -10,6 +10,11 @@ final publicEventsProvider =
   return ref.watch(attendeeApiProvider).events(when: q.when, search: q.search);
 });
 
+/// Event types for the Explore filter (managed by the superadmin).
+final eventTypesProvider = FutureProvider<List<EventType>>((ref) {
+  return ref.watch(attendeeApiProvider).eventTypes();
+});
+
 /// Event page (event + registration form).
 final eventDetailProvider = FutureProvider.autoDispose.family<EventDetail, String>((ref, slug) {
   return ref.watch(attendeeApiProvider).event(slug);

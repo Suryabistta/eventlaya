@@ -272,7 +272,7 @@ class _BannerHeader extends StatelessWidget {
             ),
             Positioned(left: 16, bottom: 16, child: EventPhaseChip(event.base)),
             if (event.category != null && event.category != 'other')
-              Positioned(right: 16, bottom: 16, child: GlassChip(EventCategories.label(event.category))),
+              Positioned(right: 16, bottom: 16, child: GlassChip(event.categoryLabel)),
           ],
         ),
       ),

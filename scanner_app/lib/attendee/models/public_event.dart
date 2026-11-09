@@ -29,6 +29,13 @@ class EventCategories {
   static String label(String? slug) => labels[slug] ?? 'Event';
 }
 
+/// An event type managed by the superadmin (`GET /api/platform/event-categories/`).
+class EventType {
+  final String slug;
+  final String name;
+  const EventType(this.slug, this.name);
+}
+
 /// A ticket type as attendees see it (`public_ticket_type` on the server),
 /// optionally with promo pricing from `POST /public/<slug>/promo/`.
 class PublicTicketType {
@@ -125,6 +132,12 @@ class PublicEvent {
   final EventModel base;
   final String? tagline;
   final String? category;
+
+  /// Server display name of [category] ('' for none/other).
+  final String? categoryName;
+
+  /// Label for the category chip: the server's name, else the built-in one.
+  String get categoryLabel => (categoryName?.isNotEmpty ?? false) ? categoryName! : EventCategories.label(category);
   final String? bannerUrl;
   final String organizerName;
   final String? organizerLogo;
@@ -172,6 +185,7 @@ class PublicEvent {
     required this.base,
     this.tagline,
     this.category,
+    this.categoryName,
     this.bannerUrl,
     this.organizerName = '',
     this.organizerLogo,
@@ -203,6 +217,7 @@ class PublicEvent {
       base: EventModel.fromJson(j),
       tagline: _str(j['tagline']),
       category: _str(j['category']),
+      categoryName: _str(j['category_name']),
       bannerUrl: mediaUrl(_str(j['banner']) ?? j['banner_absolute']),
       organizerName: _str(org?['name']) ?? _str(j['organizer_name']) ?? '',
       organizerLogo: mediaUrl(org?['logo']),
