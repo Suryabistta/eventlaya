@@ -77,6 +77,8 @@ class Event(models.Model):
     managed_by = models.CharField(max_length=120, blank=True)
     managed_by_logo = models.CharField(max_length=500, blank=True, help_text='Image URL from /api/uploads/')
     show_managed_by = models.BooleanField(default=False)
+    # Wording before the name: Managed by, Co-organized by, In partnership with... (blank = Managed by)
+    managed_by_label = models.CharField(max_length=40, blank=True)
     # Set by the superadmin (Admin → Featured events): listed first on the events page, with a badge
     is_featured = models.BooleanField(default=False, db_index=True)
 

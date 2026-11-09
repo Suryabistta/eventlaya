@@ -98,7 +98,7 @@ class EventSerializer(serializers.ModelSerializer):
             'registered_count', 'checked_in_count', 'created_at', 'updated_at',
             'tagline', 'category', 'category_name', 'is_featured', 'phase', 'registration_open', 'registration_closed_reason',
             'max_tickets_per_order', 'show_spots_left',
-            'managed_by', 'managed_by_logo', 'show_managed_by', 'ticket_layout', 'show_seat_number', 'registration_mode',
+            'managed_by', 'managed_by_logo', 'show_managed_by', 'managed_by_label', 'ticket_layout', 'show_seat_number', 'registration_mode',
             'parent', 'parent_title',
         ]
         read_only_fields = ['id', 'organizer', 'is_featured', 'created_at', 'updated_at']

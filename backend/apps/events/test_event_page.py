@@ -104,6 +104,15 @@ class EventPageTests(APITestCase):
         self.assertIsNone(ev['banner_absolute'])
         self.assertEqual(ev['map_query'], 'Purwanchal Campus, Dharan')
 
+    def test_partner_credit_wording(self):
+        self.event.managed_by, self.event.show_managed_by = 'Koshi Media', True
+        self.event.save()
+        info = self.client.get('/api/events/public/page-fest/').data['event']['managed_by_info']
+        self.assertEqual((info['label'], info['name']), ('Managed by', 'Koshi Media'))
+        self.event.managed_by_label = 'Co-organized by'
+        self.event.save()
+        self.assertEqual(self.client.get('/api/events/public/page-fest/').data['event']['managed_by_info']['label'], 'Co-organized by')
+
     def test_speakers_section_title(self):
         self.client.force_authenticate(self.organizer)
         self.client.put(self.url, {**self.payload, 'speakers_label': 'Line-up'}, format='json')

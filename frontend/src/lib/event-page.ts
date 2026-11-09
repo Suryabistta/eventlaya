@@ -102,7 +102,7 @@ export type PublicEvent = Event &
     spots_left: number | null
     organizer_info: { name: string; logo: string | null; verified?: boolean }
     /** Only present when the organizer switched "Managed by" on */
-    managed_by_info?: { name: string; logo: string | null } | null
+    managed_by_info?: { name: string; logo: string | null; label?: string } | null
     /** Published sub-events of a main event (module sub_events), soonest first */
     sub_events?: SubEventCard[]
     /** The main event, when this is a sub-event */

@@ -471,7 +471,7 @@ const OrganizerLine: React.FC<{ event: PublicEvent; className?: string; large?: 
               <img src={managed.logo} alt="" onError={() => setManagedLogoFailed(true)} className="h-5 w-5 shrink-0 rounded border border-ink-200 bg-white object-contain" />
             )}
             <span>
-              Managed by <span className="font-semibold text-ink-900">{managed.name}</span>
+              {managed.label || 'Managed by'} <span className="font-semibold text-ink-900">{managed.name}</span>
             </span>
           </span>
         )}

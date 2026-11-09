@@ -51,6 +51,7 @@ interface EventDraft {
   registration_mode: 'pass' | 'form'
   parent: string
   managed_by: string
+  managed_by_label: string
   managed_by_logo: string
   registration_deadline: string // datetime-local value
   is_paid: boolean
@@ -120,6 +121,7 @@ const emptyDraft: EventDraft = {
   registration_mode: 'pass',
   parent: '',
   managed_by: '',
+  managed_by_label: '',
   managed_by_logo: '',
   registration_deadline: '',
   is_paid: false,
@@ -181,6 +183,7 @@ function fromEvent(ev: Event, page?: EventPageContent): EventDraft {
     registration_mode: ev.registration_mode ?? 'pass',
     parent: ev.parent ?? '',
     managed_by: ev.managed_by ?? '',
+    managed_by_label: ev.managed_by_label ?? '',
     managed_by_logo: ev.managed_by_logo ?? '',
     registration_deadline: toLocalInput(ev.registration_deadline),
     is_paid: ev.is_paid,
@@ -245,7 +248,7 @@ const FIELD_STEP: Record<string, StepId> = {
   title: 'basics', tagline: 'basics', parent: 'basics', category: 'basics', description: 'basics', banner: 'basics', banner_url: 'basics',
   start_date: 'when', start_time: 'when', end_date: 'when', end_time: 'when', location: 'when', map_query: 'when',
   capacity: 'registration', show_spots_left: 'registration', status: 'registration', registration_deadline: 'registration', ticket_price: 'registration', is_paid: 'registration', allow_registration: 'registration', ticket_layout: 'registration', show_seat_number: 'registration', registration_mode: 'registration',
-  managed_by: 'page', managed_by_logo: 'page', show_managed_by: 'page',
+  managed_by: 'page', managed_by_label: 'page', managed_by_logo: 'page', show_managed_by: 'page',
 }
 
 function validateStep(id: StepId, d: EventDraft, p: PageDraft, isNew = false): Errors {
@@ -276,7 +279,7 @@ function validateStep(id: StepId, d: EventDraft, p: PageDraft, isNew = false): E
   }
   if (id === 'page') {
     if (p.contact_email.trim() && !EMAIL_RE.test(p.contact_email.trim())) e.contact_email = 'Enter an email like hello@example.com.'
-    if (d.show_managed_by && !d.managed_by.trim()) e.managed_by = 'Enter who manages the event, or turn this off.'
+    if (d.show_managed_by && !d.managed_by.trim()) e.managed_by = 'Enter the partner’s name, or turn this off.'
     p.highlights.forEach((h) => h.text.length > 120 && (e[`highlight.${h.key}`] = 'Keep each highlight to 120 characters or fewer.'))
   }
   if (id === 'schedule') {
@@ -487,6 +490,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
         registration_mode: draft.registration_mode,
         ...(subEventsOn ? { parent: draft.parent || null } : {}),
         managed_by: draft.managed_by.trim(),
+        managed_by_label: draft.managed_by_label.trim(),
         managed_by_logo: draft.managed_by_logo,
         registration_deadline: draft.registration_deadline ? new Date(draft.registration_deadline).toISOString() : isEdit ? null : undefined,
         // On create the server makes a first ticket type from this. After that, prices live on the Tickets page.
@@ -936,14 +940,17 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                     </div>
                     <div className="space-y-4 border-t border-ink-100 pt-5">
                       <Checkbox
-                        label="Show “Managed by”"
-                        hint="Credit the agency or team running the event, next to your organization’s name."
+                        label="Show a partner credit"
+                        hint="Credit another organization next to yours: managed by, co-organized by, in partnership with…"
                         checked={draft.show_managed_by}
                         onChange={(v) => set('show_managed_by', v)}
                       />
                       {draft.show_managed_by && (
                         <div className="grid gap-4 sm:grid-cols-[1fr_200px]">
-                          <Input label="Managed by" required placeholder="Eastern Events Pvt. Ltd." {...bind('managed_by')} />
+                          <div className="space-y-4">
+                            <CreditLabel value={draft.managed_by_label} onChange={(v) => set('managed_by_label', v)} />
+                            <Input label="Name" required placeholder="Eastern Events Pvt. Ltd." {...bind('managed_by')} />
+                          </div>
                           <ImageUpload label="Logo" kind="logo" shape="square" hint="Optional" value={draft.managed_by_logo || null} onChange={(url) => set('managed_by_logo', url ?? '')} />
                         </div>
                       )}
@@ -1491,6 +1498,32 @@ const SpeakersTitle: React.FC<{ value: string; onChange: (v: string) => void }> 
       </Select>
       {preset === 'custom' && (
         <Input label="Custom title" required maxLength={40} placeholder="Chief guests" value={value.trimStart()} onChange={(e) => onChange(e.target.value || ' ')} />
+      )}
+    </div>
+  )
+}
+
+const CREDIT_LABELS = ['Managed by', 'Co-organized by', 'In partnership with', 'Supported by', 'Sponsored by', 'Powered by']
+
+/** Wording of the partner credit under the event title ("Co-organized by ..."). */
+const CreditLabel: React.FC<{ value: string; onChange: (v: string) => void }> = ({ value, onChange }) => {
+  const preset = value === '' ? 'Managed by' : CREDIT_LABELS.includes(value) ? value : 'custom'
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Select
+        label="Credit line"
+        value={preset}
+        onChange={(e) => onChange(e.target.value === 'custom' ? ' ' : e.target.value === 'Managed by' ? '' : e.target.value)}
+      >
+        {CREDIT_LABELS.map((t) => (
+          <option key={t} value={t}>
+            {t}
+          </option>
+        ))}
+        <option value="custom">Custom…</option>
+      </Select>
+      {preset === 'custom' && (
+        <Input label="Custom wording" required maxLength={40} placeholder="Media partner" value={value.trimStart()} onChange={(e) => onChange(e.target.value || ' ')} />
       )}
     </div>
   )

@@ -49,6 +49,8 @@ export interface Event {
   managed_by?: string
   managed_by_logo?: string
   show_managed_by?: boolean
+  /** Wording before the name ('' = Managed by) */
+  managed_by_label?: string
   ticket_layout?: 'vertical' | 'landscape'
   /** Main event id when this is a sub-event (module sub_events) */
   parent?: string | null
