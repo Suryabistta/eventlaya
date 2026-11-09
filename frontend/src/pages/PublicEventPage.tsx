@@ -458,23 +458,20 @@ const OrganizerLine: React.FC<{ event: PublicEvent; className?: string; large?: 
           {initials(name)}
         </span>
       )}
-      {/* Managed by sits to the right of Organised by. Phones: two side-by-side columns, label above each name */}
-      <p className="flex min-w-0 items-center gap-3 text-sm text-ink-600">
-        <span className="flex min-w-0 flex-col sm:block">
-          {!large && <span className="text-xs sm:text-sm">Organised by </span>}
-          <span>
-            <span className="font-semibold text-ink-900">{name}</span>
-            {event.organizer_info?.verified && <VerifiedBadge />}
-          </span>
+      {/* Phones: Managed by on its own row under Organised by. Desktop: same row, to the right */}
+      <p className="flex min-w-0 flex-col gap-0.5 text-sm text-ink-600 sm:flex-row sm:items-center sm:gap-3">
+        <span className="min-w-0">
+          {large ? '' : 'Organised by '}
+          <span className="font-semibold text-ink-900">{name}</span>
+          {event.organizer_info?.verified && <VerifiedBadge />}
         </span>
         {managed && (
-          <span className="flex min-w-0 items-center gap-1.5 self-stretch border-l border-ink-200 pl-3">
+          <span className="flex min-w-0 items-center gap-1.5 sm:border-l sm:border-ink-200 sm:pl-3">
             {managed.logo && !managedLogoFailed && (
               <img src={managed.logo} alt="" onError={() => setManagedLogoFailed(true)} className="h-5 w-5 shrink-0 rounded border border-ink-200 bg-white object-contain" />
             )}
-            <span className="flex min-w-0 flex-col sm:block">
-              <span className="text-xs sm:text-sm">Managed by </span>
-              <span className="font-semibold text-ink-900">{managed.name}</span>
+            <span>
+              Managed by <span className="font-semibold text-ink-900">{managed.name}</span>
             </span>
           </span>
         )}
