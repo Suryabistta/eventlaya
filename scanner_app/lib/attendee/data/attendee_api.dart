@@ -51,9 +51,14 @@ class RegistrationResult {
     this.orderReference,
     this.orderTotal,
     this.payment,
+    this.registrationNumber,
   });
 
   bool get paymentRequired => payment != null;
+
+  /// Registration-only event: confirmed with this number, no pass.
+  final String? registrationNumber;
+  bool get registrationOnly => registrationNumber != null;
 }
 
 /// Everything voting on an event page: quick polls and contests
@@ -201,6 +206,15 @@ class AttendeeApi {
         payment: start,
       );
     }
+    if (data['registration_only'] == true && data['registration'] is Map) {
+      return RegistrationResult(
+        ticket: const {},
+        tickets: const [],
+        alreadyRegistered: data['already_registered'] == true,
+        message: data['message']?.toString() ?? '',
+        registrationNumber: _map(data['registration'])['number']?.toString() ?? '',
+      );
+    }
     if (data['ticket'] is! Map) throw const ApiFailure('The server did not return a ticket. Please try again.');
     final ticket = _map(data['ticket']);
     final tickets = [for (final t in _list(data['tickets'])) if (t is Map) _map(t)];
@@ -220,7 +234,8 @@ class AttendeeApi {
     final resp = await _api.get('/api/me/tickets/', queryParameters: {'when': 'all'});
     return [
       for (final t in _list(_map(resp.data)['results']))
-        if (t is Map) StoredPass.fromAccount(_map(t)),
+        // Registration-only events have no pass to keep on the phone
+        if (t is Map && t['registration_only'] != true) StoredPass.fromAccount(_map(t)),
     ];
   }
 

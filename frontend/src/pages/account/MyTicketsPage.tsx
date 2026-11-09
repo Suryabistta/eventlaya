@@ -157,9 +157,10 @@ const TicketCard: React.FC<{ tickets: MyTicket[]; onShowPass: (t: MyTicket) => v
   const e = t.event
   const when = whenOf(e)
   const phase = phaseMeta[e.phase] ?? phaseMeta.upcoming
-  const status = STATUS[t.status] ?? STATUS.valid
+  // Registration-only events have no pass: shown as "Registered", nothing to open
+  const status = t.registration_only && t.status === 'valid' ? { label: 'Registered', tone: 'success' as const } : (STATUS[t.status] ?? STATUS.valid)
   const banner = mediaUrl(e.banner)
-  const usable = t.status !== 'cancelled' && e.phase !== 'cancelled'
+  const usable = t.status !== 'cancelled' && e.phase !== 'cancelled' && !t.registration_only
 
   const editReview = async () => {
     if (!t.my_review_id) return

@@ -82,7 +82,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   List<PublicTicketType> get _types => _promo?.ticketTypes ?? _event.ticketTypes;
 
   /// The event sells ticket types: show the Tickets step.
-  bool get _ticketed => _types.isNotEmpty;
+  bool get _ticketed => _types.isNotEmpty && !_event.registrationOnly;
 
   int get _orderMax => _event.maxTicketsPerOrder;
 
@@ -362,6 +362,24 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       if (result.paymentRequired) {
         if (mounted) setState(() => _submitting = false);
         await _completePayment(result, email);
+        return;
+      }
+      if (result.registrationOnly) {
+        ref.invalidate(eventDetailProvider(widget.event.slug));
+        if (!mounted) return;
+        setState(() => _submitting = false);
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            icon: const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 40),
+            title: Text(result.alreadyRegistered ? "You're already registered" : "You're registered"),
+            content: Text(
+              'Registration no. ${result.registrationNumber}. A confirmation was sent to $email. No ticket or pass is needed.',
+            ),
+            actions: [TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Done'))],
+          ),
+        );
+        if (mounted) Navigator.of(context).pop();
         return;
       }
       final event = _event;

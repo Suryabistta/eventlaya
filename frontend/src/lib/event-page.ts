@@ -318,5 +318,6 @@ export interface PublicPass {
 /** Public: one pass by its QR token (the link in the confirmation email). */
 export const getPublicPass = (token: string) => request<PublicPass>(`/events/passes/${encodeURIComponent(token)}/`)
 
-/** Call to action on an event: "Get tickets" when any ticket costs money, otherwise "Book a spot". */
-export const bookLabel = (e: Pick<Event, 'is_paid' | 'ticket_price' | 'ticket_types'>) => (hasPaidTickets(e) ? 'Get tickets' : 'Book a spot')
+/** Call to action on an event: "Register" for registration-only events, "Get tickets" when any ticket costs money, otherwise "Book a spot". */
+export const bookLabel = (e: Pick<Event, 'is_paid' | 'ticket_price' | 'ticket_types' | 'registration_mode'>) =>
+  e.registration_mode === 'form' ? 'Register' : hasPaidTickets(e) ? 'Get tickets' : 'Book a spot'

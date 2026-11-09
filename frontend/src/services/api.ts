@@ -12,6 +12,8 @@ export interface Event {
   category_name?: string
   /** Picked by the superadmin: listed first, with a badge */
   is_featured?: boolean
+  /** 'form': registration only, no pass or check-in */
+  registration_mode?: 'pass' | 'form'
   title: string
   slug: string
   description: string
@@ -127,6 +129,9 @@ export interface RegisterResult {
   tickets?: Ticket[]
   order?: { id: string; reference: string; ticket_count: number; total: string; payment?: import('@/lib/payments').PaymentInfo }
   already_registered?: boolean
+  /** Registration-only event: no pass, just this confirmation */
+  registration_only?: boolean
+  registration?: { id: string; number: string; name: string; email: string; created_at: string }
   payment_required?: boolean
   payment?: import('@/lib/payments').PublicIntent
   checkout?: import('@/lib/payments').Checkout

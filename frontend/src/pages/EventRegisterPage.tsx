@@ -206,6 +206,13 @@ export const EventRegisterPage: React.FC = () => {
 
 /* ------------------------------------------------------------------ */
 
+interface RegisteredInfo {
+  number: string
+  name: string
+  email: string
+  existing: boolean
+}
+
 interface Issued {
   tickets: Ticket[]
   existing: boolean
@@ -227,7 +234,10 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
   const mappedFor = (b: Builtin) => mapped.find((f) => builtinOf(f) === b)
   const phoneRequired = Boolean(mappedFor('phone')?.required)
 
-  const steps: StepId[] = questions.length ? ['tickets', 'details', 'questions', 'review', 'pass'] : ['tickets', 'details', 'review', 'pass']
+  // Registration-only events (no pass): no ticket step, nothing to pay, and a confirmation at the end
+  const formOnly = event.registration_mode === 'form'
+  const steps: StepId[] = [...(formOnly ? [] : ['tickets' as const]), 'details', ...(questions.length ? ['questions' as const] : []), 'review', 'pass']
+  const labels: Record<StepId, string> = formOnly ? { ...STEP_LABEL, pass: 'Done' } : STEP_LABEL
   const passIdx = steps.length - 1
 
   const [draft, setDraft] = useState<Draft>(() => {
@@ -271,6 +281,7 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
   const cap = Math.max(0, Math.min(orderMax, spotsLeft ?? Infinity))
 
   const pricing: Pricing = useMemo(() => {
+    if (formOnly) return { lines: [], count: 1, subtotal: 0, discount: 0, total: 0, promoCode: null, promoUnused: false }
     const lines = buyable.map((type) => ({ type, qty: Math.max(0, draft.quantities[type.id] ?? 0) })).filter((l) => l.qty > 0)
     const count = lines.reduce((a, l) => a + l.qty, 0)
     const subtotal = lines.reduce((a, l) => a + l.qty * Number(l.type.price), 0)
@@ -339,6 +350,7 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
   const slots: TypeOption[] = pricing.lines.flatMap((l) => Array.from({ length: l.qty }, () => l.type))
 
   const viewingStored = params.get('view') === 'pass'
+  const [registered, setRegistered] = useState<RegisteredInfo | null>(null)
   const [issued, setIssued] = useState<Issued | null>(() => {
     const stored = viewingStored ? getStoredPasses(slug) : []
     return stored.length ? { tickets: stored, existing: true } : null
@@ -346,7 +358,7 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
 
   // Which step the URL asks for, never past what has been validated
   const requested = Math.max(0, (Number(params.get('step')) || 1) - 1)
-  const stepIdx = issued ? passIdx : Math.min(requested, draft.maxReached, passIdx - 1)
+  const stepIdx = issued || registered ? passIdx : Math.min(requested, draft.maxReached, passIdx - 1)
   const step = steps[stepIdx]
 
   useEffect(() => {
@@ -459,7 +471,7 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
       return api.registerForEvent(slug, {
         ...builtinValue,
         answers: payload,
-        items: buildItems(),
+        items: formOnly ? [{ quantity: 1, guest_names: [] }] : buildItems(),
         promo_code: pricing.promoCode ?? undefined,
         ...(draft.additional ? { additional: true } : {}),
         // Online: the provider sends the buyer back to this page (review step), where the payment is confirmed
@@ -471,6 +483,19 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
       })
     },
     onSuccess: (res) => {
+      if (res.registration_only && res.registration) {
+        void queryClient.invalidateQueries({ queryKey: ['publicEvent', slug] })
+        void queryClient.invalidateQueries({ queryKey: ['my-tickets'] })
+        if (!res.already_registered) {
+          saveDraft(slug, null)
+          track('register_event', { event_slug: slug, ticket_count: 1, value: 0, currency: 'NPR', payment: 'free' })
+        }
+        setRegistered({ ...res.registration, existing: Boolean(res.already_registered) })
+        setParams((p) => (p.set('step', String(passIdx + 1)), p), { replace: true })
+        if (res.already_registered) toast.info("You're already registered", `${res.registration.email} is already on the list.`)
+        else toast.success("You're registered", 'A confirmation is on its way to your email.')
+        return
+      }
       if (res.payment_required && res.checkout) {
         // Tickets are held; passes come after the provider confirms the payment
         setRedirecting(true)
@@ -626,6 +651,7 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
           ? `Register and get ${pricing.count} passes`
           : 'Register and get my pass'
       : 'Continue'
+  const finalLabel = formOnly && step === 'review' ? (register.isPending ? 'Registering' : 'Register') : submitLabel
   const submitDisabled = step === 'tickets' && pricing.count < 1
   const totalText = pricing.total > 0 ? (onlineProviders.length ? `Rs ${money(pricing.total)}` : `Pay Rs ${money(pricing.total)} at the venue`) : 'Free'
   const payLine =
@@ -671,7 +697,7 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
               </span>
             </p>
           )}
-          <Stepper steps={steps} current={stepIdx} maxReached={issued ? passIdx : draft.maxReached} onJump={issued ? undefined : goTo} />
+          <Stepper steps={steps} labels={labels} current={stepIdx} maxReached={issued || registered ? passIdx : draft.maxReached} onJump={issued || registered ? undefined : goTo} />
 
           <div key={step} className="el-step mt-6" style={{ ['--step-dir' as string]: String(direction) }}>
             {paymentId && !issued ? (
@@ -682,6 +708,8 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
                 onVenue={venueAllowed ? () => retryPayment(true) : undefined}
                 headingRef={headingRef}
               />
+            ) : step === 'pass' && registered ? (
+              <RegisteredStep event={event} dateLabel={when.shortDate} info={registered} headingRef={headingRef} />
             ) : step === 'pass' && issued ? (
               <PassStep event={event} dateLabel={when.shortDate} issued={issued} onAnother={reset} onGetMore={state.open ? getMore : undefined} headingRef={headingRef} />
             ) : (
@@ -689,13 +717,15 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
                 <form id="reg-form" onSubmit={onSubmit} noValidate>
                   <div className="border-b border-ink-100 px-5 py-5 sm:px-6">
                     <h2 ref={headingRef} tabIndex={-1} className="text-xl font-bold text-ink-900 outline-none focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0">
-                      {STEP_LABEL[step]}
+                      {labels[step]}
                     </h2>
                     <p className="mt-1 text-sm text-ink-500">
                       {step === 'tickets' && (orderMax > 1 ? 'Choose how many tickets you need. Each ticket is its own pass with its own QR code.' : 'Choose your ticket.')}
-                      {step === 'details' && (pricing.count > 1 ? 'Tell us who is buying. All passes go to this email.' : 'Tell us who is coming. Your pass is linked to this email.')}
+                      {step === 'details' && formOnly && 'Tell us who is registering. The confirmation goes to this email.'}
+                      {step === 'details' && !formOnly && (pricing.count > 1 ? 'Tell us who is buying. All passes go to this email.' : 'Tell us who is coming. Your pass is linked to this email.')}
                       {step === 'questions' && (form?.description || 'A few questions from the organizer.')}
-                      {step === 'review' && (pricing.count > 1 ? 'Check everything is right, then get your passes.' : 'Check everything is right, then get your pass.')}
+                      {step === 'review' && formOnly && 'Check everything is right, then register.'}
+                      {step === 'review' && !formOnly && (pricing.count > 1 ? 'Check everything is right, then get your passes.' : 'Check everything is right, then get your pass.')}
                     </p>
                   </div>
 
@@ -760,7 +790,7 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
                             inputMode="email"
                             value={draft.email}
                             placeholder="name@example.com"
-                            hint={pricing.count > 1 ? 'All passes are sent to this email.' : 'Your pass is linked to this email.'}
+                            hint={formOnly ? 'Your confirmation is sent to this email.' : pricing.count > 1 ? 'All passes are sent to this email.' : 'Your pass is linked to this email.'}
                             error={errors.email}
                             className={invalidCls}
                             onChange={(e) => setField('email', e.target.value)}
@@ -829,10 +859,10 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
                         Back
                       </Button>
                     ) : (
-                      <span className="text-sm text-ink-500">{pricing.count > 0 ? `${plural(pricing.count, 'ticket')} · ${totalText}` : 'Add a ticket to continue'}</span>
+                      <span className="text-sm text-ink-500">{formOnly ? 'Free registration' : pricing.count > 0 ? `${plural(pricing.count, 'ticket')} · ${totalText}` : 'Add a ticket to continue'}</span>
                     )}
                     <Button type="submit" size="lg" loading={busy} disabled={submitDisabled}>
-                      {submitLabel}
+                      {finalLabel}
                     </Button>
                   </div>
                 </form>
@@ -843,7 +873,7 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
 
         <aside className="hidden space-y-4 lg:sticky lg:top-6 lg:block">
           <MiniEvent event={event} when={when.shortDate} detailed={step === 'pass' || step === 'tickets'} />
-          {step !== 'pass' && <OrderSummary pricing={pricing} note={payLine} card />}
+          {step !== 'pass' && !formOnly && <OrderSummary pricing={pricing} note={payLine} card />}
           {step !== 'pass' && step !== 'tickets' && (draft.name.trim() || draft.email.trim()) && (
             <Card className="p-5">
               <h2 className="text-sm font-medium text-ink-500">Registering</h2>
@@ -860,7 +890,7 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
           {step === 'tickets' && (
             <p className="mx-auto flex max-w-6xl items-baseline justify-between gap-3 px-4 pt-2.5 text-sm sm:px-6" aria-live="polite">
-              <span className="text-ink-600">{pricing.count > 0 ? plural(pricing.count, 'ticket') : 'No tickets yet'}</span>
+              <span className="text-ink-600">{formOnly ? 'Free registration' : pricing.count > 0 ? plural(pricing.count, 'ticket') : 'No tickets yet'}</span>
               {pricing.count > 0 && <span className="font-bold tabular text-ink-900">{totalText}</span>}
             </p>
           )}
@@ -871,7 +901,7 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
               </Button>
             )}
             <Button type="submit" form="reg-form" size="lg" className="flex-[2]" loading={busy} disabled={submitDisabled}>
-              {submitLabel}
+              {finalLabel}
             </Button>
           </div>
         </div>
@@ -892,14 +922,14 @@ const stepMotionCss = `
 
 /* ------------------------------------------------------------------ */
 
-const Stepper: React.FC<{ steps: StepId[]; current: number; maxReached: number; onJump?: (i: number) => void }> = ({ steps, current, maxReached, onJump }) => {
+const Stepper: React.FC<{ steps: StepId[]; labels: Record<StepId, string>; current: number; maxReached: number; onJump?: (i: number) => void }> = ({ steps, labels, current, maxReached, onJump }) => {
   const pct = Math.round(((current + 1) / steps.length) * 100)
   return (
     <nav aria-label="Registration steps">
       {/* Phones */}
       <div className="sm:hidden">
         <p className="flex items-baseline justify-between text-sm">
-          <span className="font-semibold text-ink-900">{STEP_LABEL[steps[current]]}</span>
+          <span className="font-semibold text-ink-900">{labels[steps[current]]}</span>
           <span className="text-ink-500">
             Step {current + 1} of {steps.length}
           </span>
@@ -930,14 +960,14 @@ const Stepper: React.FC<{ steps: StepId[]; current: number; maxReached: number; 
             <li key={s} className="relative flex flex-1 flex-col items-center text-center" aria-current={isCurrent ? 'step' : undefined}>
               {i > 0 && <span aria-hidden className={cn('absolute right-1/2 top-[18px] h-0.5 w-full -translate-y-1/2', i <= current ? 'bg-brand-600' : 'bg-ink-200')} style={{ marginRight: 18 }} />}
               {canJump ? (
-                <button type="button" onClick={() => onJump!(i)} className="relative z-10 rounded-full" aria-label={`Go back to ${STEP_LABEL[s]}`}>
+                <button type="button" onClick={() => onJump!(i)} className="relative z-10 rounded-full" aria-label={`Go back to ${labels[s]}`}>
                   {circle}
                 </button>
               ) : (
                 <span className="relative z-10">{circle}</span>
               )}
               <span className={cn('mt-2 text-xs font-medium sm:text-sm', isCurrent ? 'text-ink-900' : done ? 'text-ink-700' : 'text-ink-400')}>
-                {STEP_LABEL[s]}
+                {labels[s]}
                 {done && <span className="sr-only"> (completed)</span>}
               </span>
             </li>
@@ -1659,3 +1689,29 @@ const ChoiceGroup: React.FC<{ field: FormField; value: unknown; error?: string; 
     </fieldset>
   )
 }
+
+/** Registration-only events: confirmation instead of a pass (nothing to show at the gate). */
+const RegisteredStep: React.FC<{ event: PublicEvent; dateLabel: string; info: RegisteredInfo; headingRef: React.RefObject<HTMLHeadingElement | null> }> = ({
+  event,
+  dateLabel,
+  info,
+  headingRef,
+}) => (
+  <Card className="p-6 text-center sm:p-8">
+    <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+      <Check className="h-7 w-7" aria-hidden />
+    </span>
+    <h2 ref={headingRef} tabIndex={-1} className="mt-4 text-2xl font-bold text-ink-900 outline-none">
+      {info.existing ? 'You’re already registered' : 'You’re registered'}
+    </h2>
+    <p className="mt-2 text-ink-600">
+      {info.name}, you’re on the list for <span className="font-semibold text-ink-900">{event.title}</span> ({dateLabel}).
+    </p>
+    <p className="mt-1 text-sm text-ink-500">
+      Registration no. <span className="font-mono font-semibold text-ink-800">{info.number}</span>. A confirmation was sent to {info.email}. No ticket or pass is needed.
+    </p>
+    <ButtonLink to={`/e/${event.slug}`} variant="secondary" className="mt-6">
+      Back to the event
+    </ButtonLink>
+  </Card>
+)

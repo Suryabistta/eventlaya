@@ -179,6 +179,50 @@ Event page: {event_url(event)}
         return False
 
 
+def send_registration_email(ticket, event):
+    """Registration-only events (no pass): a plain confirmation of the registration, no QR or pass link."""
+    from apps.events.sub_events import display_title
+    title = display_title(event)
+    when = f"{event.start_date} {event.start_time or ''}".strip()
+    brand, powered = email_brand(event)
+    signature = 'Organized via Eventlaya' if brand == 'Eventlaya' else (brand + ('\nPowered by Eventlaya' if powered else ''))
+    text = f"""Namaste {ticket.attendee_name},
+
+Your registration for '{title}' is confirmed.
+
+• Registration no. : {ticket.ticket_number}
+• Event            : {title}
+• When             : {when}
+• Where            : {event.location}
+
+No ticket or pass is needed. The organizer will contact you if anything else is required.
+
+Event page: {event_url(event)}
+
+{signature}
+"""
+    html = f"""<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#1C1724;">
+<h2 style="margin:0 0 4px;">You're registered</h2>
+<p style="margin:0 0 16px;color:#64748b;">{escape(title)}</p>
+<p>Namaste <strong>{escape(ticket.attendee_name)}</strong>, your registration is confirmed.</p>
+<table style="width:100%;border-collapse:collapse;font-size:14px;margin:16px 0;">
+<tr><td style="padding:8px 0;color:#64748b;border-bottom:1px solid #eee;">Registration no.</td><td style="padding:8px 0;text-align:right;font-weight:700;border-bottom:1px solid #eee;">{escape(ticket.ticket_number)}</td></tr>
+<tr><td style="padding:8px 0;color:#64748b;border-bottom:1px solid #eee;">When</td><td style="padding:8px 0;text-align:right;border-bottom:1px solid #eee;">{escape(when)}</td></tr>
+<tr><td style="padding:8px 0;color:#64748b;">Where</td><td style="padding:8px 0;text-align:right;">{escape(event.location)}</td></tr>
+</table>
+<p style="color:#64748b;font-size:13px;">No ticket or pass is needed. The organizer will contact you if anything else is required.</p>
+<p><a href="{event_url(event)}" style="color:#C2215A;">Event page</a></p>
+<p style="color:#94a3b8;font-size:12px;">{escape(signature).replace(chr(10), '<br>')}</p>
+</div>"""
+    try:
+        send_mail(subject=f"Registration confirmed: {title}", message=text, from_email=from_email(event),
+                  recipient_list=[ticket.attendee_email], html_message=html, fail_silently=True)
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to send registration email to {ticket.attendee_email}: {e}")
+        return False
+
+
 def send_order_email(order, tickets, event):
     """One email to the buyer with every pass in the order (single tickets use the regular ticket email)."""
     if len(tickets) == 1:

@@ -654,7 +654,7 @@ class _RegisterBar extends StatelessWidget {
           ]),
         ),
         PrimaryButton(
-          label: soldOut ? 'Full' : (event.priceSummary == 'Free' ? 'Book a spot' : 'Get tickets'),
+          label: soldOut ? 'Full' : (event.registrationOnly ? 'Register' : event.priceSummary == 'Free' ? 'Book a spot' : 'Get tickets'),
           expand: false,
           loading: detail == null && loading,
           onPressed: detail == null || soldOut

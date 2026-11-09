@@ -84,10 +84,16 @@ class EventRegisterView(APIView):
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         quantity = sum(i['quantity'] for i in items)
+        if event.registration_only:
+            # One free registration per person: no ticket choice, guests or payment
+            items = [{'ticket_type_id': None, 'quantity': 1, 'guest_names': []}]
+            quantity = 1
 
         # Pay online / at the venue (checked again once the order is priced)
         payment_method = (request.data.get('payment_method') or '').strip()
         provider = (request.data.get('provider') or '').strip()
+        if event.registration_only:
+            payment_method, provider = '', ''
         if payment_method not in ('', 'venue', 'online'):
             return Response({'error': 'payment_method must be venue or online.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -102,6 +108,13 @@ class EventRegisterView(APIView):
             .exclude(status=EventTicket.Status.CANCELLED, order__payment_status='failed')
             .order_by('created_at', 'guest_number')
         )
+        if existing and event.registration_only:
+            return Response({
+                'message': f'You are already registered for {event.title}.',
+                'already_registered': True,
+                'registration_only': True,
+                'registration': self._registration_data(existing[0]),
+            }, status=status.HTTP_200_OK)
         if existing and not request.data.get('additional'):
             owner = self._owner_for(request, email)
             if owner is not None:
@@ -138,7 +151,9 @@ class EventRegisterView(APIView):
                 # 1. Ticket types + promo code (locks the types so their quantities can't oversell)
                 if len(items) == 1 and not items[0]['ticket_type_id']:
                     items[0]['ticket_type_id'] = default_ticket_type_id(event)
-                lines, promo = resolve_order(event, items, request.data.get('promo_code'))
+                lines, promo = resolve_order(event, items, None if event.registration_only else request.data.get('promo_code'))
+                if event.registration_only:
+                    lines, promo = [(ticket_type, Decimal('0')) for ticket_type, _ in lines], None
                 total = sum((price for _, price in lines), Decimal('0'))
                 # 2. How it's paid: free, at the venue, or online (tickets held until the payment is confirmed)
                 method, provider = online_payments.choose_payment(event, user, lines, total, payment_method, provider)
@@ -192,6 +207,16 @@ class EventRegisterView(APIView):
                 'checkout': checkout,
             }, status=status.HTTP_201_CREATED)
 
+        if event.registration_only:
+            from apps.core.email import send_registration_email
+            send_registration_email(tickets[0], event)
+            return Response({
+                'message': f'You are registered for {event.title}.',
+                'registration_only': True,
+                'registration': self._registration_data(tickets[0]),
+                'form_response': FormResponseSerializer(form_response).data if form_response else None,
+            }, status=status.HTTP_201_CREATED)
+
         from apps.core.email import send_order_email
         send_order_email(order, tickets, event)
 
@@ -205,6 +230,12 @@ class EventRegisterView(APIView):
                       'total': str(order.total), 'payment': order.payment_info()},
             'form_response': FormResponseSerializer(form_response).data if form_response else None
         }, status=status.HTTP_201_CREATED)
+
+    @staticmethod
+    def _registration_data(ticket):
+        """Registration-only events: what the attendee sees (no QR token, so there's no pass to show)."""
+        return {'id': str(ticket.id), 'number': ticket.ticket_number, 'name': ticket.attendee_name,
+                'email': ticket.attendee_email, 'created_at': ticket.created_at}
 
     @staticmethod
     def _parse_items(data):

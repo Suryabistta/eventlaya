@@ -45,6 +45,8 @@ export interface MyTicket extends Omit<Ticket, 'ticket_type'> {
   event: MyTicketEvent
   my_review_id: string | null
   can_review: boolean
+  /** Registration-only event: no pass or QR */
+  registration_only?: boolean
 }
 
 /* ------------------------------------------------------------ My inquiries */

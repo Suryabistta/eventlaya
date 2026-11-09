@@ -87,6 +87,18 @@ class Event(models.Model):
     # Seat numbers (module `seat_numbers`): attendees see theirs only when this is on; gate staff always do
     show_seat_number = models.BooleanField(default=False)
 
+    class RegistrationMode(models.TextChoices):
+        PASS = 'pass', 'With pass (QR ticket)'
+        FORM = 'form', 'Registration only (no pass)'
+
+    # FORM: people just fill in the registration form (runs, sign-ups, data collection). Free, one per person,
+    # a confirmation email instead of a QR pass, no gate check-in. Registrations still count toward capacity.
+    registration_mode = models.CharField(max_length=10, choices=RegistrationMode.choices, default=RegistrationMode.PASS)
+
+    @property
+    def registration_only(self):
+        return self.registration_mode == self.RegistrationMode.FORM
+
     # Sub-events (module `sub_events`): a child of a main event, one level deep. It has its own form, capacity,
     # tickets and registration switch; organizer and white-label site come from the main event.
     parent = models.ForeignKey(

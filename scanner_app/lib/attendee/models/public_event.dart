@@ -133,6 +133,9 @@ class PublicEvent {
   final String? tagline;
   final String? category;
 
+  /// Registration only (`registration_mode: form`): free, one per person, no pass or check-in.
+  final bool registrationOnly;
+
   /// Picked by the superadmin: listed first on Explore, with a badge.
   final bool isFeatured;
 
@@ -189,6 +192,7 @@ class PublicEvent {
     this.tagline,
     this.category,
     this.categoryName,
+    this.registrationOnly = false,
     this.isFeatured = false,
     this.bannerUrl,
     this.organizerName = '',
@@ -222,6 +226,7 @@ class PublicEvent {
       tagline: _str(j['tagline']),
       category: _str(j['category']),
       categoryName: _str(j['category_name']),
+      registrationOnly: j['registration_mode'] == 'form',
       isFeatured: j['is_featured'] == true,
       bannerUrl: mediaUrl(_str(j['banner']) ?? j['banner_absolute']),
       organizerName: _str(org?['name']) ?? _str(j['organizer_name']) ?? '',

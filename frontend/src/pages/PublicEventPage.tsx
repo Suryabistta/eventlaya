@@ -123,7 +123,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
     if (event.description || event.highlights?.length) s.push('about')
     if (event.sub_events?.length) s.push('sessions')
     const tt = event.ticket_types ?? []
-    if (tt.length > 1 || tt.some((t) => Number(t.price) > 0 || t.remaining !== null || t.description)) s.push('tickets')
+    if (event.registration_mode !== 'form' && (tt.length > 1 || tt.some((t) => Number(t.price) > 0 || t.remaining !== null || t.description))) s.push('tickets')
     if (event.agenda?.length) s.push('schedule')
     if (event.speakers?.length) s.push('speakers')
     s.push('venue')

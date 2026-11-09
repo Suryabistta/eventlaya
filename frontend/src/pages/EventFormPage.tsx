@@ -48,6 +48,7 @@ interface EventDraft {
   show_managed_by: boolean
   ticket_layout: 'vertical' | 'landscape'
   show_seat_number: boolean
+  registration_mode: 'pass' | 'form'
   parent: string
   managed_by: string
   managed_by_logo: string
@@ -115,6 +116,7 @@ const emptyDraft: EventDraft = {
   show_managed_by: false,
   ticket_layout: 'vertical',
   show_seat_number: false,
+  registration_mode: 'pass',
   parent: '',
   managed_by: '',
   managed_by_logo: '',
@@ -175,6 +177,7 @@ function fromEvent(ev: Event, page?: EventPageContent): EventDraft {
     show_managed_by: ev.show_managed_by ?? false,
     ticket_layout: ev.ticket_layout ?? 'vertical',
     show_seat_number: ev.show_seat_number ?? false,
+    registration_mode: ev.registration_mode ?? 'pass',
     parent: ev.parent ?? '',
     managed_by: ev.managed_by ?? '',
     managed_by_logo: ev.managed_by_logo ?? '',
@@ -239,7 +242,7 @@ const localToday = () => {
 const FIELD_STEP: Record<string, StepId> = {
   title: 'basics', tagline: 'basics', parent: 'basics', category: 'basics', description: 'basics', banner: 'basics', banner_url: 'basics',
   start_date: 'when', start_time: 'when', end_date: 'when', end_time: 'when', location: 'when', map_query: 'when',
-  capacity: 'registration', show_spots_left: 'registration', status: 'registration', registration_deadline: 'registration', ticket_price: 'registration', is_paid: 'registration', allow_registration: 'registration', ticket_layout: 'registration', show_seat_number: 'registration',
+  capacity: 'registration', show_spots_left: 'registration', status: 'registration', registration_deadline: 'registration', ticket_price: 'registration', is_paid: 'registration', allow_registration: 'registration', ticket_layout: 'registration', show_seat_number: 'registration', registration_mode: 'registration',
   managed_by: 'page', managed_by_logo: 'page', show_managed_by: 'page',
 }
 
@@ -479,6 +482,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
         show_managed_by: draft.show_managed_by,
         ticket_layout: draft.ticket_layout,
         show_seat_number: draft.show_seat_number,
+        registration_mode: draft.registration_mode,
         ...(subEventsOn ? { parent: draft.parent || null } : {}),
         managed_by: draft.managed_by.trim(),
         managed_by_logo: draft.managed_by_logo,
@@ -814,6 +818,20 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                       </Select>
                     </div>
                     <Select
+                      label="Registration type"
+                      hint={
+                        draft.registration_mode === 'form'
+                          ? 'People fill in your registration form and get a confirmation email. Free, one per person, no pass or gate check-in.'
+                          : 'Each registration gets a QR pass for check-in at the gate.'
+                      }
+                      value={draft.registration_mode}
+                      onChange={(e) => set('registration_mode', e.target.value as EventDraft['registration_mode'])}
+                    >
+                      <option value="pass">With pass (QR ticket)</option>
+                      <option value="form">Registration only (no pass)</option>
+                    </Select>
+                    {draft.registration_mode === 'pass' && (
+                    <Select
                       label="Ticket layout"
                       hint="Shape of the pass people download, print and see in the app."
                       value={draft.ticket_layout}
@@ -822,6 +840,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                       <option value="vertical">Vertical (phone screen)</option>
                       <option value="landscape">Landscape (wide)</option>
                     </Select>
+                    )}
                     {seatsOn && (
                       <Checkbox
                         label="Show seat numbers to attendees"

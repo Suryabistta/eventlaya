@@ -45,7 +45,9 @@ def my_ticket_data(ticket, request=None, review_ids=None):
     return {
         'id': str(ticket.id),
         'ticket_number': ticket.ticket_number,
-        'qr_token': ticket.qr_token,
+        # Registration-only events have no pass: no QR to show or scan
+        'qr_token': None if ticket.event.registration_only else ticket.qr_token,
+        'registration_only': ticket.event.registration_only,
         'status': ticket.status,
         'attendee_name': ticket.attendee_name,
         'attendee_email': ticket.attendee_email,
