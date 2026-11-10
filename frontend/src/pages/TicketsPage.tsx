@@ -45,7 +45,7 @@ import {
   type TicketType,
   type TicketTypeInput,
 } from '@/lib/tickets'
-import { Badge, Button, ButtonLink, Card, CardHeader, EmptyState, ErrorState, IconButton, Input, Modal, PageHeader, Skeleton, Textarea, useToast } from '@/components/ui'
+import { Badge, Button, ButtonLink, Card, CardHeader, EmptyState, ErrorState, IconButton, Input, Modal, PageHeader, Skeleton, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { api, type Event } from '@/services/api'
 
