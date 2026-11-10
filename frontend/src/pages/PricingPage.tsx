@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { Check, Minus, Store, Users } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 import { Badge, Button, ButtonLink, Card, PageHeader, useToast } from '@/components/ui'
+import { SmsCreditsSection } from '@/pages/billing/SmsCredits'
 import { MyPlanSection, RequestUpgradeDialog, planCodes, useMyBilling } from '@/pages/billing/MyPlan'
 import type { Cycle, PlanCode } from '@/pages/admin/billing/api'
 import { cn } from '@/lib/utils'
@@ -388,6 +389,7 @@ export default function PricingPage() {
         <>
           <PageHeader title="Plan and billing" description={`You’re on the ${activePlan} plan. Compare plans and ask for an upgrade when you need more.`} />
           <MyPlanSection data={mine.data} isLoading={mine.isLoading} error={mine.error} onRetry={() => void mine.refetch()} />
+          <SmsCreditsSection />
           <h2 className="pt-2 text-lg font-bold text-ink-900">Compare plans</h2>
         </>
       ) : (

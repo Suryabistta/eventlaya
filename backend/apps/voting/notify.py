@@ -20,13 +20,13 @@ def notify(candidate, subject, message):
 
     def send():
         from apps.core.email import send_simple_event_email
-        from apps.core.sms import send_sms
+        from apps.platform.sms_credits import send_paid_sms
         try:
             if mode in (Poll.Notify.EMAIL, Poll.Notify.BOTH) and candidate.contact_email:
                 send_simple_event_email(poll.event, candidate.contact_email, candidate.name, subject, message,
                                         f'{poll.title} · eventlaya.com/e/{poll.event.slug}/vote/{poll.slug or poll.id}')
             if mode in (Poll.Notify.SMS, Poll.Notify.BOTH) and candidate.contact_phone:
-                send_sms(candidate.contact_phone, f'{poll.title}: {message}')
+                send_paid_sms(poll.event.organizer, candidate.contact_phone, f'{poll.title}: {message}', f'{poll.title}: {candidate.name}')
         except Exception as e:  # a notification must never break the contest
             logger.warning('Contestant notification failed (%s): %s', candidate.pk, e)
     transaction.on_commit(send)

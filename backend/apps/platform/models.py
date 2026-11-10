@@ -65,6 +65,7 @@ class Plan(models.Model):
     monthly_price = models.PositiveIntegerField(null=True, blank=True, help_text='NPR per month. Empty = custom quote.')
     yearly_price = models.PositiveIntegerField(null=True, blank=True, help_text='NPR per year. Empty = custom quote.')
     attendee_limit = models.PositiveIntegerField(null=True, blank=True, help_text='Per event. Empty = unlimited.')
+    sms_credits = models.PositiveIntegerField(default=0, help_text='SMS included per paid month, added when a payment is recorded.')
     features = models.JSONField(default=list, blank=True)
     is_active = models.BooleanField(default=True)
     order = models.PositiveSmallIntegerField(default=0)
@@ -180,6 +181,54 @@ class PlanChangeRequest(models.Model):
 
     def __str__(self):
         return f'{self.organization.email} → {self.requested_plan.name} [{self.status}]'
+
+
+class SmsCreditEntry(models.Model):
+    """One line of an organization's SMS credit ledger (module `sms`). The balance is the sum of `credits`."""
+    class Kind(models.TextChoices):
+        PLAN = 'plan', 'Included with plan'
+        TOP_UP = 'top_up', 'Top-up'
+        ADJUSTMENT = 'adjustment', 'Adjustment'
+        USAGE = 'usage', 'Sent'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    organization = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sms_entries')
+    kind = models.CharField(max_length=20, choices=Kind.choices)
+    credits = models.IntegerField(help_text='Added (+) or used (-).')
+    note = models.CharField(max_length=255, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.organization.email} {self.credits:+d} ({self.kind})'
+
+
+class SmsCreditRequest(models.Model):
+    """An organizer asks for more SMS credits; the superadmin adds them once paid (or declines with a reason)."""
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        APPROVED = 'approved', 'Approved'
+        DECLINED = 'declined', 'Declined'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    organization = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sms_requests')
+    credits = models.PositiveIntegerField()
+    note = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True)
+    granted = models.PositiveIntegerField(null=True, blank=True, help_text='Credits actually added (may differ from asked).')
+    review_note = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.organization.email} asks {self.credits} SMS [{self.status}]'
 
 
 class City(models.Model):

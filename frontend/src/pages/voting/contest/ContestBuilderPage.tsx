@@ -836,7 +836,7 @@ const ResultsSection: React.FC<Omit<SectionProps, 'contest'>> = ({ draft, set })
     {draft.results_visibility === 'top_n' && <LimitField label="How many to show" value={draft.results_top_n} onChange={(v) => set('results_top_n', v ?? 3)} className="max-w-xs" />}
     <Select
       label="Notify contestants"
-      hint="When they're added, when a round is decided and when winners are announced. Uses the email and phone from their application. SMS needs an Aakash SMS account on the server."
+      hint="When they're added, when a round is decided and when winners are announced. Uses the email and phone from their application. Each SMS uses one of your SMS credits (see Plan & billing); with no credits left, only email is sent."
       value={draft.contestant_notify ?? 'email'}
       onChange={(e) => set('contestant_notify', e.target.value as Draft['contestant_notify'])}
       containerClassName="max-w-md"

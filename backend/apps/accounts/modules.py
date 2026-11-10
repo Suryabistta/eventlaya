@@ -54,6 +54,8 @@ MODULES = [
      'with their own form; organizers accept or decline each one.', 'FileCheck', 20, ['organizer', 'staff', 'attendee']),
     ('guest_management', 'Guest management', 'Guest tags and notes, arrival alerts for the host, messages and reminders '
      'to guests.', 'UserCheck', 21, ['organizer', 'staff']),
+    ('sms', 'SMS messages', 'Text messages to contestants and guests, paid from SMS credits: included with the plan '
+     'and topped up on request.', 'MessageSquareText', 22, ['organizer']),
 ]
 
 # A module is only on when every module it requires is on too (for the same user).
@@ -97,6 +99,7 @@ PATH_MODULES = [
     # answer ("not available") even when the module is off; tenancy.white_label_active() stops the site itself.
     (re.compile(r'^/api/auth/tenant-branding/(?!resolve/)'), 'white_label'),
     (re.compile(r'^/api/platform/white-label/'), 'white_label'),
+    (re.compile(r'^/api/platform/sms/'), 'sms'),
     (re.compile(r'^/api/blog/'), 'blog'),
     (re.compile(r'^/api/platform/banners/'), 'banners'),  # public reading too: off → the blog 404s (apps.seo checks it for pages)
 ]

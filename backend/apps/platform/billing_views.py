@@ -35,7 +35,7 @@ class CSVRenderer(BaseRenderer):
 def plan_dict(p):
     return {
         'code': p.code, 'name': p.name, 'monthly_price': p.monthly_price, 'yearly_price': p.yearly_price,
-        'attendee_limit': p.attendee_limit, 'features': p.features,
+        'attendee_limit': p.attendee_limit, 'features': p.features, 'sms_credits': p.sms_credits,
     }
 
 
@@ -139,6 +139,24 @@ class PlanListView(APIView):
 
     def get(self, request):
         return Response([plan_dict(p) for p in Plan.objects.filter(is_active=True)])
+
+
+class PlanSmsView(APIView):
+    """PATCH {sms_credits}: SMS included per paid month on a plan (superadmin)."""
+
+    permission_classes = [IsSuperadmin]
+
+    def patch(self, request, code):
+        plan = get_object_or_404(Plan, code=code)
+        try:
+            n = int(request.data.get('sms_credits'))
+        except (TypeError, ValueError):
+            return _err('Enter a whole number of SMS.')
+        if not 0 <= n <= 1_000_000:
+            return _err('Enter between 0 and 1,000,000.')
+        plan.sms_credits = n
+        plan.save(update_fields=['sms_credits', 'updated_at'])
+        return Response(plan_dict(plan))
 
 
 class BillingSummaryView(APIView):
@@ -250,6 +268,10 @@ class RecordPaymentView(APIView):
             reference=(d.get('reference') or '').strip()[:120], months_covered=months, paid_at=timezone.now(),
             recorded_by=request.user, note=(d.get('note') or '').strip(),
         )
+        if plan.sms_credits:
+            from .models import SmsCreditEntry
+            from .sms_credits import add_credits
+            add_credits(org, plan.sms_credits * months, SmsCreditEntry.Kind.PLAN, f'{plan.name}, {months} month{"s" if months > 1 else ""}', request.user)
         return Response({'subscription': subscription_dict(sub, pay), 'payment': payment_dict(pay)}, status=status.HTTP_201_CREATED)
 
 

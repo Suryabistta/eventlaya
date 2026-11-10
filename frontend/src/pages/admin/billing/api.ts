@@ -12,6 +12,8 @@ export interface Plan {
   monthly_price: number | null
   yearly_price: number | null
   attendee_limit: number | null
+  /** SMS included per paid month */
+  sms_credits?: number
   features: string[]
 }
 

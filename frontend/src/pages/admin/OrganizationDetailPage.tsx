@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { OrgSmsCard } from './OrgSmsCard'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, CalendarDays, DoorOpen, ExternalLink, Globe, KeyRound, Mail, Phone, Ticket } from 'lucide-react'
 import { VerifiedBadge } from '@/components/VerifiedBadge'
@@ -238,6 +239,8 @@ export const OrganizationDetailPage: React.FC = () => {
               </ul>
             </Card>
           )}
+
+          {o.role === 'organizer' && <OrgSmsCard orgId={o.id} />}
 
           {o.role === 'organizer' && (
             <Card>

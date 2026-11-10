@@ -217,7 +217,10 @@ class ContestNotifyTests(StagesTests):
         a = Candidate.objects.create(poll=poll, name='Asha', number=1, contact_email='asha@x.com', contact_phone='9812345678')
         Candidate.objects.create(poll=poll, name='Bina', number=2, contact_email='bina@x.com')
         self.client.force_authenticate(self.organizer)
-        with mock.patch('apps.core.sms.send_sms', return_value=True) as sms, self.captureOnCommitCallbacks(execute=True):
+        from apps.platform.models import SmsCreditEntry
+        SmsCreditEntry.objects.create(organization=self.organizer, kind='top_up', credits=10)
+        with mock.patch('apps.core.sms.send_sms', return_value=True) as sms, mock.patch('apps.core.sms.sms_enabled', return_value=True), \
+                self.captureOnCommitCallbacks(execute=True):
             r = self.client.post(f'/api/voting/contests/{poll.id}/announce/', {'announcement': 'Congratulations to all!'}, format='json')
         self.assertEqual(r.status_code, 200, r.data)
         self.assertEqual(len(r.data['winners']), 2)

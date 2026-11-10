@@ -1,6 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 from . import billing_views as billing
+from . import sms_views as sms
 from . import segments
 from . import featured_events, org_admin, views
 from .catalog import BannerViewSet, CityViewSet, EventCategoryViewSet, SiteBrandingView
@@ -38,6 +39,7 @@ urlpatterns = [
     path('segments/', segments.SegmentsView.as_view(), name='platform_segments'),
     # Billing
     path('billing/plans/', billing.PlanListView.as_view(), name='platform_billing_plans'),
+    path('billing/plans/<str:code>/sms/', billing.PlanSmsView.as_view(), name='platform_billing_plan_sms'),
     path('billing/summary/', billing.BillingSummaryView.as_view(), name='platform_billing_summary'),
     path('billing/subscriptions/', billing.SubscriptionListView.as_view(), name='platform_billing_subscriptions'),
     path('billing/subscriptions/<uuid:org_id>/record-payment/', billing.RecordPaymentView.as_view(), name='platform_billing_record_payment'),
@@ -49,5 +51,10 @@ urlpatterns = [
     path('billing/upgrade-requests/<uuid:pk>/approve/', billing.UpgradeRequestReviewView.as_view(decision='approve'), name='platform_billing_upgrade_approve'),
     path('billing/upgrade-requests/<uuid:pk>/decline/', billing.UpgradeRequestReviewView.as_view(decision='decline'), name='platform_billing_upgrade_decline'),
     path('billing/mine/', billing.MyBillingView.as_view(), name='platform_billing_mine'),
+    path('sms/mine/', sms.MySmsView.as_view(), name='platform_sms_mine'),
+    path('sms/requests/', sms.SmsRequestListView.as_view(), name='platform_sms_requests'),
+    path('sms/requests/<uuid:pk>/approve/', sms.SmsRequestReviewView.as_view(decision='approve'), name='platform_sms_approve'),
+    path('sms/requests/<uuid:pk>/decline/', sms.SmsRequestReviewView.as_view(decision='decline'), name='platform_sms_decline'),
+    path('sms/orgs/<uuid:org_id>/', sms.OrgSmsView.as_view(), name='platform_sms_org'),
     path('', include(router.urls)),
 ]

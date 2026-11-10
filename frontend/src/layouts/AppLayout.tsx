@@ -231,6 +231,7 @@ function buildNav(user: ShellUser | null, pending: PendingApprovals = noPending,
               { label: 'White-label', to: '/admin/approvals/white-label', icon: Palette, badge: pending.whiteLabel },
               { label: 'Marketplace access', to: '/admin/approvals/marketplace', icon: Store, badge: pending.marketplace },
               { label: 'Listings', to: '/admin/approvals/listings', icon: Building2, badge: pending.listings },
+              { label: 'SMS credits', to: '/admin/approvals/sms', icon: MessageCircle, badge: pending.sms },
             ],
           },
           { label: 'Billing & recharges', to: '/admin/billing', icon: CreditCard },
@@ -266,15 +267,16 @@ function usePendingApprovals(enabled: boolean) {
   const p = data?.pending ?? {}
   const n = (k: string) => Number(p[k]) || 0
   return {
-    total: n('white_label') + n('marketplace_access') + n('listings'),
+    total: n('white_label') + n('marketplace_access') + n('listings') + n('sms_credits'),
     whiteLabel: n('white_label'),
     marketplace: n('marketplace_access'),
     listings: n('listings'),
+    sms: n('sms_credits'),
   }
 }
 
 type PendingApprovals = ReturnType<typeof usePendingApprovals>
-const noPending: PendingApprovals = { total: 0, whiteLabel: 0, marketplace: 0, listings: 0 }
+const noPending: PendingApprovals = { total: 0, whiteLabel: 0, marketplace: 0, listings: 0, sms: 0 }
 
 /** A sub-item is active on its own page and anything below it. */
 const subItemActive = (item: NavItem, pathname: string) => pathname === item.to || pathname.startsWith(`${item.to}/`)

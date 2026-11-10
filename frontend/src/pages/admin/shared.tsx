@@ -139,7 +139,7 @@ export function useReview() {
         const f = pendingField[target.kind]
         qc.setQueryData<PlatformStats>(STATS_KEY, {
           ...prevStats,
-          pending: { ...prevStats.pending, [f]: Math.max(0, prevStats.pending[f] - 1) },
+          pending: { ...prevStats.pending, [f]: Math.max(0, (prevStats.pending[f] ?? 0) - 1) },
         })
       }
       return { key, prevList, prevStats, allKey, prevAll }

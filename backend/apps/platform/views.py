@@ -13,7 +13,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.models import TenantBranding
 from apps.events.models import Event, EventTicket
-from .models import WhiteLabelRequest
+from .models import SmsCreditRequest, WhiteLabelRequest
 from .serializers import ReviewSerializer, WhiteLabelRequestSerializer
 
 User = get_user_model()
@@ -229,6 +229,7 @@ class PlatformStatsView(APIView):
                 'white_label': WhiteLabelRequest.objects.filter(status=WhiteLabelRequest.Status.PENDING).count(),
                 'marketplace_access': _pending_marketplace_access(),
                 'listings': _pending_listings(),
+                'sms_credits': SmsCreditRequest.objects.filter(status=SmsCreditRequest.Status.PENDING).count(),
             },
             'signups_by_day': [{'date': d.isoformat(), **signups[d]} for d in days],
             'registrations_by_day': [{'date': d.isoformat(), 'count': regs[d]} for d in days],

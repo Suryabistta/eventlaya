@@ -1,7 +1,7 @@
 import React from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronRight, Globe, MapPin, Store } from 'lucide-react'
+import { ChevronRight, Globe, MapPin, MessageSquareText, Store } from 'lucide-react'
 import { Card, CardHeader, PageHeader, Skeleton } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { platformApi, STATS_KEY } from '../api'
@@ -27,6 +27,7 @@ export const ApprovalsQueuePage: React.FC = () => {
     { label: 'White-label', icon: Globe, count: stats?.pending.white_label, to: approvalPaths.white_label, hint: 'Custom domains and branding' },
     { label: 'Marketplace access', icon: Store, count: stats?.pending.marketplace_access, to: approvalPaths.marketplace, hint: 'Event companies opening a business portal' },
     { label: 'Listings', icon: MapPin, count: stats?.pending.listings, to: approvalPaths.listing, hint: 'Venues and service profiles' },
+    { label: 'SMS credits', icon: MessageSquareText, count: stats?.pending.sms_credits ?? 0, to: '/admin/approvals/sms', hint: 'Top-ups organizers asked for' },
   ]
 
   return (
@@ -36,7 +37,7 @@ export const ApprovalsQueuePage: React.FC = () => {
         description="Everything waiting for a decision, newest first. Nothing goes live until you approve it."
       />
 
-      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4" aria-label="Pending by type">
+      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4" aria-label="Pending by type">
         {summary.map((s) => (
           <li key={s.label} className="min-w-0">
             <Link

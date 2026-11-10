@@ -38,7 +38,9 @@ def ensure_subscriptions():
 def get_subscription(user):
     sub = Subscription.objects.select_related('plan').filter(organization=user).first()
     if sub is None:
-        sub = Subscription.objects.create(organization=user, plan=free_plan(), status=Subscription.Status.ACTIVE)
+        # Two first requests at once (plan card and SMS card) must not both create it
+        sub, _ = Subscription.objects.select_related('plan').get_or_create(
+            organization=user, defaults={'plan': free_plan(), 'status': Subscription.Status.ACTIVE})
     return refresh_status(sub)
 
 

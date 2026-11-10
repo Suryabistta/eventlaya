@@ -27,6 +27,7 @@ export type ModuleSlug =
   | 'offline_tickets'
   | 'applications'
   | 'guest_management'
+  | 'sms'
 
 interface ModulesResponse {
   role: string
