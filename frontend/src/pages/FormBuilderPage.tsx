@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, CalendarDays, Eye, FileText, Lock, Pencil, Plus, Ticket as TicketIcon, Trash2 } from 'lucide-react'
-import { api, request, type DynamicForm, type Event, type FormField } from '@/services/api'
+import { ArrowDown, ArrowUp, CalendarDays, Eye, FileText, LayoutTemplate, Lock, Pencil, Plus, Ticket as TicketIcon, Trash2, Upload } from 'lucide-react'
+import { FORM_TEMPLATES, suggestedTemplate, type FormTemplate } from '@/lib/form-templates'
+import { api, request, type DynamicForm, type Event, type FieldRules, type FormField } from '@/services/api'
 import { useCurrentEvent } from '@/lib/event-context'
 import {
   Badge,
@@ -13,6 +14,7 @@ import {
   ErrorState,
   IconButton,
   Input,
+  Modal,
   PageHeader,
   Select,
   Skeleton,
@@ -41,11 +43,15 @@ const fieldTypes: { value: FieldType; label: string }[] = [
   { value: 'date', label: 'Date' },
   { value: 'select', label: 'Dropdown' },
   { value: 'radio', label: 'Single choice' },
-  { value: 'checkbox', label: 'Checkboxes' },
+  { value: 'checkbox', label: 'Checkboxes / tick box' },
+  { value: 'url', label: 'Link (film, portfolio…)' },
+  { value: 'image', label: 'Photo upload' },
+  { value: 'file_upload', label: 'File upload (PDF or photo)' },
+  { value: 'heading', label: 'Section heading (not a question)' },
 ]
 const typeLabel = (t: FieldType) => fieldTypes.find((f) => f.value === t)?.label ?? t
 const hasOptions = (t: FieldType) => t === 'select' || t === 'radio' || t === 'checkbox'
-const hasPlaceholder = (t: FieldType) => !hasOptions(t) && t !== 'date'
+const hasPlaceholder = (t: FieldType) => !hasOptions(t) && !['date', 'image', 'file_upload', 'heading'].includes(t)
 
 const slugify = (s: string) =>
   s
@@ -108,8 +114,9 @@ export const FormBuilderPage: React.FC = () => {
 const NoForm: React.FC<{ event: Event }> = ({ event }) => {
   const toast = useToast()
   const queryClient = useQueryClient()
+  const [picking, setPicking] = useState(false)
   const create = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (template?: FormTemplate) => {
       const form = await api.createForm({
         title: `${event.title} registration`,
         slug: slugify(`${event.title}-registration`),
@@ -118,6 +125,7 @@ const NoForm: React.FC<{ event: Event }> = ({ event }) => {
       })
       // Link it so the public registration page shows these questions
       await api.updateEvent(event.id, { registration_form: form.id })
+      if (template) await addTemplateFields(form.id, 0, template)
       return form
     },
     onSuccess: () => {
@@ -135,11 +143,26 @@ const NoForm: React.FC<{ event: Event }> = ({ event }) => {
         title="No registration form yet"
         description="Right now attendees only give their name, email and phone. Add a form to ask for things like college, T-shirt size or meal choice."
         action={
-          <Button icon={<Plus className="h-4 w-4" />} loading={create.isPending} onClick={() => create.mutate()}>
-            Create registration form
-          </Button>
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button icon={<LayoutTemplate className="h-4 w-4" />} loading={create.isPending} onClick={() => setPicking(true)}>
+              Start from a template
+            </Button>
+            <Button variant="secondary" icon={<Plus className="h-4 w-4" />} disabled={create.isPending} onClick={() => create.mutate(undefined)}>
+              Start empty
+            </Button>
+          </div>
         }
       />
+      {picking && (
+        <TemplatePicker
+          event={event}
+          onClose={() => setPicking(false)}
+          onPick={(t) => {
+            setPicking(false)
+            create.mutate(t)
+          }}
+        />
+      )}
     </Card>
   )
 }
@@ -151,9 +174,29 @@ interface FieldDraft {
   help_text: string
   required: boolean
   options: string
+  /** Rule inputs as typed (empty = no rule) */
+  rules: Record<keyof FieldRules, string>
 }
 
-const blankDraft: FieldDraft = { label: '', field_type: 'text', placeholder: '', help_text: '', required: false, options: '' }
+const noRules: FieldDraft['rules'] = { min: '', max: '', max_length: '', min_age: '', max_age: '' }
+const blankDraft: FieldDraft = { label: '', field_type: 'text', placeholder: '', help_text: '', required: false, options: '', rules: noRules }
+
+/** Which rules apply to which answer type */
+const RULES_FOR: Partial<Record<FieldType, (keyof FieldRules)[]>> = {
+  number: ['min', 'max'],
+  text: ['max_length'],
+  paragraph: ['max_length'],
+  date: ['min_age', 'max_age'],
+}
+
+const rulesBody = (d: FieldDraft): FieldRules => {
+  const out: FieldRules = {}
+  for (const k of RULES_FOR[d.field_type] ?? []) {
+    const v = d.rules[k].trim()
+    if (v !== '' && !Number.isNaN(Number(v))) out[k] = Number(v)
+  }
+  return out
+}
 
 const toDraft = (f: FormField): FieldDraft => ({
   label: f.label,
@@ -162,6 +205,7 @@ const toDraft = (f: FormField): FieldDraft => ({
   help_text: f.help_text ?? '',
   required: f.required,
   options: (f.options ?? []).join('\n'),
+  rules: Object.fromEntries(Object.keys(noRules).map((k) => [k, f.validation_rules?.[k as keyof FieldRules]?.toString() ?? ''])) as FieldDraft['rules'],
 })
 
 const parseOptions = (s: string) =>
@@ -178,6 +222,21 @@ const Builder: React.FC<{ form: DynamicForm; event: Event }> = ({ form, event })
   const [editing, setEditing] = useState<string | 'new' | null>(null)
   const [draft, setDraft] = useState<FieldDraft>(blankDraft)
   const [busy, setBusy] = useState(false)
+  const [picking, setPicking] = useState(false)
+
+  const addTemplate = async (t: FormTemplate) => {
+    setPicking(false)
+    setBusy(true)
+    try {
+      await addTemplateFields(form.id, fields.reduce((m, f) => Math.max(m, f.order), 0), t)
+      toast.success(`Added ${t.fields.length} questions from “${t.name}”`, 'Edit, reorder or delete any of them.')
+    } catch (err) {
+      toast.error('Couldn’t add the template', (err as Error).message)
+    } finally {
+      setBusy(false)
+      refresh()
+    }
+  }
 
   const editingField = fields.find((f) => f.id === editing)
   const isLinked = event.registration_form === form.id
@@ -197,8 +256,9 @@ const Builder: React.FC<{ form: DynamicForm; event: Event }> = ({ form, event })
         field_type: d.field_type,
         placeholder: hasPlaceholder(d.field_type) ? d.placeholder.trim() : '',
         help_text: d.help_text.trim(),
-        required: d.required,
+        required: d.field_type === 'heading' ? false : d.required,
         options: hasOptions(d.field_type) ? parseOptions(d.options) : [],
+        validation_rules: rulesBody(d),
       }
       if (editing === 'new') {
         const maxOrder = fields.reduce((m, f) => Math.max(m, f.order), 0)
@@ -281,6 +341,7 @@ const Builder: React.FC<{ form: DynamicForm; event: Event }> = ({ form, event })
       help_text: draft.help_text,
       required: draft.required,
       options: parseOptions(draft.options),
+      validation_rules: rulesBody(draft),
     }
     return editing === 'new' ? [...fields, live] : fields.map((f) => (f.id === editing ? live : f))
   }, [fields, editing, editingField, draft])
@@ -364,9 +425,14 @@ const Builder: React.FC<{ form: DynamicForm; event: Event }> = ({ form, event })
             })}
           </ol>
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-ink-100 px-5 py-3">
-            <Button size="sm" variant="secondary" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing('new')} disabled={editing === 'new'}>
-              Add question
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="secondary" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing('new')} disabled={editing === 'new'}>
+                Add question
+              </Button>
+              <Button size="sm" variant="ghost" icon={<LayoutTemplate className="h-4 w-4" />} disabled={busy} onClick={() => setPicking(true)}>
+                Add from template
+              </Button>
+            </div>
             {form.status === 'published' && (
               <Button size="sm" variant="ghost" loading={updateFormStatus.isPending} onClick={() => updateFormStatus.mutate('draft')}>
                 Hide form
@@ -388,9 +454,25 @@ const Builder: React.FC<{ form: DynamicForm; event: Event }> = ({ form, event })
         )}
       </div>
 
+      {picking && <TemplatePicker event={event} onClose={() => setPicking(false)} onPick={addTemplate} adding />}
       <Preview event={event} fields={previewFields} highlightId={editing === 'new' ? '__new' : editing} />
     </div>
   )
+}
+
+/** Dropdowns and single choices need two or more choices; checkboxes need two or more, or none (one tick box). */
+const needsChoices = (d: FieldDraft) => {
+  if (!hasOptions(d.field_type)) return false
+  const n = parseOptions(d.options).length
+  return d.field_type === 'checkbox' ? n === 1 : n < 2
+}
+
+const RULE_LABEL: Record<keyof FieldRules, { label: string; hint: string }> = {
+  min: { label: 'Lowest allowed', hint: 'e.g. 150 for height in cm' },
+  max: { label: 'Highest allowed', hint: 'e.g. 200' },
+  max_length: { label: 'Most characters', hint: 'e.g. 800 for a short bio' },
+  min_age: { label: 'Minimum age', hint: 'If this is a date of birth' },
+  max_age: { label: 'Maximum age', hint: 'If this is a date of birth' },
 }
 
 const FieldEditor: React.FC<{
@@ -406,7 +488,7 @@ const FieldEditor: React.FC<{
   const set = <K extends keyof FieldDraft>(key: K, value: FieldDraft[K]) => onChange({ ...draft, [key]: value })
   const labelError = submitted && !draft.label.trim() ? 'Write the question attendees will see.' : undefined
   const optionsError =
-    submitted && hasOptions(draft.field_type) && parseOptions(draft.options).length < 2 ? 'Add at least two choices, one per line.' : undefined
+    submitted && needsChoices(draft) ? 'Add at least two choices, one per line.' : undefined
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -415,7 +497,7 @@ const FieldEditor: React.FC<{
       toast.error('Question not saved', 'Write the question attendees will see.')
       return
     }
-    if (hasOptions(draft.field_type) && parseOptions(draft.options).length < 2) {
+    if (needsChoices(draft)) {
       toast.error('Question not saved', 'Add at least two choices, one per line.')
       return
     }
@@ -445,10 +527,10 @@ const FieldEditor: React.FC<{
         {hasOptions(draft.field_type) && (
           <Textarea
             label="Choices"
-            required
+            required={draft.field_type !== 'checkbox'}
             rows={4}
             placeholder={'Small\nMedium\nLarge'}
-            hint="One choice per line"
+            hint={draft.field_type === 'checkbox' ? 'One choice per line. Leave empty for a single tick box (e.g. “I agree to the rules”).' : 'One choice per line'}
             value={draft.options}
             onChange={(e) => set('options', e.target.value)}
             error={optionsError}
@@ -463,13 +545,29 @@ const FieldEditor: React.FC<{
             onChange={(e) => set('placeholder', e.target.value)}
           />
         )}
+        {(RULES_FOR[draft.field_type] ?? []).length > 0 && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {RULES_FOR[draft.field_type]!.map((k) => (
+              <Input
+                key={k}
+                label={RULE_LABEL[k].label}
+                type="number"
+                inputMode="numeric"
+                hint={`Optional. ${RULE_LABEL[k].hint}`}
+                value={draft.rules[k]}
+                onChange={(e) => set('rules', { ...draft.rules, [k]: e.target.value })}
+              />
+            ))}
+          </div>
+        )}
         <Input
-          label="Help text"
+          label={draft.field_type === 'heading' ? 'Text under the heading' : 'Help text'}
           placeholder="Shown under the question"
           value={draft.help_text}
           onChange={(e) => set('help_text', e.target.value)}
           hint="Optional"
         />
+        {draft.field_type !== 'heading' && (
         <label className="flex items-center gap-2.5 text-sm font-medium text-ink-800">
           <input
             type="checkbox"
@@ -479,6 +577,7 @@ const FieldEditor: React.FC<{
           />
           Attendees must answer this
         </label>
+        )}
         <div className="flex flex-wrap justify-end gap-2 pt-1">
           <Button variant="secondary" onClick={onCancel}>
             Cancel
@@ -503,8 +602,16 @@ const Preview: React.FC<{ event: Event; fields: FormField[]; highlightId: string
     <div className="max-h-none space-y-4 bg-ink-50/60 p-4 sm:p-6 xl:max-h-[calc(100dvh-10rem)] xl:overflow-y-auto">
       <div className="space-y-5 rounded-2xl border border-ink-200 bg-white p-5 sm:p-6">
         <div className="border-b border-ink-100 pb-4">
-          <h3 className="text-lg font-bold text-ink-900">Register for {event.title}</h3>
-          <p className="mt-1 text-sm text-ink-500">You’ll get a QR pass by email right after you submit.</p>
+          <h3 className="text-lg font-bold text-ink-900">
+            {event.registration_mode === 'apply' ? 'Apply' : 'Register'} for {event.title}
+          </h3>
+          <p className="mt-1 text-sm text-ink-500">
+            {event.registration_mode === 'apply'
+              ? 'You’ll get an email when your application is received, and again when it’s reviewed.'
+              : event.registration_mode === 'form'
+                ? 'You’ll get a confirmation by email.'
+                : 'You’ll get a QR pass by email right after you submit.'}
+          </p>
         </div>
         <fieldset className="space-y-4" aria-label="Form preview">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -534,6 +641,42 @@ const PreviewField: React.FC<{ field: FormField }> = ({ field: f }) => {
   const hint = f.help_text || undefined
   const placeholder = f.placeholder || undefined
   switch (f.field_type) {
+    case 'heading':
+      return (
+        <div className="border-t border-ink-100 pt-4">
+          <p className="font-semibold text-ink-900">{f.label}</p>
+          {hint && <p className="mt-0.5 text-sm text-ink-500">{hint}</p>}
+        </div>
+      )
+    case 'image':
+    case 'file_upload':
+      return (
+        <div>
+          <p className="text-sm font-medium text-ink-800">
+            {f.label}
+            {f.required && <span className="ml-0.5 text-brand-600" aria-hidden>*</span>}
+          </p>
+          <div className="mt-1.5 flex items-center gap-2 rounded-[10px] border border-dashed border-ink-300 px-4 py-3 text-sm text-ink-500">
+            <Upload className="h-4 w-4" aria-hidden />
+            {f.field_type === 'image' ? 'Choose a photo (JPG, PNG, up to 5 MB)' : 'Choose a PDF or photo (up to 5 MB)'}
+          </div>
+          {hint && <p className="mt-1.5 text-xs text-ink-500">{hint}</p>}
+        </div>
+      )
+    case 'url':
+      return <Input label={f.label} type="url" required={f.required} hint={hint} placeholder={placeholder || 'https://'} />
+    case 'checkbox':
+      if (!f.options?.length)
+        return (
+          <label className="flex items-start gap-2 text-sm text-ink-700">
+            <input type="checkbox" className={cn(choiceClass, 'mt-0.5 rounded')} />
+            <span>
+              {f.label}
+              {f.required && <span className="ml-0.5 text-brand-600" aria-hidden>*</span>}
+            </span>
+          </label>
+        )
+      return <ChoicePreview f={f} hint={hint} />
     case 'paragraph':
       return <Textarea label={f.label} required={f.required} hint={hint} placeholder={placeholder} rows={3} />
     case 'select':
@@ -548,8 +691,15 @@ const PreviewField: React.FC<{ field: FormField }> = ({ field: f }) => {
         </Select>
       )
     case 'radio':
-    case 'checkbox':
-      return (
+      return <ChoicePreview f={f} hint={hint} />
+    default: {
+      const type = { text: 'text', number: 'number', email: 'email', phone: 'tel', date: 'date' }[f.field_type as string] ?? 'text'
+      return <Input label={f.label} type={type} required={f.required} hint={hint} placeholder={placeholder} />
+    }
+  }
+}
+
+const ChoicePreview: React.FC<{ f: FormField; hint?: string }> = ({ f, hint }) => (
         <fieldset>
           <legend className="text-sm font-medium text-ink-800">
             {f.label}
@@ -569,10 +719,47 @@ const PreviewField: React.FC<{ field: FormField }> = ({ field: f }) => {
           </div>
           {hint && <p className="mt-1.5 text-xs text-ink-500">{hint}</p>}
         </fieldset>
-      )
-    default: {
-      const type = { text: 'text', number: 'number', email: 'email', phone: 'tel', date: 'date' }[f.field_type] ?? 'text'
-      return <Input label={f.label} type={type} required={f.required} hint={hint} placeholder={placeholder} />
-    }
+)
+
+/** Creates a template's questions on the form, after `afterOrder`, in order. */
+async function addTemplateFields(formId: string, afterOrder: number, t: FormTemplate) {
+  let order = afterOrder
+  for (const f of t.fields) {
+    order += 1
+    await api.createFormField({ placeholder: '', help_text: '', options: [], validation_rules: {}, ...f, form: formId, order } as Partial<FormField>)
   }
+}
+
+/** Ready-made question sets by kind of event (lib/form-templates.ts); the one that fits the event comes first. */
+const TemplatePicker: React.FC<{ event: Event; onClose: () => void; onPick: (t: FormTemplate) => void; adding?: boolean }> = ({ event, onClose, onPick, adding }) => {
+  const suggested = suggestedTemplate(event)
+  const list = suggested ? [suggested, ...FORM_TEMPLATES.filter((t) => t.id !== suggested.id)] : FORM_TEMPLATES
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      size="lg"
+      title={adding ? 'Add questions from a template' : 'Start from a template'}
+      description="Pick the closest match. You can edit, reorder or delete every question afterwards."
+    >
+      <ul className="grid gap-3 sm:grid-cols-2">
+        {list.map((t) => (
+          <li key={t.id}>
+            <button
+              type="button"
+              onClick={() => onPick(t)}
+              className="flex h-full w-full flex-col rounded-xl border border-ink-200 p-4 text-left transition-colors hover:border-brand-400 hover:bg-brand-50/40"
+            >
+              <span className="flex items-center gap-2 font-semibold text-ink-900">
+                {t.name}
+                {t.id === suggested?.id && <Badge tone="brand">Suggested</Badge>}
+              </span>
+              <span className="mt-1 text-sm text-ink-600">{t.description}</span>
+              <span className="mt-2 text-xs text-ink-500">{t.fields.filter((f) => f.field_type !== 'heading').length} questions</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Modal>
+  )
 }

@@ -126,7 +126,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
     if (event.registration_mode !== 'form' && (tt.length > 1 || tt.some((t) => Number(t.price) > 0 || t.remaining !== null || t.description))) s.push('tickets')
     if (event.agenda?.length) s.push('schedule')
     if (event.speakers?.length) s.push('speakers')
-    s.push('venue')
+    if (event.registration_mode !== 'apply' || event.location !== 'Online') s.push('venue')
     if (event.faqs?.length) s.push('faqs')
     return s
   }, [event])
@@ -198,18 +198,26 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
               </span>
             )}
           </Fact>
-          <Fact icon={<MapPin className="h-5 w-5" aria-hidden />} label="Venue">
-            <a href="#venue" className="font-semibold text-ink-900 hover:text-brand-700 hover:underline">
-              {event.location}
-            </a>
-          </Fact>
-          <Fact icon={<Users className="h-5 w-5" aria-hidden />} label="Spots">
-            <SpotsMeter event={event} />
-          </Fact>
-          <Fact icon={<TicketIcon className="h-5 w-5" aria-hidden />} label="Price">
-            <span className="font-semibold text-ink-900">{price}</span>
-            {hasPaidTickets(event) && <span className="block text-ink-500">{event.payment_options?.online ? paymentNote(event.payment_options).replace(/\.$/, '') : 'Pay at the venue'}</span>}
-          </Fact>
+          {/* Only the facts that fit the registration type: open calls skip venue (when online), spots and price;
+              registration-only events skip price and show spots only when limited */}
+          {(event.registration_mode !== 'apply' || event.location !== 'Online') && (
+            <Fact icon={<MapPin className="h-5 w-5" aria-hidden />} label="Venue">
+              <a href="#venue" className="font-semibold text-ink-900 hover:text-brand-700 hover:underline">
+                {event.location}
+              </a>
+            </Fact>
+          )}
+          {event.registration_mode !== 'apply' && (event.registration_mode !== 'form' || event.capacity > 0) && (
+            <Fact icon={<Users className="h-5 w-5" aria-hidden />} label="Spots">
+              <SpotsMeter event={event} />
+            </Fact>
+          )}
+          {(event.registration_mode ?? 'pass') === 'pass' && (
+            <Fact icon={<TicketIcon className="h-5 w-5" aria-hidden />} label="Price">
+              <span className="font-semibold text-ink-900">{price}</span>
+              {hasPaidTickets(event) && <span className="block text-ink-500">{event.payment_options?.online ? paymentNote(event.payment_options).replace(/\.$/, '') : 'Pay at the venue'}</span>}
+            </Fact>
+          )}
         </dl>
 
         <div className="mt-6 flex flex-wrap gap-2 lg:hidden">

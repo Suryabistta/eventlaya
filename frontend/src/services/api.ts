@@ -69,13 +69,25 @@ export interface Event {
 
 export interface FormField {
   id?: string
-  field_type: 'text' | 'paragraph' | 'number' | 'email' | 'phone' | 'select' | 'radio' | 'checkbox' | 'date'
+  /** url: a link; image / file_upload: uploaded through /forms/events/<slug>/upload/; heading: a section title, not a question */
+  field_type: 'text' | 'paragraph' | 'number' | 'email' | 'phone' | 'select' | 'radio' | 'checkbox' | 'date' | 'url' | 'image' | 'file_upload' | 'heading'
   label: string
   placeholder?: string
   help_text?: string
   required: boolean
   order: number
   options?: string[]
+  /** Checked on the website, in the app and on the server (apps/dynamic_forms/validation.py) */
+  validation_rules?: FieldRules
+}
+
+export interface FieldRules {
+  min?: number
+  max?: number
+  max_length?: number
+  /** Date of birth: allowed age range */
+  min_age?: number
+  max_age?: number
 }
 
 export interface DynamicForm {

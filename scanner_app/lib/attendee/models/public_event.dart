@@ -378,7 +378,8 @@ class FormFieldSpec {
   /// A single required tick box ("I agree to the terms").
   bool get isConsent => type == 'checkbox' && options.isEmpty;
 
-  bool get isFileUpload => type == 'file_upload';
+  /// Photo or file questions (the app can't upload yet, so it sends people to the website).
+  bool get isFileUpload => type == 'file_upload' || type == 'image';
 }
 
 class FormSchema {

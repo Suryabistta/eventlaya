@@ -16,6 +16,8 @@ import {
   CheckCircle2,
   MapPin,
   Minus,
+  FileText,
+  Upload,
   Plus,
   Printer,
   Share2,
@@ -439,9 +441,14 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
       for (const f of questions) {
         const k = keyOf(f)
         const v = draft.answers[k]
-        if (f.required && isEmpty(v)) e[k] = ['radio', 'select', 'checkbox'].includes(f.field_type) ? 'Choose an option.' : 'This field is required.'
-        else if (!isEmpty(v) && f.field_type === 'number' && Number.isNaN(Number(v))) e[k] = 'Enter a number.'
+        if (f.field_type === 'heading') continue
+        if (f.required && isEmpty(v))
+          e[k] = ['radio', 'select', 'checkbox'].includes(f.field_type) ? 'Choose an option.' : ['image', 'file_upload'].includes(f.field_type) ? 'Upload a file.' : 'This field is required.'
         else if (!isEmpty(v) && f.field_type === 'email' && !EMAIL_RE.test(String(v))) e[k] = 'Enter an email like name@example.com.'
+        else if (!isEmpty(v)) {
+          const problem = ruleError(f, v)
+          if (problem) e[k] = problem
+        }
       }
     }
     if (id === 'review') {
@@ -836,7 +843,7 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
 
                     {step === 'questions' &&
                       questions.map((f) => (
-                        <DynamicField key={keyOf(f)} field={f} value={draft.answers[keyOf(f)]} error={errors[keyOf(f)]} onChange={(v) => setAnswer(keyOf(f), v)} />
+                        <DynamicField key={keyOf(f)} slug={slug} field={f} value={draft.answers[keyOf(f)]} error={errors[keyOf(f)]} onChange={(v) => setAnswer(keyOf(f), v)} />
                       ))}
 
                     {step === 'review' && (
@@ -1002,6 +1009,11 @@ const Stepper: React.FC<{ steps: StepId[]; labels: Record<StepId, string>; curre
 }
 
 const MiniEvent: React.FC<{ event: PublicEvent; when: string; detailed?: boolean; className?: string }> = ({ event, when, detailed, className }) => {
+  // Show only what matters for this kind of registration: open calls have no price, spots or (usually) venue;
+  // registration-only events have no price and show spots only when there is a limit
+  const mode = event.registration_mode ?? 'pass'
+  const showVenue = mode !== 'apply' || (event.location && event.location !== 'Online')
+  const showMoney = mode === 'pass'
   const spots = spotsInfo(event)
   const left = spots.left
   const pct = spots.capacity && left !== null ? Math.min(100, Math.round(((spots.capacity - left) / spots.capacity) * 100)) : 0
@@ -1016,14 +1028,16 @@ const MiniEvent: React.FC<{ event: PublicEvent; when: string; detailed?: boolean
             <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" aria-hidden />
             {when}
           </p>
-          <p className="mt-0.5 flex items-start gap-1.5 text-sm text-ink-600">
-            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" aria-hidden />
-            <span className="min-w-0">{event.location}</span>
-          </p>
-          {detailed && (
+          {showVenue && (
+            <p className="mt-0.5 flex items-start gap-1.5 text-sm text-ink-600">
+              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" aria-hidden />
+              <span className="min-w-0">{event.location}</span>
+            </p>
+          )}
+          {detailed && (showMoney || (mode === 'form' && spots.capacity !== null)) && (
             <div className="mt-4 border-t border-ink-100 pt-4 text-sm">
               <p className="flex items-baseline justify-between">
-                <span className="font-semibold text-ink-900">{priceLabel(event)}</span>
+                <span className="font-semibold text-ink-900">{showMoney ? priceLabel(event) : 'Places'}</span>
                 <span className="text-ink-500">{spots.full ? 'Fully booked' : spots.hidden ? 'Spots available' : left === null ? 'Open to everyone' : `${left.toLocaleString()} spots left`}</span>
               </p>
               {left !== null && (
@@ -1095,8 +1109,14 @@ const Review: React.FC<{
       )}
       {questions.length > 0 && (
         <ReviewGroup title="Event questions" onEdit={() => onEdit('questions')}>
-          {questions.map((f) => (
-            <ReviewRow key={keyOf(f)} label={f.label} value={answerText(draft.answers[keyOf(f)])} />
+          {questions
+            .filter((f) => f.field_type !== 'heading')
+            .map((f) => (
+            <ReviewRow
+              key={keyOf(f)}
+              label={f.label}
+              value={['image', 'file_upload'].includes(f.field_type) && !isEmpty(draft.answers[keyOf(f)]) ? 'Uploaded' : answerText(draft.answers[keyOf(f)])}
+            />
           ))}
         </ReviewGroup>
       )}
@@ -1610,9 +1630,45 @@ const AccountNote: React.FC<{ email: string; many?: boolean }> = ({ email, many 
 
 /* ---------- dynamic fields ---------- */
 
-const DynamicField: React.FC<{ field: FormField; value: unknown; error?: string; onChange: (v: unknown) => void }> = ({ field: f, value, error, onChange }) => {
+/** The organizer's rules for an answer (same as apps/dynamic_forms/validation.py on the server). */
+function ruleError(f: FormField, v: unknown): string | null {
+  const r = f.validation_rules ?? {}
+  const text = String(v).trim()
+  if (f.field_type === 'number') {
+    const n = Number(text)
+    if (Number.isNaN(n)) return 'Enter a number.'
+    if (r.min != null && n < r.min) return `Must be at least ${r.min}.`
+    if (r.max != null && n > r.max) return `Must be at most ${r.max}.`
+  }
+  if (f.field_type === 'url' && !/^https?:\/\/\S+\.\S+$/i.test(text)) return 'Paste a full link starting with https://'
+  if ((f.field_type === 'text' || f.field_type === 'paragraph') && r.max_length && text.length > r.max_length)
+    return `Keep it to ${r.max_length} characters (now ${text.length}).`
+  if (f.field_type === 'date' && (r.min_age != null || r.max_age != null)) {
+    const born = new Date(text)
+    const now = new Date()
+    if (Number.isNaN(born.getTime())) return 'Enter a valid date.'
+    const age = now.getFullYear() - born.getFullYear() - (now.getMonth() < born.getMonth() || (now.getMonth() === born.getMonth() && now.getDate() < born.getDate()) ? 1 : 0)
+    if (r.min_age != null && age < r.min_age) return `You must be at least ${r.min_age}.`
+    if (r.max_age != null && age > r.max_age) return `You must be ${r.max_age} or younger.`
+  }
+  return null
+}
+
+const DynamicField: React.FC<{ slug: string; field: FormField; value: unknown; error?: string; onChange: (v: unknown) => void }> = ({ slug, field: f, value, error, onChange }) => {
   const common = { label: f.label, required: f.required, error, hint: f.help_text || undefined, className: invalidCls }
   switch (f.field_type) {
+    case 'heading':
+      return (
+        <div className="border-t border-ink-100 pt-4 first:border-t-0 first:pt-0">
+          <p className="font-semibold text-ink-900">{f.label}</p>
+          {f.help_text && <p className="mt-0.5 text-sm text-ink-500">{f.help_text}</p>}
+        </div>
+      )
+    case 'image':
+    case 'file_upload':
+      return <FileAnswer slug={slug} field={f} value={value as string | undefined} error={error} onChange={onChange} />
+    case 'url':
+      return <Input {...common} type="url" inputMode="url" placeholder={f.placeholder || 'https://'} value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value.trim())} />
     case 'paragraph':
       return <Textarea {...common} rows={3} placeholder={f.placeholder} value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} />
     case 'select':
@@ -1747,3 +1803,60 @@ const RegisteredStep: React.FC<{ event: PublicEvent; dateLabel: string; info: Re
     </ButtonLink>
   </Card>
 )
+
+/** Photo / file question: uploads to the event's public form upload endpoint (guests too) and keeps the URL. */
+const FileAnswer: React.FC<{ slug: string; field: FormField; value?: string; error?: string; onChange: (v: unknown) => void }> = ({ slug, field: f, value, error, onChange }) => {
+  const [busy, setBusy] = useState(false)
+  const [problem, setProblem] = useState<string | null>(null)
+  const isImage = f.field_type === 'image'
+  const pick = async (file: File | undefined) => {
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) return setProblem('Files must be 5 MB or smaller. For videos, share a link instead.')
+    setBusy(true)
+    setProblem(null)
+    try {
+      const body = new FormData()
+      body.append('file', file)
+      const res = await fetch(`/api/forms/events/${slug}/upload/`, { method: 'POST', body })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error ?? `Upload failed (${res.status})`)
+      onChange(data.url)
+    } catch (e) {
+      setProblem((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const shown = problem ?? error
+  return (
+    <div className="space-y-1.5" data-invalid={shown ? 'true' : undefined}>
+      <p className="text-sm font-medium text-ink-800">
+        {f.label}
+        {f.required && <span className="ml-0.5 text-brand-600" aria-hidden>*</span>}
+      </p>
+      {value ? (
+        <div className="flex items-center gap-3 rounded-[10px] border border-ink-200 p-2">
+          {isImage ? <img src={value} alt="" className="h-14 w-14 rounded-lg object-cover" /> : <FileText className="h-6 w-6 text-ink-400" aria-hidden />}
+          <span className="min-w-0 flex-1 truncate text-sm text-ink-700">{isImage ? 'Photo uploaded' : 'File uploaded'}</span>
+          <Button variant="ghost" size="sm" onClick={() => onChange('')}>
+            Remove
+          </Button>
+        </div>
+      ) : (
+        <label className="flex cursor-pointer items-center gap-2 rounded-[10px] border border-dashed border-ink-300 px-4 py-3 text-sm text-ink-600 hover:border-brand-400 hover:bg-brand-50/40">
+          <Upload className="h-4 w-4" aria-hidden />
+          {busy ? 'Uploading…' : isImage ? 'Choose a photo (JPG, PNG or WebP, up to 5 MB)' : 'Choose a PDF or photo (up to 5 MB)'}
+          <input
+            type="file"
+            className="sr-only"
+            accept={isImage ? 'image/jpeg,image/png,image/webp' : 'application/pdf,image/jpeg,image/png,image/webp'}
+            disabled={busy}
+            onChange={(e) => void pick(e.target.files?.[0])}
+          />
+        </label>
+      )}
+      {f.help_text && !shown && <p className="text-xs text-ink-500">{f.help_text}</p>}
+      {shown && <p className="text-xs font-medium text-red-600">{shown}</p>}
+    </div>
+  )
+}

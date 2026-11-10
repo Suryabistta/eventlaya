@@ -182,7 +182,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (onSale.length == 1) _qty[onSale.first.id] = 1;
     _step = widget.event.ticketTypes.isEmpty ? 1 : 0;
     for (final f in _questions) {
-      if (!['select', 'radio', 'checkbox', 'date'].contains(f.type)) _text[f.id] = TextEditingController();
+      if (!['select', 'radio', 'checkbox', 'date', 'heading'].contains(f.type)) _text[f.id] = TextEditingController();
     }
   }
 
@@ -929,6 +929,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Widget _questionRow(FormFieldSpec f) {
     final label = f.required ? f.label : '${f.label} (optional)';
     switch (f.type) {
+      case 'heading':
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(f.label, style: AppType.heading(16)),
+            if (f.helpText.isNotEmpty) Text(f.helpText, style: AppType.caption),
+          ]),
+        );
       case 'select':
       case 'radio':
       case 'checkbox':
@@ -1001,6 +1009,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             'email' => TextInputType.emailAddress,
             'phone' => TextInputType.phone,
             'paragraph' => TextInputType.multiline,
+            'url' => TextInputType.url,
             _ => TextInputType.text,
           },
           validator: (v) {
@@ -1008,6 +1017,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             if (f.required && s.isEmpty) return 'This field is required';
             if (s.isNotEmpty && f.type == 'number' && num.tryParse(s) == null) return 'Enter a number';
             if (s.isNotEmpty && f.type == 'email' && !_emailRe.hasMatch(s)) return 'Enter a valid email';
+            if (s.isNotEmpty && f.type == 'url' && !RegExp(r'^https?://\S+\.\S+$', caseSensitive: false).hasMatch(s)) {
+              return 'Paste a full link starting with https://';
+            }
             return null;
           },
         );

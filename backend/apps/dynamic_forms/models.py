@@ -49,6 +49,10 @@ class FormField(models.Model):
         CHECKBOX = 'checkbox', 'Checkboxes'
         DATE = 'date', 'Date'
         FILE_UPLOAD = 'file_upload', 'File Upload'
+        URL = 'url', 'Link'
+        IMAGE = 'image', 'Photo'
+        # Not a question: a title (label) and optional text (help_text) that splits a long form
+        HEADING = 'heading', 'Section heading'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     form = models.ForeignKey(Form, on_delete=models.CASCADE, related_name='fields')

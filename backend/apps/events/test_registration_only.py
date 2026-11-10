@@ -57,7 +57,7 @@ class RegistrationOnlyTests(APITestCase):
     def test_export_lists_registrations_with_answers(self):
         from apps.dynamic_forms.models import Form, FormField
         form = Form.objects.create(organizer=self.organizer, event=self.event, title='Run form', slug='run-form', status='published')
-        size = FormField.objects.create(form=form, label='T-shirt size', field_type='select', order=1)
+        size = FormField.objects.create(form=form, label='T-shirt size', field_type='select', options=['S', 'M', 'L'], order=1)
         self.event.registration_form = form
         self.event.save()
         self.register('sita@x.com', answers={str(size.id): 'M'})

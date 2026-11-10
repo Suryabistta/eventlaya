@@ -6,6 +6,8 @@ from django.utils import timezone
 from rest_framework import viewsets, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser
+from rest_framework.throttling import AnonRateThrottle
 from apps.accounts.authentication import OptionalJWTAuthentication
 from apps.events.models import Event, EventTicket
 from apps.events.serializers import EventTicketSerializer
@@ -140,7 +142,14 @@ class EventRegisterView(APIView):
 
         # Validate required form fields if dynamic form is attached
         if form and form.status == Form.Status.PUBLISHED:
-            for field in form.fields.filter(required=True):
+            from .validation import answer_error
+            if not isinstance(answers_map, dict):
+                return Response({'error': 'Invalid answers.'}, status=status.HTTP_400_BAD_REQUEST)
+            for field in form.fields.all():
+                problem = answer_error(field, answers_map.get(str(field.id)), event.id)
+                if problem:
+                    return Response({'error': problem}, status=status.HTTP_400_BAD_REQUEST)
+            for field in form.fields.filter(required=True).exclude(field_type=FormField.FieldType.HEADING):
                 val = answers_map.get(str(field.id))
                 if val is None or val == '' or (isinstance(val, list) and len(val) == 0):
                     return Response({'error': f"'{field.label}' is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -329,3 +338,50 @@ class ResponseReviewView(APIView):
             from apps.core.email import send_review_email
             send_review_email(resp, resp.event)
         return Response(FormResponseSerializer(resp).data)
+
+
+class FormUploadThrottle(AnonRateThrottle):
+    """Files for form answers: generous for a real applicant, too tight for bulk abuse."""
+
+    scope = 'form_upload'
+    rate = '30/hour'
+
+
+class FormUploadView(APIView):
+    """POST /api/forms/events/<slug>/upload/ multipart `file`: a photo or PDF for a form answer (guests too).
+    Stored under uploads/forms/<event id>/; the answer keeps the returned URL (checked in validation.answer_error)."""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = [OptionalJWTAuthentication]
+    throttle_classes = [FormUploadThrottle]
+    parser_classes = [MultiPartParser]
+    MAX_BYTES = 5 * 1024 * 1024
+
+    def post(self, request, slug):
+        import uuid
+        from django.core.files.storage import default_storage
+        from PIL import Image, UnidentifiedImageError
+        from apps.accounts.tenancy import scope_events
+        event = get_object_or_404(scope_events(Event.objects.all(), request), slug=slug)
+        if event.registration_closed_reason():
+            return Response({'error': event.registration_closed_reason()}, status=status.HTTP_400_BAD_REQUEST)
+        upload = request.FILES.get('file')
+        if not upload:
+            return Response({'error': 'Choose a file to upload.'}, status=status.HTTP_400_BAD_REQUEST)
+        if upload.size > self.MAX_BYTES:
+            return Response({'error': 'Files must be 5 MB or smaller. For videos, share a link instead.'}, status=status.HTTP_400_BAD_REQUEST)
+        head = upload.read(5)
+        upload.seek(0)
+        if head == b'%PDF-':
+            ext = 'pdf'
+        else:
+            try:
+                image = Image.open(upload)
+                image.verify()
+                ext = {'JPEG': 'jpg', 'PNG': 'png', 'WEBP': 'webp'}.get(image.format or '')
+            except (UnidentifiedImageError, OSError, SyntaxError):
+                ext = None
+            upload.seek(0)
+            if not ext:
+                return Response({'error': 'Use a JPG, PNG or WebP photo, or a PDF.'}, status=status.HTTP_400_BAD_REQUEST)
+        path = default_storage.save(f'uploads/forms/{event.id}/{uuid.uuid4().hex}.{ext}', upload)
+        return Response({'url': default_storage.url(path), 'name': upload.name[:120], 'size': upload.size}, status=status.HTTP_201_CREATED)
