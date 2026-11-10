@@ -136,6 +136,9 @@ class PublicEvent {
   /// Registration only (`registration_mode: form`): free, one per person, no pass or check-in.
   final bool registrationOnly;
 
+  /// Registrations must include a phone number (on unless the organizer turned it off).
+  final bool phoneRequired;
+
   /// Applications stage on and tickets off (for now only an open call: film submissions, pageant applications).
   final bool isOpenCall;
 
@@ -206,6 +209,7 @@ class PublicEvent {
     this.category,
     this.categoryName,
     this.registrationOnly = false,
+    this.phoneRequired = true,
     this.isOpenCall = false,
     this.applicationsOpen = false,
     this.applyLabel = 'Apply',
@@ -245,6 +249,7 @@ class PublicEvent {
       category: _str(j['category']),
       categoryName: _str(j['category_name']),
       registrationOnly: j['registration_mode'] == 'form',
+      phoneRequired: j['phone_required'] != false,
       isOpenCall: j['applications_enabled'] == true && j['tickets_enabled'] == false,
       applicationsOpen: j['applications'] is Map ? (j['applications'] as Map)['open'] == true : false,
       applyLabel: j['applications'] is Map ? _str((j['applications'] as Map)['cta']) ?? 'Apply' : (_str(j['application_cta']) ?? 'Apply'),

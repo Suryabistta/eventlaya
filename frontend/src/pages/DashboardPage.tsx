@@ -23,6 +23,8 @@ import {
   QrCode,
   Armchair,
   FileText,
+  Send,
+  UserCog,
 } from 'lucide-react'
 import { api, request, tokenStore, type Event, type Ticket, type EventTask } from '@/services/api'
 import { eventPhase, startsInText } from '@/lib/phase'
@@ -31,6 +33,7 @@ import { useCurrentEvent } from '@/lib/event-context'
 import { TicketPassModal } from '@/components/TicketPassModal'
 import { RegistrationQrModal } from '@/components/RegistrationQrModal'
 import { AnswerValue, ApplicationsCard, type Answer } from '@/components/ApplicationsCard'
+import { ArrivalsCard, GuestEditModal, MessageGuestsModal, type GuestTicket } from '@/components/GuestTools'
 import { SeatsModal } from '@/components/SeatsModal'
 import { useModuleEnabled } from '@/lib/modules'
 import { Badge, Button, ButtonLink, Card, CardHeader, EmptyState, ErrorState, Modal, Skeleton, useToast } from '@/components/ui'
@@ -106,6 +109,7 @@ export const DashboardPage: React.FC = () => {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const isOrganizer = user?.role === 'organizer' || user?.role === 'superadmin'
   const formOnly = currentEvent?.registration_mode === 'form'
+  const guestsOn = useModuleEnabled('guest_management')
 
   const eventId = currentEvent?.id
   const { data: gateStats } = useQuery({
@@ -474,11 +478,14 @@ export const DashboardPage: React.FC = () => {
           loading={ticketsLoading}
           formOnly={formOnly}
           hasForm={Boolean(currentEvent.registration_form)}
+          canMessage={isOrganizer}
+          ticketTypes={(currentEvent.ticket_types ?? []).map((t) => ({ id: t.id, name: t.name }))}
           onOpen={setSelectedTicket}
           onCopyLink={copyLink}
         />
 
         <div className="space-y-6 xl:col-span-4">
+          {guestsOn && <ArrivalsCard eventId={currentEvent.id} />}
           {isOrganizer && <TasksCard tasks={tasks} />}
 
           <Card className="flex flex-col overflow-hidden">
@@ -746,9 +753,16 @@ const AttendeesCard: React.FC<{
   formOnly?: boolean
   /** The event has a registration form: each attendee's answers can be opened */
   hasForm?: boolean
+  /** Organizer (not gate staff): may message guests */
+  canMessage?: boolean
+  ticketTypes?: { id: string; name: string }[]
   onOpen: (t: Ticket) => void
   onCopyLink: () => void
-}> = ({ className, eventId, tickets, loading, formOnly, hasForm, onOpen, onCopyLink }) => {
+}> = ({ className, eventId, tickets, loading, formOnly, hasForm, canMessage, ticketTypes = [], onOpen, onCopyLink }) => {
+  const guestsOn = useModuleEnabled('guest_management')
+  const [editing, setEditing] = useState<GuestTicket | null>(null)
+  const [messaging, setMessaging] = useState(false)
+  const allTags = useMemo(() => [...new Set((tickets as GuestTicket[]).flatMap((t) => t.guest_tags ?? []))], [tickets])
   // Registration form answers per ticket (only the buyer's ticket carries them)
   const { data: responses = [] } = useQuery({
     queryKey: ['registration-answers', eventId],
@@ -805,6 +819,11 @@ const AttendeesCard: React.FC<{
             {seatsOn && tickets.length > 0 && (
               <Button variant="secondary" size="sm" icon={<Armchair className="h-4 w-4" />} onClick={() => setSeatsOpen(true)}>
                 Seats
+              </Button>
+            )}
+            {guestsOn && canMessage && tickets.length > 0 && (
+              <Button variant="secondary" size="sm" icon={<Send className="h-4 w-4" />} onClick={() => setMessaging(true)}>
+                Message guests
               </Button>
             )}
             <Button variant="secondary" size="sm" loading={exporting} icon={<Download className="h-4 w-4" />} onClick={exportCsv}>
@@ -907,7 +926,18 @@ const AttendeesCard: React.FC<{
                           <p className="truncate text-xs text-ink-500">
                             {t.guest_number ? <span className="font-medium text-ink-700">Guest of </span> : null}
                             {t.attendee_email}
+                            {t.attendee_phone && ` · ${t.attendee_phone}`}
                           </p>
+                          {guestsOn && ((t as GuestTicket).guest_tags?.length || (t as GuestTicket).host_note) ? (
+                            <p className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-ink-600">
+                              {(t as GuestTicket).guest_tags?.map((g) => (
+                                <Badge key={g} tone="warning">
+                                  {g}
+                                </Badge>
+                              ))}
+                              {(t as GuestTicket).host_note && <span className="truncate">{(t as GuestTicket).host_note}</span>}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
                     </td>
@@ -923,6 +953,12 @@ const AttendeesCard: React.FC<{
                       {new Date(t.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
                     </td>
                     <td className="whitespace-nowrap px-2 py-3 text-right">
+                      {guestsOn && (
+                        <Button variant="ghost" size="sm" onClick={() => setEditing(t as GuestTicket)} aria-label={`Tags and note for ${t.attendee_name}`}>
+                          <UserCog className="h-4 w-4 text-ink-500" aria-hidden />
+                          <span className="hidden xl:inline">Guest</span>
+                        </Button>
+                      )}
                       {answersByTicket.get(t.id) && (
                         <Button variant="ghost" size="sm" onClick={() => setAnswersOf(t)} aria-label={`Form answers from ${t.attendee_name}`}>
                           <FileText className="h-4 w-4 text-ink-500" aria-hidden />
@@ -945,6 +981,8 @@ const AttendeesCard: React.FC<{
           </table>
         </div>
       )}
+      {editing && <GuestEditModal eventId={eventId} ticket={editing} onClose={() => setEditing(null)} />}
+      {messaging && <MessageGuestsModal eventId={eventId} tags={allTags} ticketTypes={ticketTypes} onClose={() => setMessaging(false)} />}
       {answersOf && (
         <Modal open onClose={() => setAnswersOf(null)} size="lg" title={answersOf.attendee_name} description={`${answersOf.attendee_email} · ${answersOf.ticket_number}`}>
           <dl className="divide-y divide-ink-100 rounded-xl border border-ink-200">

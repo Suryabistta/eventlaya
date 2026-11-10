@@ -38,6 +38,10 @@ class ScanResultModel {
   /// Seat ("A-12") when the organizer assigned one; empty otherwise.
   final String seatNumber;
 
+  /// Guest tags (VIP, Press...) and the organizer's note for this guest (module guest_management).
+  final List<String> guestTags;
+  final String hostNote;
+
   ScanResultModel({
     required this.outcome,
     required this.message,
@@ -50,6 +54,8 @@ class ScanResultModel {
     this.rawData,
     this.ticketType = TicketTypeInfo.empty,
     this.seatNumber = '',
+    this.guestTags = const [],
+    this.hostNote = '',
   });
 
   bool get isSuccess => outcome == ScanOutcome.success;
@@ -139,6 +145,11 @@ class ScanResultModel {
       rawData: json,
       ticketType: TicketTypeInfo.fromTicket(ticketData),
       seatNumber: ticketData?['seat_number']?.toString().trim() ?? '',
+      guestTags: [
+        if (ticketData?['guest_tags'] is List)
+          for (final t in ticketData!['guest_tags'] as List) t.toString(),
+      ],
+      hostNote: ticketData?['host_note']?.toString().trim() ?? '',
     );
   }
 

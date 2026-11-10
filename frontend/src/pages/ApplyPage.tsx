@@ -36,6 +36,7 @@ export const ApplyPage: React.FC = () => {
 
   const event = data?.event
   const call = event?.applications
+  const phoneRequired = event?.phone_required ?? true
   const fields = useMemo(() => [...(call?.form?.fields ?? [])].sort((a, b) => a.order - b.order), [call?.form])
 
   const submit = useMutation({
@@ -56,6 +57,7 @@ export const ApplyPage: React.FC = () => {
     const errs: Record<string, string> = {}
     if (!name.trim()) errs.name = 'Enter your full name.'
     if (!EMAIL_RE.test(email.trim())) errs.email = 'Enter an email like name@example.com.'
+    if (phoneRequired && (phone.replace(/\D/g, '').length < 7 || phone.replace(/\D/g, '').length > 15)) errs.phone = 'Enter your mobile number.'
     for (const f of fields) {
       if (f.field_type === 'heading') continue
       const v = answers[keyOf(f)]
@@ -162,7 +164,16 @@ export const ApplyPage: React.FC = () => {
                   <Input label="Full name" required value={name} error={errors.name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
                   <div className="grid gap-4 sm:grid-cols-2">
                     <Input label="Email" type="email" required value={email} error={errors.email} hint="We email you about your application here." onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
-                    <Input label="Mobile number" type="tel" value={phone} hint="Optional" onChange={(e) => setPhone(e.target.value)} autoComplete="tel" />
+                    <Input
+                      label="Mobile number"
+                      type="tel"
+                      required={phoneRequired}
+                      value={phone}
+                      error={errors.phone}
+                      hint={phoneRequired ? 'The organizer may call you about your application.' : 'Optional'}
+                      onChange={(e) => setPhone(e.target.value)}
+                      autoComplete="tel"
+                    />
                   </div>
                   {fields.map((f) => (
                     <DynamicField

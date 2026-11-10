@@ -164,7 +164,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   /// File uploads can't be answered in the app yet.
   bool get _needsFileUpload => _fields.any((f) => f.isFileUpload && f.required);
 
-  bool get _phoneRequired => _mapped.any((f) => f.builtin == 'phone' && f.required);
+  bool get _phoneRequired => _event.phoneRequired || _mapped.any((f) => f.builtin == 'phone' && f.required);
 
   TextEditingController _guestCtrl(_Line l) =>
       _guestCtrls.putIfAbsent('${l.type.id}#${l.index}', () => TextEditingController());

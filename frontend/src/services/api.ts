@@ -23,6 +23,10 @@ export interface Event {
   application_form?: string | null
   applications_close?: string | null
   application_cta?: string
+  /** Guests (docs/plan-2026-11-guest-management.md) */
+  phone_required?: boolean
+  arrival_alerts?: 'tagged' | 'all' | 'off'
+  reminders_enabled?: boolean
   /** Main button text set by the organizer ('' = from the registration type) */
   cta_label?: string
   title: string

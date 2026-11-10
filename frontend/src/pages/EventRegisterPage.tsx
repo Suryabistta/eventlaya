@@ -234,7 +234,8 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
   const consents = useMemo(() => fields.filter((f) => !builtinOf(f) && isConsent(f)), [fields])
   const questions = useMemo(() => fields.filter((f) => !builtinOf(f) && !isConsent(f)), [fields])
   const mappedFor = (b: Builtin) => mapped.find((f) => builtinOf(f) === b)
-  const phoneRequired = Boolean(mappedFor('phone')?.required)
+  // Organizers need a number to reach guests: required unless the event turned it off
+  const phoneRequired = Boolean(event.phone_required ?? true) || Boolean(mappedFor('phone')?.required)
 
   // Registration-only events (no pass): no ticket step, nothing to pay, and a confirmation at the end
   const formOnly = event.registration_mode === 'form'

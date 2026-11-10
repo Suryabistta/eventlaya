@@ -883,6 +883,8 @@ class _ResultPanel extends StatelessWidget {
         if (name != null && name.isNotEmpty) name,
         if (type.hasName) '${type.name} ticket',
         if (result.seatNumber.isNotEmpty) 'Seat ${result.seatNumber}',
+        ...result.guestTags,
+        if (result.hostNote.isNotEmpty) result.hostNote,
         if (note) type.gateNote,
         if (collect) 'Collect ${type.priceLabel}',
       ].join('. '),
@@ -948,7 +950,7 @@ class _ResultPanel extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: AppType.mono(18, weight: FontWeight.w600, color: fg)),
                       ],
-                      if (type.hasName || result.seatNumber.isNotEmpty) ...[
+                      if (type.hasName || result.seatNumber.isNotEmpty || result.guestTags.isNotEmpty) ...[
                         const SizedBox(height: 12),
                         Wrap(
                           spacing: 8,
@@ -957,8 +959,13 @@ class _ResultPanel extends StatelessWidget {
                             if (type.hasName) _TypePill(label: type.name.toUpperCase(), onWarning: onWarning),
                             if (result.seatNumber.isNotEmpty)
                               _TypePill(label: 'SEAT ${result.seatNumber.toUpperCase()}', onWarning: onWarning),
+                            for (final t in result.guestTags) _TypePill(label: '★ ${t.toUpperCase()}', onWarning: onWarning),
                           ],
                         ),
+                      ],
+                      if (result.hostNote.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(result.hostNote, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppType.body(14, weight: FontWeight.w600, color: fg)),
                       ],
                       if (collect) ...[
                         const SizedBox(height: 12),

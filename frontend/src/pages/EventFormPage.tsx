@@ -58,6 +58,9 @@ interface EventDraft {
   applications_enabled: boolean
   applications_close: string // datetime-local value
   application_cta: string
+  phone_required: boolean
+  arrival_alerts: 'tagged' | 'all' | 'off'
+  reminders_enabled: boolean
   parent: string
   managed_by: string
   managed_by_label: string
@@ -135,6 +138,9 @@ const emptyDraft: EventDraft = {
   applications_enabled: false,
   applications_close: '',
   application_cta: '',
+  phone_required: true,
+  arrival_alerts: 'tagged',
+  reminders_enabled: true,
   parent: '',
   managed_by: '',
   managed_by_label: '',
@@ -205,6 +211,9 @@ function fromEvent(ev: Event, page?: EventPageContent): EventDraft {
     applications_enabled: ev.applications_enabled ?? false,
     applications_close: toLocalInput(ev.applications_close ?? undefined),
     application_cta: ev.application_cta ?? '',
+    phone_required: ev.phone_required ?? true,
+    arrival_alerts: ev.arrival_alerts ?? 'tagged',
+    reminders_enabled: ev.reminders_enabled ?? true,
     parent: ev.parent ?? '',
     managed_by: ev.managed_by ?? '',
     managed_by_label: ev.managed_by_label ?? '',
@@ -272,7 +281,7 @@ const localToday = () => {
 const FIELD_STEP: Record<string, StepId> = {
   title: 'basics', tagline: 'basics', parent: 'basics', category: 'basics', description: 'basics', banner: 'basics', banner_url: 'basics',
   start_date: 'when', start_time: 'when', end_date: 'when', end_time: 'when', location: 'when', map_query: 'when',
-  capacity: 'registration', limit_spots: 'registration', show_spots_left: 'registration', status: 'registration', registration_deadline: 'registration', ticket_price: 'registration', is_paid: 'registration', allow_registration: 'registration', ticket_layout: 'registration', show_seat_number: 'registration', registration_mode: 'registration', cta_label: 'registration', tickets_enabled: 'stages', applications_enabled: 'stages', applications_close: 'stages', application_cta: 'stages', date_tba: 'when',
+  capacity: 'registration', limit_spots: 'registration', show_spots_left: 'registration', status: 'registration', registration_deadline: 'registration', ticket_price: 'registration', is_paid: 'registration', allow_registration: 'registration', ticket_layout: 'registration', show_seat_number: 'registration', registration_mode: 'registration', cta_label: 'registration', tickets_enabled: 'stages', applications_enabled: 'stages', applications_close: 'stages', application_cta: 'stages', date_tba: 'when', phone_required: 'registration', arrival_alerts: 'registration', reminders_enabled: 'registration',
   managed_by: 'page', managed_by_label: 'page', managed_by_logo: 'page', show_managed_by: 'page',
 }
 
@@ -409,6 +418,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
   const seatsOn = useModuleEnabled('seat_numbers')
   const subEventsOn = useModuleEnabled('sub_events')
   const applicationsOn = useModuleEnabled('applications')
+  const guestsOn = useModuleEnabled('guest_management')
   const { events: myEvents } = useCurrentEvent()
   // Main events this one can sit under: the organizer's own top-level events, not itself
   const parentChoices = myEvents.filter((e) => !e.parent && e.id !== event?.id)
@@ -533,6 +543,8 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
         applications_enabled: draft.applications_enabled,
         applications_close: draft.applications_close ? new Date(draft.applications_close).toISOString() : null,
         application_cta: draft.application_cta.trim(),
+        phone_required: draft.phone_required,
+        ...(guestsOn ? { arrival_alerts: draft.arrival_alerts, reminders_enabled: draft.reminders_enabled } : {}),
         ...(subEventsOn ? { parent: draft.parent || null } : {}),
         managed_by: draft.managed_by.trim(),
         managed_by_label: draft.managed_by_label.trim(),
@@ -903,6 +915,32 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
 
                 {step.id === 'registration' && (
                   <>
+                    <Checkbox
+                      label="Phone number required"
+                      hint="Guests and applicants must give a mobile number so you can call or message them."
+                      checked={draft.phone_required}
+                      onChange={(v) => set('phone_required', v)}
+                    />
+                    {guestsOn && (
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <Select
+                          label="Arrival alerts"
+                          hint="A push to you and your staff when a guest is scanned in (tag guests VIP, Press… on the dashboard)."
+                          value={draft.arrival_alerts}
+                          onChange={(e) => set('arrival_alerts', e.target.value as EventDraft['arrival_alerts'])}
+                        >
+                          <option value="tagged">Tagged guests only</option>
+                          <option value="all">Every guest</option>
+                          <option value="off">Off</option>
+                        </Select>
+                        <Checkbox
+                          label="Reminder emails"
+                          hint="Guests get an email the day before and about two hours before the start."
+                          checked={draft.reminders_enabled}
+                          onChange={(v) => set('reminders_enabled', v)}
+                        />
+                      </div>
+                    )}
                     <Checkbox
                       label="Limit the number of spots"
                       hint={draft.limit_spots ? 'Registration closes when this many people sign up.' : 'No limit: anyone can register until you close registration. No spot count is shown.'}
