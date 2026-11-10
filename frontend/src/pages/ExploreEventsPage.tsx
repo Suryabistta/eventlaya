@@ -22,6 +22,7 @@ export const ExploreEventsPage: React.FC = () => {
   const [params, setParams] = useSearchParams()
   const city = params.get('city') ?? ''
   const category = params.get('category') ?? ''
+  const openCalls = params.get('kind') === 'open_calls'
   const setParam = (key: string, value: string) =>
     setParams((p) => {
       if (value) p.set(key, value)
@@ -35,9 +36,9 @@ export const ExploreEventsPage: React.FC = () => {
   useTrackSearch(deferredSearch, 'events')
 
   const { data: events = [], isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['public-events', when, city, category, deferredSearch],
+    queryKey: ['public-events', when, city, category, openCalls, deferredSearch],
     queryFn: () =>
-      api.getPublicEvents({ when, search: deferredSearch || undefined, city: city || undefined, category: category || undefined }),
+      api.getPublicEvents({ when, search: deferredSearch || undefined, city: city || undefined, category: category || undefined, kind: openCalls ? 'open_calls' : undefined }),
     placeholderData: (prev) => prev,
   })
 
@@ -93,21 +94,33 @@ export const ExploreEventsPage: React.FC = () => {
         aria-label="Event type"
         className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0 [&::-webkit-scrollbar]:hidden"
       >
-        {[{ slug: '', name: 'All events' }, ...eventTypes].map((t) => (
+        {[{ slug: '', name: 'All events' }, { slug: '_open_calls', name: 'Open calls' }, ...eventTypes].map((t) => {
+          // "Open calls" (applications / submissions) is a kind of event, not a type: its own URL param
+          const selected = t.slug === '_open_calls' ? openCalls : !openCalls && category === t.slug
+          return (
           <button
             key={t.slug || 'all'}
             type="button"
             role="radio"
-            aria-checked={category === t.slug}
-            onClick={() => setParam('category', t.slug)}
+            aria-checked={selected}
+            onClick={() =>
+              setParams((p) => {
+                p.delete('category')
+                p.delete('kind')
+                if (t.slug === '_open_calls') p.set('kind', 'open_calls')
+                else if (t.slug) p.set('category', t.slug)
+                return p
+              }, { replace: true })
+            }
             className={cn(
               'inline-flex h-9 shrink-0 items-center rounded-full border px-3.5 text-sm font-semibold transition-colors',
-              category === t.slug ? 'border-ink-900 bg-ink-900 text-white' : 'border-ink-200 bg-white text-ink-700 hover:border-ink-400',
+              selected ? 'border-ink-900 bg-ink-900 text-white' : 'border-ink-200 bg-white text-ink-700 hover:border-ink-400',
             )}
           >
             {t.name}
           </button>
-        ))}
+          )
+        })}
       </div>
 
       {/* Results */}
@@ -123,9 +136,9 @@ export const ExploreEventsPage: React.FC = () => {
         ) : events.length === 0 ? (
           <EmptyState
             icon={<CalendarX2 className="h-6 w-6" />}
-            title={deferredSearch || city || category ? 'No events match those filters' : when === 'upcoming' ? 'No upcoming events yet' : 'No past events'}
+            title={deferredSearch || city || category || openCalls ? 'No events match those filters' : when === 'upcoming' ? 'No upcoming events yet' : 'No past events'}
             description={
-              deferredSearch || city || category
+              deferredSearch || city || category || openCalls
                 ? 'Try another city, event type or a shorter search.'
                 : 'Organizing something? Publish it on Eventlaya and it shows up here.'
             }
@@ -197,7 +210,12 @@ export const EventCard: React.FC<{ event: PublicEvent; past: boolean }> = ({ eve
               Featured
             </Badge>
           )}
-          {phase === 'live' && (
+          {e.registration_mode === 'apply' && !over && (
+            <Badge tone="brand" className="shadow-2xs">
+              Open call
+            </Badge>
+          )}
+          {phase === 'live' && e.registration_mode !== 'apply' && (
             <Badge tone="success" dot>
               Happening now
             </Badge>
@@ -230,6 +248,8 @@ export const EventCard: React.FC<{ event: PublicEvent; past: boolean }> = ({ eve
         <div className="mt-3 space-y-1.5 text-sm text-ink-600">
           <p className="flex items-center gap-1.5">
             <Clock className="h-4 w-4 shrink-0 text-ink-400" aria-hidden />
+            {e.registration_mode === 'apply' && <span className="shrink-0 font-medium text-ink-800">Closes</span>}
+            
             <time dateTime={e.start_date} className="truncate">
               {start.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
               {e.start_time && `, ${start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}

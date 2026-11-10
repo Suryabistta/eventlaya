@@ -94,14 +94,25 @@ class Event(models.Model):
     class RegistrationMode(models.TextChoices):
         PASS = 'pass', 'With pass (QR ticket)'
         FORM = 'form', 'Registration only (no pass)'
+        APPLY = 'apply', 'Applications / submissions'
 
+    # APPLY: an open call (pageant applications, film submissions...). Like FORM, plus: no fixed date or venue
+    # (the event date is the application deadline), every entry starts Pending and the organizer accepts or
+    # rejects it (apps.dynamic_forms review endpoint), emailing the applicant.
     # FORM: people just fill in the registration form (runs, sign-ups, data collection). Free, one per person,
     # a confirmation email instead of a QR pass, no gate check-in. Registrations still count toward capacity.
+    # Text of the main button (Apply, Submit entry, Nominate...); blank = chosen from the registration type
+    cta_label = models.CharField(max_length=30, blank=True)
     registration_mode = models.CharField(max_length=10, choices=RegistrationMode.choices, default=RegistrationMode.PASS)
 
     @property
     def registration_only(self):
-        return self.registration_mode == self.RegistrationMode.FORM
+        """No pass or check-in: registration-only events and open calls."""
+        return self.registration_mode in (self.RegistrationMode.FORM, self.RegistrationMode.APPLY)
+
+    @property
+    def is_application(self):
+        return self.registration_mode == self.RegistrationMode.APPLY
 
     # Sub-events (module `sub_events`): a child of a main event, one level deep. It has its own form, capacity,
     # tickets and registration switch; organizer and white-label site come from the main event.

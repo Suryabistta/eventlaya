@@ -189,7 +189,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
 
         {/* Key facts */}
         <dl className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Fact icon={<CalendarDays className="h-5 w-5" aria-hidden />} label="Date">
+          <Fact icon={<CalendarDays className="h-5 w-5" aria-hidden />} label={event.registration_mode === 'apply' ? 'Applications close' : 'Date'}>
             <span className="font-semibold text-ink-900">{when.range}</span>
             {event.start_time && (
               <span className="block text-ink-500">
@@ -512,7 +512,7 @@ const PhaseBanner: React.FC<{ event: PublicEvent; state: ReturnType<typeof regis
         <Radio className="mt-0.5 h-6 w-6 shrink-0 text-emerald-600" aria-hidden />
         <div>
           <p className="text-lg font-bold">Happening now</p>
-          <p className="mt-0.5 text-sm">{state.open ? (event.registration_mode === 'form' ? 'You can still register.' : 'You can still register and get your pass, then head to the gate.') : state.reason}</p>
+          <p className="mt-0.5 text-sm">{state.open ? (event.registration_mode === 'apply' ? 'Applications are open.' : event.registration_mode === 'form' ? 'You can still register.' : 'You can still register and get your pass, then head to the gate.') : state.reason}</p>
         </div>
       </div>
     )
@@ -929,7 +929,7 @@ const RegistrationCard: React.FC<{ event: PublicEvent; state: ReturnType<typeof 
       ) : (
         state.open && (
           <p className="mt-3 text-center text-xs text-ink-500">
-            {event.registration_mode === 'form' ? 'Takes about a minute. You get a confirmation by email.' : 'Takes about a minute. Your QR pass appears right away.'}
+            {event.registration_mode === 'apply' ? 'You get an email when your application is received, and again when it’s reviewed.' : event.registration_mode === 'form' ? 'Takes about a minute. You get a confirmation by email.' : 'Takes about a minute. Your QR pass appears right away.'}
           </p>
         )
       )}

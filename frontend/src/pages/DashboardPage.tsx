@@ -29,6 +29,7 @@ import { useAuth } from '@/lib/auth'
 import { useCurrentEvent } from '@/lib/event-context'
 import { TicketPassModal } from '@/components/TicketPassModal'
 import { RegistrationQrModal } from '@/components/RegistrationQrModal'
+import { ApplicationsCard } from '@/components/ApplicationsCard'
 import { SeatsModal } from '@/components/SeatsModal'
 import { useModuleEnabled } from '@/lib/modules'
 import { Badge, Button, ButtonLink, Card, CardHeader, EmptyState, ErrorState, Skeleton, useToast } from '@/components/ui'
@@ -103,7 +104,7 @@ export const DashboardPage: React.FC = () => {
   const { currentEvent, isLoading: eventsLoading, isError: eventsError, error, refetch } = useCurrentEvent()
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const isOrganizer = user?.role === 'organizer' || user?.role === 'superadmin'
-  const formOnly = currentEvent?.registration_mode === 'form'
+  const formOnly = currentEvent?.registration_mode === 'form' || currentEvent?.registration_mode === 'apply'
 
   const eventId = currentEvent?.id
   const { data: gateStats } = useQuery({
@@ -467,7 +468,8 @@ export const DashboardPage: React.FC = () => {
           eventId={currentEvent.id}
           tickets={tickets}
           loading={ticketsLoading}
-          formOnly={currentEvent.registration_mode === 'form'}
+          formOnly={formOnly}
+          applications={currentEvent.registration_mode === 'apply'}
           onOpen={setSelectedTicket}
           onCopyLink={copyLink}
         />
@@ -738,9 +740,11 @@ const AttendeesCard: React.FC<{
   loading: boolean
   /** Registration-only event: no passes or check-in, so no pass column or arrival statuses */
   formOnly?: boolean
+  /** Open call: the applications to review instead of an attendee list */
+  applications?: boolean
   onOpen: (t: Ticket) => void
   onCopyLink: () => void
-}> = ({ className, eventId, tickets, loading, formOnly, onOpen, onCopyLink }) => {
+}> = ({ className, eventId, tickets, loading, formOnly, applications, onOpen, onCopyLink }) => {
   const toast = useToast()
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
@@ -778,6 +782,8 @@ const AttendeesCard: React.FC<{
       setExporting(false)
     }
   }
+
+  if (applications) return <ApplicationsCard className={className} eventId={eventId} onExport={exportCsv} exporting={exporting} />
 
   return (
     <Card className={cn('overflow-hidden', className)}>

@@ -78,6 +78,8 @@ class EventRegisterView(APIView):
 
         if not name or not email:
             return Response({'error': 'Name and Email are required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if event.is_application and not (event.registration_form and event.registration_form.status == Form.Status.PUBLISHED):
+            return Response({'error': 'Applications are not open yet.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             items = self._parse_items(request.data)
@@ -209,9 +211,9 @@ class EventRegisterView(APIView):
 
         if event.registration_only:
             from apps.core.email import send_registration_email
-            send_registration_email(tickets[0], event)
+            send_registration_email(tickets[0], event, application=event.is_application)
             return Response({
-                'message': f'You are registered for {event.title}.',
+                'message': f'Your application for {event.title} was received.' if event.is_application else f'You are registered for {event.title}.',
                 'registration_only': True,
                 'registration': self._registration_data(tickets[0]),
                 'form_response': FormResponseSerializer(form_response).data if form_response else None,
@@ -279,7 +281,8 @@ class EventRegisterView(APIView):
             submitter_name=name,
             submitter_email=email,
             submitter_phone=phone,
-            review_status=FormResponse.ReviewStatus.ACCEPTED
+            # Open calls: the organizer screens every entry
+            review_status=FormResponse.ReviewStatus.PENDING if event.is_application else FormResponse.ReviewStatus.ACCEPTED,
         )
         for field in form.fields.all():
             if str(field.id) in answers_map:
@@ -296,6 +299,33 @@ class EventSubmissionsListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, event_id):
-        event = get_object_or_404(Event, id=event_id, organizer=request.user)
+        from apps.events.views import can_manage_event
+        event = get_object_or_404(Event, id=event_id)
+        if not can_manage_event(request.user, event):
+            return Response({'error': 'Only the organizer can see this.'}, status=status.HTTP_403_FORBIDDEN)
         responses = FormResponse.objects.filter(event=event).prefetch_related('answers', 'answers__field')
         return Response(FormResponseSerializer(responses, many=True).data)
+
+
+class ResponseReviewView(APIView):
+    """POST /api/forms/responses/<id>/review/ {status: accepted|rejected|pending, note}: the organizer screens an
+    application (open calls, Event.registration_mode apply). The applicant is emailed when it's accepted or rejected."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        from apps.events.views import can_manage_event
+        resp = get_object_or_404(FormResponse.objects.select_related('event'), pk=pk)
+        if resp.event is None or not can_manage_event(request.user, resp.event):
+            return Response({'error': 'Only the organizer can review applications.'}, status=status.HTTP_403_FORBIDDEN)
+        new = request.data.get('status')
+        if new not in FormResponse.ReviewStatus.values:
+            return Response({'error': 'status must be pending, accepted or rejected.'}, status=status.HTTP_400_BAD_REQUEST)
+        note = (request.data.get('note') or '').strip()[:2000]
+        changed = resp.review_status != new
+        resp.review_status = new
+        resp.rejection_note = note if new == FormResponse.ReviewStatus.REJECTED else ''
+        resp.save(update_fields=['review_status', 'rejection_note', 'updated_at'])
+        if changed and new != FormResponse.ReviewStatus.PENDING:
+            from apps.core.email import send_review_email
+            send_review_email(resp, resp.event)
+        return Response(FormResponseSerializer(resp).data)

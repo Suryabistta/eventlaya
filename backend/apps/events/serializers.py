@@ -98,10 +98,12 @@ class EventSerializer(serializers.ModelSerializer):
             'registered_count', 'checked_in_count', 'created_at', 'updated_at',
             'tagline', 'category', 'category_name', 'is_featured', 'phase', 'registration_open', 'registration_closed_reason',
             'max_tickets_per_order', 'show_spots_left',
-            'managed_by', 'managed_by_logo', 'show_managed_by', 'managed_by_label', 'ticket_layout', 'show_seat_number', 'registration_mode',
+            'managed_by', 'managed_by_logo', 'show_managed_by', 'managed_by_label', 'ticket_layout', 'show_seat_number', 'registration_mode', 'cta_label',
             'parent', 'parent_title',
         ]
         read_only_fields = ['id', 'organizer', 'is_featured', 'created_at', 'updated_at']
+        # Open calls (registration_mode apply) have no date or venue of their own; validate() fills them in
+        extra_kwargs = {'start_date': {'required': False}, 'location': {'required': False, 'allow_blank': True}}
 
     def validate_parent(self, parent):
         """A sub-event hangs under one of the organizer's own main events, one level deep."""
@@ -196,6 +198,24 @@ class EventSerializer(serializers.ModelSerializer):
                     slug = f"{base_slug}-{counter}"
                     counter += 1
                 attrs['slug'] = slug
+
+        # Open call: the application deadline is the event's date; no venue needed
+        mode = attrs.get('registration_mode', getattr(self.instance, 'registration_mode', Event.RegistrationMode.PASS))
+        if mode == Event.RegistrationMode.APPLY:
+            deadline = attrs.get('registration_deadline') or (self.instance.registration_deadline if self.instance else None)
+            if not deadline:
+                raise serializers.ValidationError({'registration_deadline': 'Set the date applications close.'})
+            attrs['start_date'] = timezone.localtime(deadline).date()
+            attrs['end_date'] = None
+            attrs['start_time'] = timezone.localtime(deadline).time().replace(second=0, microsecond=0)
+            attrs['end_time'] = None
+            if not (attrs.get('location') or getattr(self.instance, 'location', '')).strip():
+                attrs['location'] = 'Online'
+        else:
+            if not (attrs.get('start_date') or getattr(self.instance, 'start_date', None)):
+                raise serializers.ValidationError({'start_date': 'Set the event date.'})
+            if 'location' in attrs and not attrs['location'].strip() or (not self.instance and not attrs.get('location', '').strip()):
+                raise serializers.ValidationError({'location': 'Enter the venue.'})
 
         # Date validations
         start_date = attrs.get('start_date') or (self.instance.start_date if self.instance else None)

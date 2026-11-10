@@ -188,7 +188,7 @@ export function registrationState(e: PublicEvent): { open: boolean; reason?: str
 
 /** "Free", "Rs 500", or "From Rs 250" when the event has several ticket prices. */
 export const priceLabel = (e: Pick<Event, 'is_paid' | 'ticket_price' | 'ticket_types' | 'registration_mode'>) =>
-  e.registration_mode === 'form' ? 'Free · Registration' : eventPriceLabel(e.ticket_types, e)
+  e.registration_mode === 'apply' ? 'Free · Open call' : e.registration_mode === 'form' ? 'Free · Registration' : eventPriceLabel(e.ticket_types, e)
 
 /** True when anyone has to pay at the venue for some ticket. */
 export const hasPaidTickets = (e: Pick<Event, 'is_paid' | 'ticket_price' | 'ticket_types'>) =>
@@ -322,5 +322,5 @@ export interface PublicPass {
 export const getPublicPass = (token: string) => request<PublicPass>(`/events/passes/${encodeURIComponent(token)}/`)
 
 /** Call to action on an event: "Register" for registration-only events, "Get tickets" when any ticket costs money, otherwise "Book a spot". */
-export const bookLabel = (e: Pick<Event, 'is_paid' | 'ticket_price' | 'ticket_types' | 'registration_mode'>) =>
-  e.registration_mode === 'form' ? 'Register' : hasPaidTickets(e) ? 'Get tickets' : 'Book a spot'
+export const bookLabel = (e: Pick<Event, 'is_paid' | 'ticket_price' | 'ticket_types' | 'registration_mode' | 'cta_label'>) =>
+  e.cta_label?.trim() ? e.cta_label.trim() : e.registration_mode === 'apply' ? 'Apply' : e.registration_mode === 'form' ? 'Register' : hasPaidTickets(e) ? 'Get tickets' : 'Book a spot'

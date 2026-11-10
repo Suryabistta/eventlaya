@@ -376,10 +376,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           context: context,
           builder: (ctx) => AlertDialog(
             icon: const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 40),
-            title: Text(result.alreadyRegistered ? "You're already registered" : "You're registered"),
-            content: Text(
-              'Registration no. ${result.registrationNumber}. A confirmation was sent to $email. No ticket or pass is needed.',
-            ),
+            title: Text(_event.isOpenCall
+                ? (result.alreadyRegistered ? "You've already applied" : 'Application received')
+                : (result.alreadyRegistered ? "You're already registered" : "You're registered")),
+            content: Text(_event.isOpenCall
+                ? 'Application no. ${result.registrationNumber}. A confirmation was sent to $email. You get another email once the organizer reviews it.'
+                : 'Registration no. ${result.registrationNumber}. A confirmation was sent to $email. No ticket or pass is needed.'),
             actions: [TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Done'))],
           ),
         );
@@ -915,7 +917,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         ]),
       ),
       PrimaryButton(
-        label: _payOnline ? 'Pay ${formatRupees(_due)}' : 'Register',
+        label: _payOnline ? 'Pay ${formatRupees(_due)}' : (_event.ctaLabel ?? (_event.isOpenCall ? 'Submit application' : 'Register')),
         icon: _payOnline ? Icons.lock_rounded : null,
         expand: false,
         loading: _submitting,

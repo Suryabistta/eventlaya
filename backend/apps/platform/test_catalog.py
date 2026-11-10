@@ -108,7 +108,7 @@ class ManagedByTests(PlatformTestBase):
         self.assertIsNone(self.client.get(url).data['event']['managed_by_info'])
         ev.show_managed_by = True
         ev.save()
-        self.assertEqual(self.client.get(url).data['event']['managed_by_info'], {'name': 'Eastern Events Co.', 'logo': '/media/x.png'})
+        self.assertEqual(self.client.get(url).data['event']['managed_by_info'], {'name': 'Eastern Events Co.', 'logo': '/media/x.png', 'label': 'Managed by'})
 
     def test_organizer_sets_managed_by_and_bad_logo_rejected(self):
         from apps.events.models import Event

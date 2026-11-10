@@ -67,3 +67,41 @@ class RegistrationOnlyTests(APITestCase):
         self.assertIn('registrations', r['Content-Disposition'])
         self.assertEqual(rows[0], 'Registration No.,Name,Email,Phone,Status,Registered At,T-shirt size')
         self.assertTrue(rows[1].endswith(',registered,' + rows[1].split(',')[5] + ',M'))
+
+
+class OpenCallTests(APITestCase):
+    def setUp(self):
+        from datetime import datetime
+        from django.utils import timezone
+        from apps.dynamic_forms.models import Form, FormField
+        self.organizer = User.objects.create_user(username='org2', email='org2@test.com', password='x', role=User.Role.ORGANIZER)
+        self.client.force_authenticate(self.organizer)
+        deadline = timezone.make_aware(datetime.combine(date.today() + timedelta(days=20), datetime.min.time().replace(hour=17)))
+        r = self.client.post('/api/events/', {'title': 'Short Film Call', 'registration_mode': 'apply',
+                                              'registration_deadline': deadline.isoformat(), 'status': 'published'}, format='json')
+        self.assertEqual(r.status_code, 201, r.data)
+        self.event = Event.objects.get(id=r.data['id'])
+        self.form = Form.objects.create(organizer=self.organizer, event=self.event, title='Entry', slug='entry', status='published')
+        self.link = FormField.objects.create(form=self.form, label='Film link', field_type='text', required=True, order=1)
+        self.client.force_authenticate(None)
+
+    def test_no_date_or_venue_needed_and_listed_as_open_call(self):
+        self.assertEqual((self.event.location, self.event.start_date), ('Online', date.today() + timedelta(days=20)))
+        self.assertEqual([e['title'] for e in self.client.get('/api/events/public/?kind=open_calls').data], ['Short Film Call'])
+
+    def test_apply_needs_a_form_then_review_emails_applicant(self):
+        url = f'/api/forms/events/{self.event.slug}/register/'
+        self.assertEqual(self.client.post(url, {'name': 'Ram', 'email': 'ram@x.com'}, format='json').status_code, 400)
+        self.event.registration_form = self.form
+        self.event.save()
+        r = self.client.post(url, {'name': 'Ram', 'email': 'ram@x.com', 'answers': {str(self.link.id): 'https://vimeo.com/1'}}, format='json')
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertIn('Application received', mail.outbox[-1].subject)
+        resp_id = r.data['form_response']['id']
+        self.assertEqual(r.data['form_response']['review_status'], 'pending')
+        review = f'/api/forms/responses/{resp_id}/review/'
+        self.assertEqual(self.client.post(review, {'status': 'accepted'}, format='json').status_code, 401)
+        self.client.force_authenticate(self.organizer)
+        r = self.client.post(review, {'status': 'rejected', 'note': 'Too long'}, format='json')
+        self.assertEqual((r.data['review_status'], r.data['rejection_note']), ('rejected', 'Too long'))
+        self.assertIn('Too long', mail.outbox[-1].body)

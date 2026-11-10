@@ -136,6 +136,12 @@ class PublicEvent {
   /// Registration only (`registration_mode: form`): free, one per person, no pass or check-in.
   final bool registrationOnly;
 
+  /// Open call (`registration_mode: apply`): applications the organizer reviews; the date is the closing date.
+  final bool isOpenCall;
+
+  /// Main button text chosen by the organizer (Apply, Submit entry...); null = automatic.
+  final String? ctaLabel;
+
   /// Picked by the superadmin: listed first on Explore, with a badge.
   final bool isFeatured;
 
@@ -196,6 +202,8 @@ class PublicEvent {
     this.category,
     this.categoryName,
     this.registrationOnly = false,
+    this.isOpenCall = false,
+    this.ctaLabel,
     this.isFeatured = false,
     this.bannerUrl,
     this.organizerName = '',
@@ -230,7 +238,9 @@ class PublicEvent {
       tagline: _str(j['tagline']),
       category: _str(j['category']),
       categoryName: _str(j['category_name']),
-      registrationOnly: j['registration_mode'] == 'form',
+      registrationOnly: j['registration_mode'] == 'form' || j['registration_mode'] == 'apply',
+      isOpenCall: j['registration_mode'] == 'apply',
+      ctaLabel: _str(j['cta_label']),
       isFeatured: j['is_featured'] == true,
       bannerUrl: mediaUrl(_str(j['banner']) ?? j['banner_absolute']),
       organizerName: _str(org?['name']) ?? _str(j['organizer_name']) ?? '',
@@ -305,7 +315,7 @@ class PublicEvent {
 
   /// Cheapest on-sale price, for list cards: "Free", "Rs 500", "From Rs 300".
   /// What to show as the price: registration-only events read "Free · Registration".
-  String get priceLabel => registrationOnly ? 'Free · Registration' : priceSummary;
+  String get priceLabel => isOpenCall ? 'Free · Open call' : registrationOnly ? 'Free · Registration' : priceSummary;
 
   String get priceSummary {
     final onSale = ticketTypes.where((t) => t.onSale).toList();

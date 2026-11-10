@@ -235,7 +235,8 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
   const phoneRequired = Boolean(mappedFor('phone')?.required)
 
   // Registration-only events (no pass): no ticket step, nothing to pay, and a confirmation at the end
-  const formOnly = event.registration_mode === 'form'
+  const formOnly = event.registration_mode === 'form' || event.registration_mode === 'apply'
+  const applying = event.registration_mode === 'apply'
   // Free event with nothing to choose (no ticket types, or a single free one): no ticket step;
   // the group size is asked in Your details instead
   const eventTypes = event.ticket_types ?? []
@@ -248,7 +249,7 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
         : null
   const simpleFree = simpleFreeId !== null
   const steps: StepId[] = [...(formOnly || simpleFree ? [] : ['tickets' as const]), 'details', ...(questions.length ? ['questions' as const] : []), 'review', 'pass']
-  const labels: Record<StepId, string> = formOnly ? { ...STEP_LABEL, pass: 'Done' } : STEP_LABEL
+  const labels: Record<StepId, string> = applying ? { ...STEP_LABEL, questions: 'Your entry', pass: 'Done' } : formOnly ? { ...STEP_LABEL, pass: 'Done' } : STEP_LABEL
   const passIdx = steps.length - 1
 
   const [draft, setDraft] = useState<Draft>(() => {
@@ -662,7 +663,8 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
         ? 'Registering'
         : 'Register'
       : 'Continue'
-  const finalLabel = formOnly && step === 'review' ? (register.isPending ? 'Registering' : 'Register') : submitLabel
+  const custom = event.cta_label?.trim()
+  const finalLabel = formOnly && step === 'review' ? (register.isPending ? (applying ? 'Sending' : 'Registering') : custom || (applying ? 'Submit application' : 'Register')) : submitLabel
   const submitDisabled = step === 'tickets' && pricing.count < 1
   const totalText = pricing.total > 0 ? (onlineProviders.length ? `Rs ${money(pricing.total)}` : `Pay Rs ${money(pricing.total)} at the venue`) : 'Free'
   const payLine =
@@ -688,7 +690,7 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
       </Link>
 
       {/* Compact event card on phones */}
-      <MiniEvent event={event} when={when.shortDate} className="mt-4 lg:hidden" />
+      <MiniEvent event={event} when={applying ? `Closes ${when.shortDate}` : when.shortDate} detailed={stepIdx === 0} className="mt-4 lg:hidden" />
 
       <div className="mt-5 grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
         <div className="min-w-0">
@@ -732,7 +734,7 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
                     </h2>
                     <p className="mt-1 text-sm text-ink-500">
                       {step === 'tickets' && (orderMax > 1 ? 'Choose how many tickets you need. Each ticket is its own pass with its own QR code.' : 'Choose your ticket.')}
-                      {step === 'details' && formOnly && 'Tell us who is registering. The confirmation goes to this email.'}
+                      {step === 'details' && formOnly && (applying ? 'Tell us who is applying. We email you at this address.' : 'Tell us who is registering. The confirmation goes to this email.')}
                       {step === 'details' && !formOnly && (pricing.count > 1 ? 'Tell us who is buying. All passes go to this email.' : 'Tell us who is coming. Your pass is linked to this email.')}
                       {step === 'questions' && (form?.description || 'A few questions from the organizer.')}
                       {step === 'review' && formOnly && 'Check everything is right, then register.'}
@@ -879,7 +881,7 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
                         Back
                       </Button>
                     ) : (
-                      <span className="text-sm text-ink-500">{formOnly ? 'Free registration' : simpleFree ? `${pricing.count === 1 ? '1 person' : `${pricing.count} people`} · Free` : pricing.count > 0 ? `${plural(pricing.count, 'ticket')} · ${totalText}` : 'Add a ticket to continue'}</span>
+                      <span className="text-sm text-ink-500">{applying ? 'Free to apply' : formOnly ? 'Free registration' : simpleFree ? `${pricing.count === 1 ? '1 person' : `${pricing.count} people`} · Free` : pricing.count > 0 ? `${plural(pricing.count, 'ticket')} · ${totalText}` : 'Add a ticket to continue'}</span>
                     )}
                     <Button type="submit" size="lg" loading={busy} disabled={submitDisabled}>
                       {finalLabel}
@@ -892,7 +894,8 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
         </div>
 
         <aside className="hidden space-y-4 lg:sticky lg:top-6 lg:block">
-          <MiniEvent event={event} when={when.shortDate} detailed={step === 'pass' || step === 'tickets'} />
+          {/* The event banner always shows beside the form */}
+          <MiniEvent event={event} when={applying ? `Closes ${when.shortDate}` : when.shortDate} detailed />
           {step !== 'pass' && !formOnly && !simpleFree && <OrderSummary pricing={pricing} note={payLine} card />}
           {step !== 'pass' && step !== 'tickets' && (draft.name.trim() || draft.email.trim()) && (
             <Card className="p-5">
@@ -1722,13 +1725,22 @@ const RegisteredStep: React.FC<{ event: PublicEvent; dateLabel: string; info: Re
       <Check className="h-7 w-7" aria-hidden />
     </span>
     <h2 ref={headingRef} tabIndex={-1} className="mt-4 text-2xl font-bold text-ink-900 outline-none">
-      {info.existing ? 'You’re already registered' : 'You’re registered'}
+      {event.registration_mode === 'apply' ? (info.existing ? 'You’ve already applied' : 'Application received') : info.existing ? 'You’re already registered' : 'You’re registered'}
     </h2>
     <p className="mt-2 text-ink-600">
-      {info.name}, you’re on the list for <span className="font-semibold text-ink-900">{event.title}</span> ({dateLabel}).
+      {event.registration_mode === 'apply' ? (
+        <>
+          {info.name}, your application for <span className="font-semibold text-ink-900">{event.title}</span> is in.
+        </>
+      ) : (
+        <>
+          {info.name}, you’re on the list for <span className="font-semibold text-ink-900">{event.title}</span> ({dateLabel}).
+        </>
+      )}
     </p>
     <p className="mt-1 text-sm text-ink-500">
-      Registration no. <span className="font-mono font-semibold text-ink-800">{info.number}</span>. A confirmation was sent to {info.email}. No ticket or pass is needed.
+      {event.registration_mode === 'apply' ? 'Application' : 'Registration'} no. <span className="font-mono font-semibold text-ink-800">{info.number}</span>. A confirmation was sent to {info.email}.{' '}
+      {event.registration_mode === 'apply' ? 'You’ll get another email once the organizer reviews it.' : 'No ticket or pass is needed.'}
     </p>
     <ButtonLink to={`/e/${event.slug}`} variant="secondary" className="mt-6">
       Back to the event

@@ -13,7 +13,9 @@ export interface Event {
   /** Picked by the superadmin: listed first, with a badge */
   is_featured?: boolean
   /** 'form': registration only, no pass or check-in */
-  registration_mode?: 'pass' | 'form'
+  registration_mode?: 'pass' | 'form' | 'apply'
+  /** Main button text set by the organizer ('' = from the registration type) */
+  cta_label?: string
   title: string
   slug: string
   description: string
@@ -679,12 +681,13 @@ export const api = {
 
   // Events
   getEvents: () => request<Event[]>('/events/'),
-  getPublicEvents: (params?: { when?: 'upcoming' | 'past' | 'all'; search?: string; city?: string; category?: string }) => {
+  getPublicEvents: (params?: { when?: 'upcoming' | 'past' | 'all'; search?: string; city?: string; category?: string; kind?: 'open_calls' }) => {
     const q = new URLSearchParams()
     if (params?.when) q.append('when', params.when)
     if (params?.search) q.append('search', params.search)
     if (params?.city) q.append('city', params.city)
     if (params?.category) q.append('category', params.category)
+    if (params?.kind) q.append('kind', params.kind)
     const str = q.toString()
     return request<(Event & { organizer_name?: string })[]>(`/events/public/${str ? `?${str}` : ''}`)
   },

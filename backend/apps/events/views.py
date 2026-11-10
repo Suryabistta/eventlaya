@@ -139,6 +139,10 @@ class PublicEventListView(APIView):
         if category:
             events = events.filter(category=category)
 
+        # ?kind=open_calls: applications / submissions (pageants, film festivals...)
+        if request.query_params.get('kind') == 'open_calls':
+            events = events.filter(registration_mode=Event.RegistrationMode.APPLY)
+
         # Sub-events are listed on their main event's page, not on their own here
         from apps.accounts.modules import module_enabled
         if module_enabled('sub_events'):
@@ -905,7 +909,9 @@ class ExportAttendeesCSVView(APIView):
         response['Content-Disposition'] = f'attachment; filename="eventlaya_registrations_{event.slug}.csv"'
         form = event.registration_form
         fields = list(form.fields.order_by('order')) if form else []
-        writer.writerow(['Registration No.', 'Name', 'Email', 'Phone', 'Status', 'Registered At', *[f.label for f in fields]])
+        review = event.is_application
+        writer.writerow(['Application No.' if review else 'Registration No.', 'Name', 'Email', 'Phone', 'Status', 'Registered At',
+                         *(['Review', 'Review note'] if review else []), *[f.label for f in fields]])
         for t in tickets.prefetch_related('form_response__answers'):
             response_obj = getattr(t, 'form_response', None)
             answers = {a.field_id: a.value for a in response_obj.answers.all()} if response_obj else {}
@@ -917,6 +923,7 @@ class ExportAttendeesCSVView(APIView):
                 t.ticket_number, t.attendee_name, t.attendee_email, t.attendee_phone,
                 'cancelled' if t.status == 'cancelled' else 'registered',
                 t.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                *([response_obj.review_status if response_obj else '', response_obj.rejection_note if response_obj else ''] if review else []),
                 *[text(answers.get(f.id)) for f in fields],
             ])
         return response

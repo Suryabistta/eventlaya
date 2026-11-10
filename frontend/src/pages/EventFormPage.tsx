@@ -21,7 +21,7 @@ import {
 import { api, request, type Event } from '@/services/api'
 import { eventPhase } from '@/lib/phase'
 import { useCurrentEvent } from '@/lib/event-context'
-import { eventPageApi, useEventCategories, fmtClock, type EventCategory, type EventPageContent } from '@/lib/event-page'
+import { bookLabel, eventPageApi, useEventCategories, fmtClock, type EventCategory, type EventPageContent } from '@/lib/event-page'
 import { eventPriceLabel, priceText, ticketKeys, ticketsApi } from '@/lib/tickets'
 import { Button, ButtonLink, Card, EmptyState, ErrorState, IconButton, ImageUpload, Input, PageHeader, Select, Skeleton, Textarea, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
@@ -50,7 +50,8 @@ interface EventDraft {
   show_managed_by: boolean
   ticket_layout: 'vertical' | 'landscape'
   show_seat_number: boolean
-  registration_mode: 'pass' | 'form'
+  registration_mode: 'pass' | 'form' | 'apply'
+  cta_label: string
   parent: string
   managed_by: string
   managed_by_label: string
@@ -122,6 +123,7 @@ const emptyDraft: EventDraft = {
   ticket_layout: 'vertical',
   show_seat_number: false,
   registration_mode: 'pass',
+  cta_label: '',
   parent: '',
   managed_by: '',
   managed_by_label: '',
@@ -185,6 +187,7 @@ function fromEvent(ev: Event, page?: EventPageContent): EventDraft {
     ticket_layout: ev.ticket_layout ?? 'vertical',
     show_seat_number: ev.show_seat_number ?? false,
     registration_mode: ev.registration_mode ?? 'pass',
+    cta_label: ev.cta_label ?? '',
     parent: ev.parent ?? '',
     managed_by: ev.managed_by ?? '',
     managed_by_label: ev.managed_by_label ?? '',
@@ -251,7 +254,7 @@ const localToday = () => {
 const FIELD_STEP: Record<string, StepId> = {
   title: 'basics', tagline: 'basics', parent: 'basics', category: 'basics', description: 'basics', banner: 'basics', banner_url: 'basics',
   start_date: 'when', start_time: 'when', end_date: 'when', end_time: 'when', location: 'when', map_query: 'when',
-  capacity: 'registration', limit_spots: 'registration', show_spots_left: 'registration', status: 'registration', registration_deadline: 'registration', ticket_price: 'registration', is_paid: 'registration', allow_registration: 'registration', ticket_layout: 'registration', show_seat_number: 'registration', registration_mode: 'registration',
+  capacity: 'registration', limit_spots: 'registration', show_spots_left: 'registration', status: 'registration', registration_deadline: 'registration', ticket_price: 'registration', is_paid: 'registration', allow_registration: 'registration', ticket_layout: 'registration', show_seat_number: 'registration', registration_mode: 'registration', cta_label: 'registration',
   managed_by: 'page', managed_by_label: 'page', managed_by_logo: 'page', show_managed_by: 'page',
 }
 
@@ -261,7 +264,11 @@ function validateStep(id: StepId, d: EventDraft, p: PageDraft, isNew = false): E
     if (!d.title.trim()) e.title = 'Give the event a name.'
     if (d.tagline.length > 160) e.tagline = 'Keep the tagline to 160 characters or fewer.'
   }
-  if (id === 'when') {
+  if (id === 'when' && d.registration_mode === 'apply') {
+    // Open call: no event date or venue, just when applications close
+    if (!d.registration_deadline) e.registration_deadline = 'Pick when applications close.'
+    else if (isNew && new Date(d.registration_deadline) < new Date()) e.registration_deadline = 'The closing time can’t be in the past.'
+  } else if (id === 'when') {
     if (!d.start_date) e.start_date = 'Pick the day the event starts.'
     else if (isNew && d.start_date < localToday()) e.start_date = 'The start date can’t be in the past.'
     if (d.end_date && d.start_date && d.end_date < d.start_date) e.end_date = 'End date can’t be before the start date.'
@@ -272,7 +279,7 @@ function validateStep(id: StepId, d: EventDraft, p: PageDraft, isNew = false): E
   if (id === 'registration') {
     const cap = Number(d.capacity)
     if (d.limit_spots && (!d.capacity || !Number.isInteger(cap) || cap <= 0)) e.capacity = 'Enter a whole number greater than 0.'
-    if (d.registration_deadline) {
+    if (d.registration_deadline && d.registration_mode !== 'apply') {
       const last = d.end_date || d.start_date
       if (last && d.registration_deadline.slice(0, 10) > last) e.registration_deadline = 'The deadline must be on or before the last day of the event.'
     }
@@ -484,7 +491,8 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
         category: draft.category,
         description: draft.description.trim(),
         location: draft.location.trim(),
-        start_date: draft.start_date,
+        // Open calls: the server sets the date from the closing time
+        ...(draft.registration_mode === 'apply' ? {} : { start_date: draft.start_date }),
         start_time: optional(draft.start_time),
         end_date: optional(draft.end_date),
         end_time: optional(draft.end_time),
@@ -496,6 +504,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
         ticket_layout: draft.ticket_layout,
         show_seat_number: draft.show_seat_number,
         registration_mode: draft.registration_mode,
+        cta_label: draft.cta_label.trim(),
         ...(subEventsOn ? { parent: draft.parent || null } : {}),
         managed_by: draft.managed_by.trim(),
         managed_by_label: draft.managed_by_label.trim(),
@@ -803,6 +812,20 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                 )}
 
                 {step.id === 'when' && (
+                  <Checkbox
+                    label="This is an open call (applications or submissions)"
+                    hint="For pageant applications, film submissions, auditions and the like: no event date or venue, just a closing date. You accept or reject each entry."
+                    checked={draft.registration_mode === 'apply'}
+                    onChange={(v) => set('registration_mode', v ? 'apply' : 'pass')}
+                  />
+                )}
+                {step.id === 'when' && draft.registration_mode === 'apply' && (
+                  <>
+                    <Input label="Applications close" type="datetime-local" required hint="Entries are accepted until this time." {...bind('registration_deadline')} />
+                    <Input label="Where" placeholder="Online" hint="Optional. Leave empty for Online, or name the city or venue of the final event." {...bind('location')} />
+                  </>
+                )}
+                {step.id === 'when' && draft.registration_mode !== 'apply' && (
                   <>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <Input label="Start date" type="date" required min={isEdit ? undefined : localToday()} {...bind('start_date')} />
@@ -843,7 +866,9 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                     <Select
                       label="Registration type"
                       hint={
-                        draft.registration_mode === 'form'
+                        draft.registration_mode === 'apply'
+                          ? 'Applicants fill in your form (link a film, upload photos...). Free, one per person, no pass. Accept or reject each entry from the dashboard.'
+                          : draft.registration_mode === 'form'
                           ? 'People fill in your registration form and get a confirmation email. Free, one per person, no pass or gate check-in.'
                           : 'Each registration gets a QR pass for check-in at the gate.'
                       }
@@ -852,7 +877,13 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                     >
                       <option value="pass">With pass (QR ticket)</option>
                       <option value="form">Registration only (no pass)</option>
+                      <option value="apply">Applications / submissions (open call)</option>
                     </Select>
+                    <ButtonText
+                      value={draft.cta_label}
+                      auto={bookLabel({ ...(event ?? {}), registration_mode: draft.registration_mode, is_paid: draft.is_paid, ticket_price: draft.ticket_price, ticket_types: event?.ticket_types, cta_label: '' } as Event)}
+                      onChange={(v) => set('cta_label', v)}
+                    />
                     {draft.registration_mode === 'pass' && (
                     <Select
                       label="Ticket layout"
@@ -886,7 +917,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                       checked={draft.allow_registration}
                       onChange={(v) => set('allow_registration', v)}
                     />
-                    {draft.allow_registration && (
+                    {draft.allow_registration && draft.registration_mode !== 'apply' && (
                       <Input label="Registration deadline" type="datetime-local" hint="Optional. Sign-ups close at this time." {...bind('registration_deadline')} />
                     )}
                     {isEdit ? (
@@ -1552,4 +1583,32 @@ const SINGULAR: Record<string, string> = { 'Line-up': 'Act' }
 function singularOf(plural: string) {
   if (SINGULAR[plural]) return SINGULAR[plural]
   return /[^s]s$/i.test(plural) ? plural.slice(0, -1) : 'Person'
+}
+
+const BUTTON_TEXTS = ['Register', 'Apply', 'Apply now', 'Submit', 'Submit entry', 'Nominate', 'Enroll', 'Sign up', 'Get tickets', 'Book a spot']
+
+/** Text of the event's main button; "Automatic" follows the registration type and prices. */
+const ButtonText: React.FC<{ value: string; auto: string; onChange: (v: string) => void }> = ({ value, auto, onChange }) => {
+  const preset = value === '' ? '' : BUTTON_TEXTS.includes(value) ? value : 'custom'
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Select
+        label="Button text"
+        hint="The main button on the event page and event cards."
+        value={preset}
+        onChange={(e) => onChange(e.target.value === 'custom' ? ' ' : e.target.value)}
+      >
+        <option value="">Automatic ({auto})</option>
+        {BUTTON_TEXTS.map((t) => (
+          <option key={t} value={t}>
+            {t}
+          </option>
+        ))}
+        <option value="custom">Custom…</option>
+      </Select>
+      {preset === 'custom' && (
+        <Input label="Custom button text" required maxLength={30} placeholder="Send your film" value={value.trimStart()} onChange={(e) => onChange(e.target.value || ' ')} />
+      )}
+    </div>
+  )
 }

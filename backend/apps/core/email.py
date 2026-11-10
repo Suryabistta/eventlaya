@@ -179,13 +179,18 @@ Event page: {event_url(event)}
         return False
 
 
-def send_registration_email(ticket, event):
-    """Registration-only events (no pass): a plain confirmation of the registration, no QR or pass link."""
+def send_registration_email(ticket, event, application=False):
+    """Registration-only events (no pass): a plain confirmation of the registration, no QR or pass link.
+    Open calls (`application`): "application received", the organizer reviews it next."""
     from apps.events.sub_events import display_title
     title = display_title(event)
     when = f"{event.start_date} {event.start_time or ''}".strip()
     brand, powered = email_brand(event)
     signature = 'Organized via Eventlaya' if brand == 'Eventlaya' else (brand + ('\nPowered by Eventlaya' if powered else ''))
+    if application:
+        return _send_simple(event, ticket.attendee_email, f"Application received: {title}", ticket.attendee_name,
+                            f"We received your application for '{title}' (no. {ticket.ticket_number}).",
+                            "The organizer will review it and you'll get an email when it's accepted or not.", signature)
     text = f"""Namaste {ticket.attendee_name},
 
 Your registration for '{title}' is confirmed.
@@ -221,6 +226,36 @@ Event page: {event_url(event)}
     except Exception as e:
         logger.warning(f"Failed to send registration email to {ticket.attendee_email}: {e}")
         return False
+
+
+def _send_simple(event, to, subject, name, line1, line2, signature):
+    text = f"Namaste {name},\n\n{line1}\n\n{line2}\n\nEvent page: {event_url(event)}\n\n{signature}\n"
+    html = (f'<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#1C1724;">'
+            f'<h2 style="margin:0 0 12px;">{escape(subject)}</h2><p>Namaste <strong>{escape(name)}</strong>,</p>'
+            f'<p>{escape(line1)}</p><p style="color:#475569;white-space:pre-line;">{escape(line2)}</p>'
+            f'<p><a href="{event_url(event)}" style="color:#C2215A;">Event page</a></p>'
+            f'<p style="color:#94a3b8;font-size:12px;">{escape(signature).replace(chr(10), "<br>")}</p></div>')
+    try:
+        send_mail(subject=subject, message=text, from_email=from_email(event), recipient_list=[to], html_message=html, fail_silently=True)
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to send email to {to}: {e}")
+        return False
+
+
+def send_review_email(response, event):
+    """Open calls: tell the applicant their application was accepted or not (with the organizer's note)."""
+    from apps.events.sub_events import display_title
+    title = display_title(event)
+    brand, powered = email_brand(event)
+    signature = 'Organized via Eventlaya' if brand == 'Eventlaya' else (brand + ('\nPowered by Eventlaya' if powered else ''))
+    if response.review_status == 'accepted':
+        return _send_simple(event, response.submitter_email, f"Application accepted: {title}", response.submitter_name,
+                            f"Good news: your application for '{title}' has been accepted.",
+                            "The organizer will contact you with the next steps.", signature)
+    note = f"Note from the organizer:\n{response.rejection_note}" if response.rejection_note else 'Thank you for applying.'
+    return _send_simple(event, response.submitter_email, f"Application update: {title}", response.submitter_name,
+                        f"Thank you for applying to '{title}'. Your application was not selected this time.", note, signature)
 
 
 def send_order_email(order, tickets, event):
