@@ -27,6 +27,8 @@ class Form(models.Model):
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
     
     allow_multiple_submissions = models.BooleanField(default=False)
+    # Saved by the organizer to reuse on other events ("Your templates" in the builder)
+    is_template = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -64,6 +66,11 @@ class FormField(models.Model):
     order = models.PositiveIntegerField(default=0)
     options = models.JSONField(default=list, blank=True) # for select/radio/checkbox
     validation_rules = models.JSONField(default=dict, blank=True)
+    # Conditional question: {"field": "<field id>", "values": ["21K"]} shows it only when that earlier answer is one
+    # of the values (any value for checkboxes). Empty = always shown.
+    show_if = models.JSONField(default=dict, blank=True)
+    # Only for buyers of these ticket types (ids); empty = everyone
+    ticket_types = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

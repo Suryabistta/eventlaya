@@ -130,6 +130,9 @@ class Event(models.Model):
     reminders_enabled = models.BooleanField(default=True)
     reminder_day_sent_at = models.DateTimeField(null=True, blank=True)
     reminder_soon_sent_at = models.DateTimeField(null=True, blank=True)
+    # Bib numbers (runs, races): every registration gets the next number from bib_start, shown on the pass
+    bib_numbers = models.BooleanField(default=False)
+    bib_start = models.PositiveIntegerField(default=1)
 
     @property
     def registration_only(self):
@@ -333,6 +336,8 @@ class EventTicket(models.Model):
     seat_number = models.CharField(max_length=20, blank=True)
     # Guest management (module guest_management): tags like VIP / Press and a note only organizers and staff see
     guest_tags = models.JSONField(default=list, blank=True)
+    # Race bib (Event.bib_numbers): assigned in registration order
+    bib_number = models.PositiveIntegerField(null=True, blank=True)
     host_note = models.TextField(blank=True)
     # Printed tickets for physical sales (TicketBatch); null for online registrations
     batch = models.ForeignKey('TicketBatch', null=True, blank=True, on_delete=models.SET_NULL, related_name='tickets')

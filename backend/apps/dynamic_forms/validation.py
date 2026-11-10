@@ -72,3 +72,20 @@ def answer_error(field, value, event_id=None):
     if len(text) > min(limit, MAX_TEXT):
         return f'“{label}” can be at most {min(limit, MAX_TEXT)} characters.'
     return None
+
+
+def is_visible(field, answers, ticket_type_ids=None):
+    """Whether the question is asked: its ticket types (if any) were chosen, and its condition (show_if) holds."""
+    types = [str(t) for t in (field.ticket_types or [])]
+    if types and ticket_type_ids is not None and not (set(types) & {str(t) for t in ticket_type_ids}):
+        return False
+    cond = field.show_if if isinstance(field.show_if, dict) else {}
+    if not cond.get('field'):
+        return True
+    value = (answers or {}).get(str(cond['field']))
+    wanted = [str(v) for v in (cond.get('values') or [])]
+    if isinstance(value, list):
+        return bool(value) and (not wanted or any(str(v) in wanted for v in value))
+    if value in (None, '', False):
+        return False
+    return not wanted or str(value) in wanted

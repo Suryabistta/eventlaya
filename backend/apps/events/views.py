@@ -896,13 +896,14 @@ class ExportAttendeesCSVView(APIView):
         if event.registration_only:
             return self._registrations(writer, response, event, tickets)
         writer.writerow([
-            'Ticket Number', 'Attendee Name', 'Email', 'Phone', 'Ticket Type', 'Price', 'Promo Code',
+            'Ticket Number', 'Bib', 'Attendee Name', 'Email', 'Phone', 'Ticket Type', 'Price', 'Promo Code',
             'Status', 'First Check In', 'Last Activity', 'Registered At', 'Order', 'Payment'
         ])
 
         for t in tickets:
             writer.writerow([
                 t.ticket_number,
+                t.bib_number or '',
                 t.attendee_name,
                 t.attendee_email,
                 t.attendee_phone,
@@ -926,7 +927,7 @@ class ExportAttendeesCSVView(APIView):
         response['Content-Disposition'] = f'attachment; filename="eventlaya_registrations_{event.slug}.csv"'
         form = event.registration_form
         fields = list(form.fields.order_by('order')) if form else []
-        writer.writerow(['Registration No.', 'Name', 'Email', 'Phone', 'Status', 'Registered At', *[f.label for f in fields]])
+        writer.writerow(['Registration No.', 'Bib', 'Name', 'Email', 'Phone', 'Status', 'Registered At', *[f.label for f in fields]])
         for t in tickets.prefetch_related('form_response__answers'):
             response_obj = getattr(t, 'form_response', None)
             answers = {a.field_id: a.value for a in response_obj.answers.all()} if response_obj else {}
@@ -935,7 +936,7 @@ class ExportAttendeesCSVView(APIView):
                     v = v.get('value', '')
                 return ', '.join(map(str, v)) if isinstance(v, list) else ('' if v is None else str(v))
             writer.writerow([
-                t.ticket_number, t.attendee_name, t.attendee_email, t.attendee_phone,
+                t.ticket_number, t.bib_number or '', t.attendee_name, t.attendee_email, t.attendee_phone,
                 'cancelled' if t.status == 'cancelled' else 'registered',
                 t.created_at.strftime('%Y-%m-%d %H:%M:%S'),
                 *[text(answers.get(f.id)) for f in fields],

@@ -65,8 +65,8 @@ class RegistrationOnlyTests(APITestCase):
         r = self.client.get(f'/api/events/{self.event.id}/export-attendees/')
         rows = r.content.decode().splitlines()
         self.assertIn('registrations', r['Content-Disposition'])
-        self.assertEqual(rows[0], 'Registration No.,Name,Email,Phone,Status,Registered At,T-shirt size')
-        self.assertTrue(rows[1].endswith(',registered,' + rows[1].split(',')[5] + ',M'))
+        self.assertEqual(rows[0], 'Registration No.,Bib,Name,Email,Phone,Status,Registered At,T-shirt size')
+        self.assertTrue(rows[1].endswith(',registered,' + rows[1].split(',')[6] + ',M'))
 
 
 class StagesTests(APITestCase):

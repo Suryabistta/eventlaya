@@ -6,7 +6,7 @@ class FormFieldSerializer(serializers.ModelSerializer):
         model = FormField
         fields = [
             'id', 'form', 'field_type', 'label', 'placeholder',
-            'help_text', 'required', 'order', 'options', 'validation_rules'
+            'help_text', 'required', 'order', 'options', 'validation_rules', 'show_if', 'ticket_types'
         ]
         read_only_fields = ['id']
 
@@ -43,7 +43,7 @@ class FormDetailSerializer(serializers.ModelSerializer):
         model = Form
         fields = [
             'id', 'organizer', 'event', 'title', 'slug', 'description',
-            'status', 'allow_multiple_submissions', 'fields', 'responses_count',
+            'status', 'allow_multiple_submissions', 'is_template', 'fields', 'responses_count',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'organizer', 'created_at', 'updated_at']

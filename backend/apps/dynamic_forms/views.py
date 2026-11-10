@@ -1,9 +1,11 @@
+import uuid
 from datetime import timedelta
 from decimal import Decimal
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import viewsets, permissions, status
+from rest_framework.decorators import action
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser
@@ -24,6 +26,42 @@ class FormViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(organizer=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def duplicate(self, request, pk=None):
+        """POST /api/forms/<id>/duplicate/ {as_template?, event?, link?: registration|application}: copy the form and its
+        questions (conditions re-pointed to the copies). As a template it is saved to "Your templates"; with an event
+        it becomes that event's registration or application form."""
+        src = self.get_object()
+        as_template = bool(request.data.get('as_template'))
+        event = None
+        if request.data.get('event'):
+            from apps.events.views import can_manage_event
+            event = get_object_or_404(Event, pk=request.data['event'])
+            if not can_manage_event(request.user, event):
+                return Response({'error': 'Not your event.'}, status=status.HTTP_403_FORBIDDEN)
+        title = (request.data.get('title') or src.title).strip()[:255]
+        with transaction.atomic():
+            copy = Form.objects.create(organizer=request.user, event=event, title=title,
+                                       slug=f'{src.slug}-copy'[:240], description=src.description,
+                                       status=Form.Status.DRAFT if as_template else Form.Status.PUBLISHED, is_template=as_template)
+            ids = {}
+            for f in src.fields.order_by('order'):
+                old = str(f.id)
+                f.id = uuid.uuid4()  # UUID primary keys: a new id makes save() insert a copy
+                f._state.adding = True
+                f.form = copy
+                f.save()
+                ids[old] = str(f.id)
+            for f in copy.fields.exclude(show_if={}):
+                target = ids.get(str((f.show_if or {}).get('field')))
+                f.show_if = {**f.show_if, 'field': target} if target else {}
+                f.save(update_fields=['show_if'])
+            link = request.data.get('link')
+            if event is not None and link in ('registration', 'application'):
+                setattr(event, 'registration_form' if link == 'registration' else 'application_form', copy)
+                event.save(update_fields=['registration_form' if link == 'registration' else 'application_form'])
+        return Response(FormDetailSerializer(copy).data, status=status.HTTP_201_CREATED)
 
 
 class FormFieldViewSet(viewsets.ModelViewSet):
@@ -143,17 +181,11 @@ class EventRegisterView(APIView):
 
         # Validate required form fields if dynamic form is attached
         if form and form.status == Form.Status.PUBLISHED:
-            from .validation import answer_error
-            if not isinstance(answers_map, dict):
-                return Response({'error': 'Invalid answers.'}, status=status.HTTP_400_BAD_REQUEST)
-            for field in form.fields.all():
-                problem = answer_error(field, answers_map.get(str(field.id)), event.id)
-                if problem:
-                    return Response({'error': problem}, status=status.HTTP_400_BAD_REQUEST)
-            for field in form.fields.filter(required=True).exclude(field_type=FormField.FieldType.HEADING):
-                val = answers_map.get(str(field.id))
-                if val is None or val == '' or (isinstance(val, list) and len(val) == 0):
-                    return Response({'error': f"'{field.label}' is required."}, status=status.HTTP_400_BAD_REQUEST)
+            from apps.events.ticketing import default_ticket_type_id as _default_type
+            chosen = {str(i['ticket_type_id'] or _default_type(event) or '') for i in items}
+            problem = check_answers(form, answers_map, event, chosen)
+            if problem:
+                return Response({'error': problem}, status=status.HTTP_400_BAD_REQUEST)
 
         from apps.events.models import TicketOrder
         from apps.events.ticketing import TicketError, default_ticket_type_id, promo_applies, resolve_order
@@ -197,6 +229,8 @@ class EventRegisterView(APIView):
                         guest_number=i,
                         status=EventTicket.Status.RESERVED if online else EventTicket.Status.VALID,
                     ))
+                if event.bib_numbers and not online:
+                    assign_bibs(event, tickets)
                 form_response = self._save_answers(form, event, tickets[0], name, email, phone, answers_map)
         except TicketError as e:
             return Response({'error': e.message}, status=e.code)
@@ -294,8 +328,9 @@ class EventRegisterView(APIView):
             # Open calls: the organizer screens every entry
             review_status=FormResponse.ReviewStatus.ACCEPTED,
         )
+        from .validation import is_visible
         for field in form.fields.all():
-            if str(field.id) in answers_map:
+            if str(field.id) in answers_map and is_visible(field, answers_map):
                 FormAnswer.objects.create(
                     response=form_response,
                     field=field,
@@ -390,16 +425,20 @@ class FormUploadView(APIView):
         return Response({'url': default_storage.url(path), 'name': upload.name[:120], 'size': upload.size}, status=status.HTTP_201_CREATED)
 
 
-def check_answers(form, answers_map, event):
-    """Error message for the first bad or missing answer, or None (shared by registration and applications)."""
-    from .validation import answer_error
+def check_answers(form, answers_map, event, ticket_type_ids=None):
+    """Error message for the first bad or missing answer, or None (shared by registration and applications).
+    Questions hidden by their condition or ticket types are not checked (and their answers are not saved)."""
+    from .validation import answer_error, is_visible
     if not isinstance(answers_map, dict):
         return 'Invalid answers.'
-    for field in form.fields.all():
+    fields = [f for f in form.fields.all() if is_visible(f, answers_map, ticket_type_ids)]
+    for field in fields:
         problem = answer_error(field, answers_map.get(str(field.id)), event.id)
         if problem:
             return problem
-    for field in form.fields.filter(required=True).exclude(field_type=FormField.FieldType.HEADING):
+    for field in fields:
+        if not field.required or field.field_type == FormField.FieldType.HEADING:
+            continue
         val = answers_map.get(str(field.id))
         if val is None or val == '' or (isinstance(val, list) and len(val) == 0):
             return f"'{field.label}' is required."
@@ -442,8 +481,9 @@ class ApplyView(APIView):
                 form=form, event=event, submitter_name=name, submitter_email=email, submitter_phone=phone,
                 review_status=FormResponse.ReviewStatus.PENDING, number=f'APP-{str(event.id)[:4].upper()}-{n:04d}',
             )
+            from .validation import is_visible
             for field in form.fields.exclude(field_type=FormField.FieldType.HEADING):
-                if str(field.id) in answers:
+                if str(field.id) in answers and is_visible(field, answers):
                     FormAnswer.objects.create(response=resp, field=field, value=answers[str(field.id)])
         from apps.core.email import send_application_received
         send_application_received(resp, event)
@@ -479,3 +519,16 @@ def phone_error(phone, required):
     if digits < 7 or digits > 15:
         return 'Enter a valid mobile number.'
     return None
+
+
+def assign_bibs(event, tickets):
+    """Next race bib numbers (Event.bib_numbers), in registration order; the event row is locked so two
+    registrations never get the same number. Call inside atomic()."""
+    from django.db.models import Max
+    Event.objects.select_for_update().filter(pk=event.pk).first()
+    last = EventTicket.objects.filter(event=event).aggregate(m=Max('bib_number'))['m']
+    nxt = max(last + 1 if last else 0, event.bib_start or 1)
+    for t in tickets:
+        t.bib_number = nxt
+        t.save(update_fields=['bib_number'])
+        nxt += 1
