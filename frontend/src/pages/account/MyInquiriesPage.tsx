@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { downloadApiFile } from '@/lib/download'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Building2, CalendarDays, Inbox, MessageSquareText, Star, Store, Users, Wallet, XCircle } from 'lucide-react'
@@ -136,6 +137,13 @@ const SentInquiryCard: React.FC<{ inquiry: MySentInquiry }> = ({ inquiry: i }) =
           {i.status === 'booked' && i.agreed_amount && (
             <p className="rounded-xl bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-900">
               Agreed <span className="font-semibold">{fmtPrice(i.agreed_amount)}</span> · Paid <span className="font-semibold">{fmtPrice(i.paid ?? 0)}</span>
+              <button
+                type="button"
+                className="float-right font-semibold text-emerald-800 underline underline-offset-2"
+                onClick={() => downloadApiFile(`/me/inquiries/${i.kind}/${i.id}/receipt/`, 'receipt.pdf').catch(() => undefined)}
+              >
+                Receipt
+              </button>
               {Number(i.agreed_amount) - Number(i.paid ?? 0) > 0 && (
                 <>
                   {' '}

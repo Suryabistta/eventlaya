@@ -1,6 +1,6 @@
 import React, { useDeferredValue, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarCheck, Plus, Search, Trash2 } from 'lucide-react'
+import { CalendarCheck, FileDown, Plus, Search, Trash2 } from 'lucide-react'
 import { request } from '@/services/api'
 import { Badge, Button, Card, EmptyState, ErrorState, Input, Modal, PageHeader, Select, Skeleton, StatTile, Textarea, useToast } from '@/components/ui'
 import { CalendarToggle } from '@/components/CalendarToggle'
@@ -8,6 +8,7 @@ import { fmtDay, fmtPrice, slotTime } from '@/lib/availability'
 import { useCalendarSystem } from '@/lib/calendar'
 import { cn } from '@/lib/utils'
 import { businessApi } from './api'
+import { downloadApiFile } from '@/lib/download'
 
 /**
  * Business portal → Bookings: confirmed requests and bookings the owner added, with the agreed amount, payments received
@@ -332,6 +333,13 @@ const BookingModal: React.FC<{ booking: Booking; onClose: () => void }> = ({ boo
           </div>
         ) : (
           <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              variant="secondary"
+              icon={<FileDown className="h-4 w-4" />}
+              onClick={() => downloadApiFile(`${base}receipt/`, 'receipt.pdf').catch((e: Error) => toast.error('Couldn’t download', e.message))}
+            >
+              Receipt (PDF)
+            </Button>
             {active && !b.completed_at && (
               <Button variant="ghost" onClick={() => setCancelNote('')}>
                 Cancel booking

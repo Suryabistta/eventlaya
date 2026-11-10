@@ -1,4 +1,4 @@
-from . import bookings
+from . import bookings, receipts
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
@@ -37,6 +37,7 @@ urlpatterns = [
     path('my/bookings/<str:kind>/<uuid:pk>/payments/<uuid:payment_id>/', bookings.BookingPaymentDeleteView.as_view(),
          name='marketplace_my_booking_payment'),
     path('my/bookings/<str:kind>/<uuid:pk>/complete/', bookings.BookingCompleteView.as_view(), name='marketplace_my_booking_complete'),
+    path('my/bookings/<str:kind>/<uuid:pk>/receipt/', receipts.OwnerReceiptView.as_view(), name='marketplace_my_booking_receipt'),
     path('my/bookings/<str:kind>/<uuid:pk>/cancel/', bookings.BookingCancelView.as_view(), name='marketplace_my_booking_cancel'),
     path('my/slots/', MySlotsView.as_view(), name='marketplace_my_slots'),
     path('my/slots/bulk/', MySlotsBulkView.as_view(), name='marketplace_my_slots_bulk'),

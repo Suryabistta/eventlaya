@@ -42,6 +42,14 @@ class BookingManagementTests(BookingRequestTests):
         mine = self.client.get('/api/me/inquiries/').data
         item = (mine['results'] if isinstance(mine, dict) else mine)[0]
         self.assertEqual((item['agreed_amount'], item['paid']), ('45000.00', '25000.00'))
+        # PDF receipt for the business and the customer (BS dates); not for others
+        self.as_(self.owner)
+        pdf = self.client.get(f'{url}receipt/')
+        self.assertEqual((pdf.status_code, pdf['Content-Type'], pdf.content[:5]), (200, 'application/pdf', b'%PDF-'))
+        self.as_(self.customer)
+        self.assertEqual(self.client.get(f'/api/me/inquiries/venue/{b.id}/receipt/').status_code, 200)
+        self.as_(self.other)
+        self.assertEqual(self.client.get(f'/api/me/inquiries/venue/{b.id}/receipt/').status_code, 404)
         # Someone else's booking is not reachable
         self.as_(self.other)
         self.assertEqual(self.client.get(url).status_code, 404)
