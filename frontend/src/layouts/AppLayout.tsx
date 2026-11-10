@@ -43,6 +43,8 @@ import {
   GalleryHorizontal,
   Image as ImageIcon,
   Printer,
+  ClipboardList,
+  Crown,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
@@ -82,8 +84,9 @@ interface NavExtras {
   whiteLabel: boolean
   payments: boolean
   printedTickets: boolean
+  contests: boolean
 }
-const noExtras: NavExtras = { chat: false, chatUnread: 0, reviews: false, marketplace: true, whiteLabel: true, payments: true, printedTickets: false }
+const noExtras: NavExtras = { chat: false, chatUnread: 0, reviews: false, marketplace: true, whiteLabel: true, payments: true, printedTickets: false, contests: false }
 
 /** Modules on for this user + chat unread count, for the sidebar, More sheet and tab bar. */
 function useNavExtras(): NavExtras {
@@ -97,6 +100,7 @@ function useNavExtras(): NavExtras {
     marketplace: modules.enabled('marketplace'),
     whiteLabel: modules.enabled('white_label'),
     payments: modules.enabled('payments'),
+    contests: modules.enabled('voting') && modules.enabled('contests'),
   }
 }
 
@@ -113,7 +117,18 @@ const eventTools = (x: NavExtras): NavGroup => ({
   label: 'Run your event',
   items: [
     { label: 'Overview', to: '/app', icon: LayoutDashboard, end: true },
-    { label: 'Events', to: '/app/events', icon: CalendarDays, roles: ORGANIZER },
+    {
+      label: 'Events',
+      to: '/app/events',
+      end: true,
+      icon: CalendarDays,
+      roles: ORGANIZER,
+      children: [
+        { label: 'Ticketing', to: '/app/events/ticketing', icon: Ticket },
+        { label: 'Registration', to: '/app/events/registration', icon: ClipboardList },
+        ...(x.contests ? [{ label: 'Pageants', to: '/app/events/pageants', icon: Crown }] : []),
+      ],
+    },
     { label: 'Tickets', to: '/app/tickets', icon: Ticket, roles: ORGANIZER },
     ...(x.printedTickets ? [{ label: 'Printed tickets', to: '/app/printed-tickets', icon: Printer, roles: ORGANIZER }] : []),
     { label: 'Payments', to: '/app/payments', icon: Wallet, roles: ORGANIZER },

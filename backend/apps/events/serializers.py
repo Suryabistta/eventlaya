@@ -95,6 +95,7 @@ class EventSerializer(serializers.ModelSerializer):
     registration_open = serializers.SerializerMethodField()
     registration_closed_reason = serializers.SerializerMethodField()
     category_name = serializers.SerializerMethodField()
+    event_kind = serializers.SerializerMethodField()
     # New events ask for a phone number unless the organizer turns it off
     phone_required = serializers.BooleanField(default=True)
 
@@ -106,7 +107,7 @@ class EventSerializer(serializers.ModelSerializer):
             'capacity', 'status', 'allow_registration', 'registration_deadline',
             'is_paid', 'ticket_price', 'registration_form', 'registration_form_title',
             'registered_count', 'checked_in_count', 'created_at', 'updated_at',
-            'tagline', 'category', 'category_name', 'is_featured', 'phase', 'registration_open', 'registration_closed_reason',
+            'tagline', 'category', 'category_name', 'event_kind', 'is_featured', 'phase', 'registration_open', 'registration_closed_reason',
             'max_tickets_per_order', 'show_spots_left',
             'managed_by', 'managed_by_logo', 'show_managed_by', 'managed_by_label', 'ticket_layout', 'show_seat_number', 'registration_mode', 'cta_label',
             'tickets_enabled', 'date_tba', 'applications_enabled', 'application_form', 'applications_close', 'application_cta',
@@ -159,6 +160,14 @@ class EventSerializer(serializers.ModelSerializer):
         if not obj.category or obj.category == Event.Category.OTHER:
             return ''
         return category_labels(self).get(obj.category, obj.category.replace('-', ' ').title())
+
+    def get_event_kind(self, obj):
+        """Which Events sub-menu lists it: pageant (has a contest), registration (sign-up or applications only), ticketing."""
+        if any(p.kind == 'contest' for p in obj.polls.all()):
+            return 'pageant'
+        if obj.registration_mode == 'form' or (obj.applications_enabled and not obj.tickets_enabled):
+            return 'registration'
+        return 'ticketing'
 
     def get_phase(self, obj):
         return obj.phase()

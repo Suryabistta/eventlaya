@@ -69,6 +69,16 @@ export const FORM_TEMPLATES: FormTemplate[] = [
     ],
   },
   {
+    id: 'registration',
+    name: 'Simple registration',
+    description: 'Organization, how they heard about you and a meal preference.',
+    fields: [
+      q('Organization or college', 'text'),
+      q('How did you hear about us?', 'select', { options: ['Facebook', 'Instagram', 'TikTok', 'A friend', 'Poster or banner', 'Other'] }),
+      q('Meal preference', 'radio', { options: ['Veg', 'Non-veg', 'No meal'] }),
+    ],
+  },
+  {
     id: 'conference',
     name: 'Conference / workshop',
     description: 'Organization, job title, dietary needs and sessions of interest.',
@@ -174,11 +184,11 @@ export async function addTemplateFields(formId: string, afterOrder: number, t: F
   }
 }
 
-/** A published registration form from a template, linked to the event (used right after creating an event). */
-export async function createFormFromTemplate(event: Pick<Event, 'id' | 'title'>, t: FormTemplate) {
-  const slug = `${event.title}-registration`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'form'
-  const form = await api.createForm({ title: `${event.title} registration`, slug, event: event.id, status: 'published' })
-  await api.updateEvent(event.id, { registration_form: form.id })
+/** A published form from a template, linked to the event as its registration or application form (used right after creating an event). */
+export async function createFormFromTemplate(event: Pick<Event, 'id' | 'title'>, t: FormTemplate, as: 'registration' | 'application' = 'registration') {
+  const slug = `${event.title}-${as}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'form'
+  const form = await api.createForm({ title: `${event.title} ${as}`, slug, event: event.id, status: 'published' })
+  await api.updateEvent(event.id, as === 'application' ? { application_form: form.id } : { registration_form: form.id })
   await addTemplateFields(form.id, 0, t)
   return form
 }

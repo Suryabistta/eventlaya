@@ -26,6 +26,9 @@ const ForgotPasswordPage = lazyPage(() => import('./pages/auth/PasswordResetPage
 const ResetPasswordPage = lazyPage(() => import('./pages/auth/PasswordResetPages'), 'ResetPasswordPage')
 const DashboardPage = lazyPage(() => import('./pages/DashboardPage'), 'DashboardPage')
 const EventsPage = lazyPage(() => import('./pages/EventsPage'), 'EventsPage')
+const TicketingEventsPage = lazyPage(() => import('./pages/EventsPage'), 'TicketingEventsPage')
+const RegistrationEventsPage = lazyPage(() => import('./pages/EventsPage'), 'RegistrationEventsPage')
+const PageantEventsPage = lazyPage(() => import('./pages/EventsPage'), 'PageantEventsPage')
 const EventFormPage = lazyPage(() => import('./pages/EventFormPage'), 'EventFormPage')
 const FormBuilderPage = lazyPage(() => import('./pages/FormBuilderPage'), 'FormBuilderPage')
 const GateScannerPage = lazyPage(() => import('./pages/GateScannerPage'), 'GateScannerPage')
@@ -215,6 +218,9 @@ export const App: React.FC = () => {
               >
                 <Route index element={<AppHome><DashboardPage /></AppHome>} />
                 <Route path="events" element={organizer(<EventsPage />)} />
+                <Route path="events/ticketing" element={organizer(<TicketingEventsPage />)} />
+                <Route path="events/registration" element={organizer(<RegistrationEventsPage />)} />
+                <Route path="events/pageants" element={organizer(<PageantEventsPage />)} />
                 <Route path="forms" element={organizer(<FormBuilderPage />)} />
                 <Route path="scanner" element={<RequireAuth roles={['organizer', 'staff', 'superadmin']}><GateScannerPage /></RequireAuth>} />
                 <Route path="gates" element={organizer(<GatesPage />)} />

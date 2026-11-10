@@ -68,7 +68,7 @@ class EventViewSet(viewsets.ModelViewSet):
                 assigned_event_ids = user.gate_assignments.filter(is_active=True).values_list('event_id', flat=True)
                 return Event.objects.filter(models.Q(id__in=assigned_event_ids) | models.Q(status=Event.Status.PUBLISHED))
             # Organizers see their own events
-            return Event.objects.filter(organizer=user)
+            return Event.objects.filter(organizer=user).prefetch_related('polls')
         # Visitors use /api/events/public/: it hides counts the organizer chose to hide and respects white-label
         # sites. This organizer view would show registered/checked-in counts for every event.
         return Event.objects.none()

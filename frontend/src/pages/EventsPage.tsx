@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { CalendarDays, Check, ClipboardList, ExternalLink, Link2, MapPin, Pencil, Plus, LayoutTemplate, QrCode } from 'lucide-react'
 import { RegistrationQrModal } from '@/components/RegistrationQrModal'
-import { type Event } from '@/services/api'
+import { type Event, type EventKind } from '@/services/api'
 import { useCurrentEvent } from '@/lib/event-context'
 import { Badge, Button, ButtonLink, Card, EmptyState, ErrorState, IconButton, PageHeader, Skeleton, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
@@ -20,13 +20,40 @@ function dateRange(ev: Event) {
   return `${start} to ${fmtDate(ev.end_date)}`
 }
 
-export const EventsPage: React.FC = () => {
+/** The Events sub-menus: each lists one kind of event and starts new ones with its sample settings and form. */
+const KINDS: Record<EventKind, { title: string; description: string; create: string; empty: string; emptyText: string }> = {
+  ticketing: {
+    title: 'Ticketing',
+    description: 'Concerts, shows and festivals: paid or free tickets with QR passes.',
+    create: 'New ticketed event',
+    empty: 'No ticketed events yet',
+    emptyText: 'Starts with General and VIP tickets and a short buyer form. Change anything before you publish.',
+  },
+  registration: {
+    title: 'Registration',
+    description: 'Seminars, workshops and open calls: a free sign-up form, no tickets.',
+    create: 'New registration',
+    empty: 'No registration events yet',
+    emptyText: 'Starts with a sample sign-up form (organization, how they heard about you, meal preference).',
+  },
+  pageant: {
+    title: 'Pageants',
+    description: 'Applications, rounds, judging and voting, then winners.',
+    create: 'New pageant',
+    empty: 'No pageants yet',
+    emptyText: 'Starts with a sample application form (age, height, photos, bio) and a draft contest with rounds.',
+  },
+}
+
+export const EventsPage: React.FC<{ kind?: EventKind }> = ({ kind }) => {
+  const k = kind ? KINDS[kind] : undefined
+  const newLink = kind ? `/app/events/new?kind=${kind}` : '/app/events/new'
   const toast = useToast()
   const navigate = useNavigate()
   const { events, currentEvent, setCurrentEventId, isLoading, isError, error, refetch } = useCurrentEvent()
 
   // Live first, then upcoming (soonest at the top), drafts, then ended and cancelled (most recent first)
-  const sorted = useMemo(() => sortByPhase(events), [events])
+  const sorted = useMemo(() => sortByPhase(kind ? events.filter((e) => (e.event_kind ?? 'ticketing') === kind) : events), [events, kind])
   const [qrEvent, setQrEvent] = useState<Event | null>(null)
 
   // Open crew tasks per event, shown on each row
@@ -55,11 +82,11 @@ export const EventsPage: React.FC = () => {
   return (
     <div className="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 2xl:px-10">
       <PageHeader
-        title="Events"
-        description="Everything you’re running. Open an event to manage registrations, the gate and voting."
+        title={k?.title ?? 'Events'}
+        description={k?.description ?? 'Everything you’re running. Open an event to manage registrations, the gate and voting.'}
         actions={
-          <ButtonLink to="/app/events/new" icon={<Plus className="h-4 w-4" />}>
-            Create event
+          <ButtonLink to={newLink} icon={<Plus className="h-4 w-4" />}>
+            {k?.create ?? 'Create event'}
           </ButtonLink>
         }
       />
@@ -82,11 +109,11 @@ export const EventsPage: React.FC = () => {
         <Card>
           <EmptyState
             icon={<CalendarDays className="h-6 w-6" />}
-            title="No events yet"
-            description="Create an event to get a registration link, QR passes and a gate scanner."
+            title={k?.empty ?? 'No events yet'}
+            description={k?.emptyText ?? 'Create an event to get a registration link, QR passes and a gate scanner.'}
             action={
-              <ButtonLink to="/app/events/new" icon={<Plus className="h-4 w-4" />}>
-                Create event
+              <ButtonLink to={newLink} icon={<Plus className="h-4 w-4" />}>
+                {k?.create ?? 'Create event'}
               </ButtonLink>
             }
           />
@@ -116,6 +143,10 @@ export const EventsPage: React.FC = () => {
     </div>
   )
 }
+
+export const TicketingEventsPage = () => <EventsPage kind="ticketing" />
+export const RegistrationEventsPage = () => <EventsPage kind="registration" />
+export const PageantEventsPage = () => <EventsPage kind="pageant" />
 
 const EventRow: React.FC<{
   event: Event

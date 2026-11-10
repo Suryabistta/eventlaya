@@ -235,3 +235,23 @@ class ContestNotifyTests(StagesTests):
             from apps.voting import notify
             notify.added(Candidate.objects.get(pk=a.pk))
         self.assertEqual(len(mail.outbox), 0)  # notifications are optional
+
+
+class EventKindTests(APITestCase):
+    """event_kind decides which Events sub-menu (Ticketing, Registration, Pageants) lists the event."""
+
+    def test_kinds(self):
+        from apps.voting.models import Poll
+        org = User.objects.create_user(username='k', email='k@test.com', password='x', role=User.Role.ORGANIZER)
+        day = date.today() + timedelta(days=5)
+        make = lambda slug, **kw: Event.objects.create(organizer=org, title=slug, slug=slug, location='Dharan', start_date=day, **kw)
+        make('concert')
+        make('seminar', registration_mode=Event.RegistrationMode.FORM)
+        make('films', tickets_enabled=False, applications_enabled=True)
+        miss = make('miss', tickets_enabled=False, applications_enabled=True)
+        Poll.objects.create(event=miss, title='Miss Dharan', kind=Poll.Kind.CONTEST)
+        self.client.force_authenticate(org)
+        r = self.client.get('/api/events/')
+        rows = r.data['results'] if isinstance(r.data, dict) else r.data
+        kinds = {e['slug']: e['event_kind'] for e in rows}
+        self.assertEqual(kinds, {'concert': 'ticketing', 'seminar': 'registration', 'films': 'registration', 'miss': 'pageant'})

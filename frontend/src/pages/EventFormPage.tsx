@@ -20,7 +20,8 @@ import {
   Trash2,
   Users,
 } from 'lucide-react'
-import { api, request, type Event } from '@/services/api'
+import { api, request, type Event, type EventKind } from '@/services/api'
+import { contestApi } from '@/pages/voting/contest/api'
 import { eventPhase } from '@/lib/phase'
 import { useCurrentEvent } from '@/lib/event-context'
 import { bookLabel, eventPageApi, useEventCategories, fmtClock, type EventCategory, type EventPageContent } from '@/lib/event-page'
@@ -425,6 +426,35 @@ export const EventFormPage: React.FC = () => {
   return <EventBuilder key={event?.id ?? 'new'} event={event} page={pageQuery.data} />
 }
 
+/** The sample pieces each kind starts with: a VIP ticket, or a pageant application form and a draft contest. Best effort: the
+ *  event is already saved, so a failure here only means the organizer adds that piece by hand. */
+async function setUpKind(saved: Event, kind: EventKind, draft: EventDraft) {
+  try {
+    if (kind === 'ticketing' && draft.is_paid && Number(draft.ticket_price) > 0) {
+      await ticketsApi.create(saved.id, { name: 'VIP', price: (Number(draft.ticket_price) * 2).toFixed(2), description: 'Front seating and early entry', order: 2 })
+    }
+    if (kind === 'pageant') {
+      const t = FORM_TEMPLATES.find((x) => x.id === 'pageant')
+      if (t) await createFormFromTemplate(saved, t, 'application')
+      await contestApi.create({ event: saved.id, title: saved.title, preset: 'pageant' })
+    }
+  } catch {
+    /* the organizer can add these from Tickets, Forms and Live voting */
+  }
+}
+
+/** Starting settings for "New event" from the Events sub-menus (?kind=ticketing|registration|pageant) */
+const KIND_PRESETS: Record<EventKind, { title: string; draft: Partial<EventDraft> }> = {
+  ticketing: { title: 'Create a ticketed event', draft: { is_paid: true, registration_mode: 'pass' } },
+  registration: { title: 'Create a registration event', draft: { registration_mode: 'form', is_paid: false, form_template: 'registration' } },
+  pageant: { title: 'Create a pageant', draft: { tickets_enabled: false, date_tba: true, applications_enabled: true, applications_close: inDays(30), application_cta: 'Apply now', limit_spots: false } },
+}
+
+function inDays(n: number) {
+  const d = new Date(Date.now() + n * 864e5)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T23:59`
+}
+
 const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ event, page }) => {
   const eventCategories = useEventCategories()
   const seatsOn = useModuleEnabled('seat_numbers')
@@ -441,7 +471,9 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
   const [params, setParams] = useSearchParams()
   const isEdit = Boolean(event)
 
-  const initial = useMemo(() => (event ? fromEvent(event, page) : emptyDraft), [event, page])
+  const kindParam = params.get('kind') as EventKind | null
+  const preset = !event && kindParam ? KIND_PRESETS[kindParam] : undefined
+  const initial = useMemo(() => (event ? fromEvent(event, page) : { ...emptyDraft, ...preset?.draft }), [event, page, preset])
   const initialPage = useMemo(() => pageFromContent(page), [page])
   const [draft, setDraft] = useState<EventDraft>(initial)
   const [content, setContent] = useState<PageDraft>(initialPage)
@@ -579,6 +611,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
           toast.error('Event saved, but the form wasn’t created', 'Add it from Forms.')
         }
       }
+      if (!event && kindParam) await setUpKind(saved, kindParam, draft)
       try {
         await eventPageApi.put(saved.id, {
           map_query: draft.map_query.trim(),
@@ -707,7 +740,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
           </ol>
         </nav>
         <PageHeader
-          title={isEdit ? 'Edit event' : 'Create event'}
+          title={isEdit ? 'Edit event' : (preset?.title ?? 'Create event')}
           description={isEdit ? 'Changes show on the public event page as soon as you save.' : 'Fill in the first three steps to create it. The rest can wait.'}
           actions={
             isEdit ? (

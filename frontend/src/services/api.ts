@@ -5,7 +5,11 @@ export type EventPhase = 'draft' | 'upcoming' | 'live' | 'ended' | 'cancelled'
 
 const API_BASE = '/api'
 
+export type EventKind = 'ticketing' | 'registration' | 'pageant'
+
 export interface Event {
+  /** Which Events sub-menu lists it */
+  event_kind?: EventKind
   id: string
   /** Event type slug and its display name ('' for none/other) */
   category?: string
