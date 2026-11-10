@@ -106,6 +106,8 @@ export type PublicEvent = Event &
     managed_by_info?: { name: string; logo: string | null; label?: string } | null
     /** Applications stage (null when off) */
     applications?: PublicApplications | null
+    /** Timeline when the event has more than one stage (applications → voting → tickets) */
+    stages?: EventStage[]
     /** Published sub-events of a main event (module sub_events), soonest first */
     sub_events?: SubEventCard[]
     /** The main event, when this is a sub-event */
@@ -340,4 +342,16 @@ export interface PublicApplications {
   closes_at: string | null
   cta: string
   form: import('@/services/api').DynamicForm | null
+}
+
+/** One stage of the event's timeline (apps.events.views.event_stages). */
+export interface EventStage {
+  kind: 'applications' | 'voting' | 'tickets'
+  title: string
+  cta: string | null
+  state: 'upcoming' | 'open' | 'closed'
+  opens_at: string | null
+  closes_at: string | null
+  date?: string | null
+  href: string
 }

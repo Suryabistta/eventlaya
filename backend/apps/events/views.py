@@ -210,6 +210,8 @@ class PublicEventDetailView(APIView):
                 'form': FormDetailSerializer(event.application_form).data if reason is None else None,
             }
 
+        data['stages'] = event_stages(event, data)
+
         return Response({
             'event': data,
             'form': form_schema
@@ -1202,3 +1204,30 @@ class PublicPassView(APIView):
                 'banner': request.build_absolute_uri(e.banner.url) if e.banner else None, 'phase': e.phase(),
             },
         })
+
+
+def event_stages(event, data):
+    """The event's timeline (docs/plan-2026-11-event-journeys.md): applications → voting → tickets, each with its
+    state (upcoming | open | closed), dates and where its button goes. Only stages the event uses are listed."""
+    from apps.accounts.modules import module_enabled
+    from apps.voting.models import Poll
+    now = timezone.now()
+    stages = []
+    apps = data.get('applications')
+    if apps:
+        stages.append({'kind': 'applications', 'title': 'Applications', 'cta': apps['cta'],
+                       'state': 'open' if apps['open'] else ('closed' if event.applications_close and event.applications_close < now else 'upcoming'),
+                       'opens_at': None, 'closes_at': event.applications_close, 'href': f'/e/{event.slug}/apply'})
+    if module_enabled('contests'):
+        for poll in Poll.objects.filter(event=event, kind=Poll.Kind.CONTEST).exclude(status=Poll.Status.DRAFT).order_by('opens_at', 'created_at')[:3]:
+            state = {'open': 'open', 'closed': 'closed'}.get(poll.status, 'upcoming')
+            stages.append({'kind': 'voting', 'title': poll.title or 'Voting', 'cta': 'Vote', 'state': state,
+                           'opens_at': poll.opens_at, 'closes_at': poll.closes_at, 'href': f'/e/{event.slug}/vote/{poll.slug or poll.id}'})
+    if event.tickets_enabled or stages:
+        phase = data.get('phase')
+        state = 'closed' if phase in ('ended', 'cancelled') else ('open' if data.get('registration_open') else 'upcoming')
+        stages.append({'kind': 'tickets', 'title': event.title if stages else 'Tickets', 'cta': event.cta_label or None,
+                       'state': state, 'opens_at': None,
+                       'closes_at': None, 'date': None if event.date_tba else event.start_date,
+                       'href': f'/e/{event.slug}/register'})
+    return stages if len(stages) > 1 else []

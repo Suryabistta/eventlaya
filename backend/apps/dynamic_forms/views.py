@@ -363,8 +363,10 @@ class FormUploadView(APIView):
         from PIL import Image, UnidentifiedImageError
         from apps.accounts.tenancy import scope_events
         event = get_object_or_404(scope_events(Event.objects.all(), request), slug=slug)
-        if event.registration_closed_reason():
-            return Response({'error': event.registration_closed_reason()}, status=status.HTTP_400_BAD_REQUEST)
+        # Files for registration answers or for applications: either stage must be open
+        closed = event.registration_closed_reason()
+        if closed and event.applications_closed_reason():
+            return Response({'error': closed}, status=status.HTTP_400_BAD_REQUEST)
         upload = request.FILES.get('file')
         if not upload:
             return Response({'error': 'Choose a file to upload.'}, status=status.HTTP_400_BAD_REQUEST)

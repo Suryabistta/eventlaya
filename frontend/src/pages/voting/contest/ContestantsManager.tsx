@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, FileUp, GripVertical, ListOrdered, Pencil, Plus, Trash2, Users } from 'lucide-react'
+import { ArrowDown, ArrowUp, FileUp, GripVertical, ListOrdered, Pencil, Plus, Trash2, UserCheck, Users } from 'lucide-react'
 import { Button, EmptyState, ErrorState, IconButton, ImageGalleryUpload, ImageUpload, Input, Modal, Select, Skeleton, Textarea, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { contestApi, type Contest, type Contestant, type ContestantInput, type ContestantStatus, type SocialKey } from './api'
@@ -26,6 +26,14 @@ export const ContestantsManager: React.FC<{ contest: Contest }> = ({ contest }) 
   const [bulk, setBulk] = useState<'names' | 'csv' | null>(null)
   const [order, setOrder] = useState<string[] | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
+  const fromApps = useMutation({
+    mutationFn: () => contestApi.fromApplications(contest.id),
+    onSuccess: (added) => {
+      void qc.invalidateQueries({ queryKey: contestantsKey(contest.id) })
+      toast.success(`Added ${added.length} ${added.length === 1 ? 'contestant' : 'contestants'}`, 'Name, photo and bio come from their applications.')
+    },
+    onError: (e: Error) => toast.error('Couldn’t add applicants', e.message),
+  })
 
   const list = useMemo(() => {
     if (!data) return []
@@ -91,6 +99,9 @@ export const ContestantsManager: React.FC<{ contest: Contest }> = ({ contest }) 
         <Button icon={<Plus className="h-4 w-4" />} onClick={() => setEditing('new')}>Add contestant</Button>
         <Button variant="secondary" icon={<Users className="h-4 w-4" />} onClick={() => setBulk('names')}>Add many</Button>
         <Button variant="secondary" icon={<FileUp className="h-4 w-4" />} onClick={() => setBulk('csv')}>Import CSV</Button>
+        <Button variant="secondary" icon={<UserCheck className="h-4 w-4" />} loading={fromApps.isPending} onClick={() => fromApps.mutate()}>
+          Add accepted applicants
+        </Button>
         {list.length > 1 && !order && (
           <Button variant="ghost" icon={<ListOrdered className="h-4 w-4" />} onClick={async () => {
             const ok = await toast.confirm({ title: 'Renumber everyone?', description: 'Numbers become 1, 2, 3… in the order shown. Shared posters with old numbers will be out of date.', confirmLabel: 'Renumber' })

@@ -198,6 +198,8 @@ class Candidate(models.Model):
     gallery = models.JSONField(default=list, blank=True, help_text='Extra photo URLs from /api/uploads/')
     social_links = models.JSONField(default=dict, blank=True, help_text='{"facebook": url, "instagram": url, ...}')
     profile = models.JSONField(default=dict, blank=True, help_text='Values of the contest\'s custom profile fields, by key')
+    # Added from an accepted application (event applications stage): that FormResponse, so it isn't imported twice
+    application_id = models.UUIDField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

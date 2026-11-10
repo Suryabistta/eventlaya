@@ -143,3 +143,36 @@ class StagesTests(APITestCase):
         clear_cache()
         self.addCleanup(clear_cache)
         self.assertEqual(self.apply().status_code, 403)
+
+
+class StageTimelineAndContestTests(StagesTests):
+    def test_timeline_and_accepted_applicants_become_contestants(self):
+        from apps.dynamic_forms.models import FormField
+        from apps.voting.models import Poll
+        photo = FormField.objects.create(form=self.form, label='Portrait', field_type='image', order=2)
+        bio = FormField.objects.create(form=self.form, label='Short bio', field_type='paragraph', order=3)
+        img = self.client.post(f'/api/forms/events/{self.event.slug}/upload/', {'file': _png()}, format='multipart').data['url']
+        answers = {str(self.link.id): 'https://vimeo.com/1', str(photo.id): img, str(bio.id): 'I sing.'}
+        for email in ('a@x.com', 'b@x.com'):
+            r = self.client.post(self.apply_url, {'name': email[0].upper(), 'email': email, 'phone': '9812345678', 'answers': answers}, format='json')
+            self.assertEqual(r.status_code, 201, r.data)
+        poll = Poll.objects.create(event=self.event, title='Public vote', kind=Poll.Kind.CONTEST, status=Poll.Status.SCHEDULED)
+        stages = self.client.get(f'/api/events/public/{self.event.slug}/').data['event']['stages']
+        self.assertEqual([(s['kind'], s['state']) for s in stages], [('applications', 'open'), ('voting', 'upcoming'), ('tickets', 'upcoming')])
+        self.client.force_authenticate(self.organizer)
+        apps = self.client.get(f'/api/forms/events/{self.event.id}/applications/').data
+        self.client.post(f"/api/forms/responses/{apps[0]['id']}/review/", {'status': 'accepted'}, format='json')
+        url = f'/api/voting/contests/{poll.id}/contestants/from-applications/'
+        r = self.client.post(url)
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual((len(r.data), r.data[0]['photo_url'], r.data[0]['description']), (1, img, 'I sing.'))
+        self.assertEqual(self.client.post(url).status_code, 400)  # nothing new to add
+
+
+def _png():
+    import io
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from PIL import Image
+    buf = io.BytesIO()
+    Image.new('RGB', (4, 4)).save(buf, 'PNG')
+    return SimpleUploadedFile('p.png', buf.getvalue())

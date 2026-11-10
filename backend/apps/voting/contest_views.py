@@ -816,3 +816,46 @@ class ContestExportView(OrganizerView):
                             r['provider'] or '', r['payment_id'] or '', r['provider_txn_id'], ' '.join(p.flags or [])])
             return response
         return Response({'error': 'kind must be votes, scores, results or purchases.'}, status=400)
+
+
+class ContestantFromApplicationsView(OrganizerView):
+    """POST contests/<pk>/contestants/from-applications/: every accepted application of the contest's event becomes a
+    contestant (name, photo, gallery, bio and city taken from the answers). Already imported ones are skipped."""
+
+    def post(self, request, pk):
+        from apps.dynamic_forms.models import FormResponse
+        poll = get_contest(request, pk)
+        done = set(poll.candidates.exclude(application_id=None).values_list('application_id', flat=True))
+        apps = (FormResponse.objects.filter(event=poll.event, ticket__isnull=True, review_status='accepted')
+                .exclude(pk__in=done).prefetch_related('answers__field').order_by('submitted_at'))
+        rows, ids = [], []
+        for a in apps:
+            photos, bio, city = [], '', ''
+            for ans in sorted(a.answers.all(), key=lambda x: x.field.order):
+                v = ans.value.get('value') if isinstance(ans.value, dict) else ans.value
+                t = ans.field.field_type
+                if t == 'image' and isinstance(v, str) and v:
+                    photos.append(v)
+                elif t == 'paragraph' and not bio and isinstance(v, str):
+                    bio = v.strip()[:2000]
+                elif not city and 'city' in ans.field.label.lower() and isinstance(v, str):
+                    city = v.strip()[:255]
+            rows.append({'name': a.submitter_name, 'subtitle': city, 'description': bio,
+                         'photo_url': photos[0] if photos else '', 'gallery': photos[1:20]})
+            ids.append(a.pk)
+        if not rows:
+            return Response({'error': 'No new accepted applications to add.'}, status=400)
+        created, errors = [], {}
+        with transaction.atomic():
+            for i, (row, app_id) in enumerate(zip(rows, ids)):
+                ser = ContestantSerializer(data=row, context={'poll': poll})
+                if ser.is_valid():
+                    created.append(ser.save(application_id=app_id))
+                else:
+                    errors[row['name'] or i + 1] = ser.errors
+            if errors:
+                transaction.set_rollback(True)
+                return Response({'error': f'{len(errors)} applications could not be added. Nothing was added.', 'rows': errors}, status=400)
+        audit(poll, request.user, 'contestants_added', f'{len(created)} contestants added from applications')
+        return Response(ContestantSerializer(contestants_qs(poll).filter(pk__in=[c.pk for c in created]), many=True,
+                                             context={'poll': poll}).data, status=201)

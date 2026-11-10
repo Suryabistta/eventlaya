@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useMemo, useState } from 'react'
+import { formatDate } from '@/lib/dates'
 import { track } from '@/lib/analytics'
 import { useTenant } from '@/lib/tenant'
 import { Link, useParams } from 'react-router-dom'
@@ -43,6 +44,7 @@ import {
   type Speaker,
   bookLabel,
   callOnly,
+  type EventStage,
 } from '@/lib/event-page'
 import { paymentNote, type PaymentOptions } from '@/lib/payments'
 import { availabilityText, fmtShortDate, money, priceText, type PublicTicketType } from '@/lib/tickets'
@@ -189,6 +191,8 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
             </Button>
           </div>
         </div>
+
+        {event.stages && event.stages.length > 1 && <StageTimeline event={event} />}
 
         {/* Key facts */}
         <dl className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -995,3 +999,41 @@ const RegistrationCard: React.FC<{ event: PublicEvent; state: ReturnType<typeof 
   )
 }
 
+
+/** Applications → Voting → Grand finale: where the event is now, with the open stage's button. */
+const StageTimeline: React.FC<{ event: PublicEvent }> = ({ event }) => {
+  const stages = event.stages ?? []
+  const label = (s: EventStage) => {
+    const when = s.closes_at ? new Date(s.closes_at) : s.opens_at ? new Date(s.opens_at) : null
+    if (s.state === 'open') return s.closes_at ? `Open until ${formatDate(s.closes_at, 'short')}` : 'Open now'
+    if (s.state === 'closed') return when ? `Closed ${formatDate(when, 'short')}` : 'Closed'
+    if (s.kind === 'tickets') return s.date ? formatDate(s.date, 'medium') : 'Date to be announced'
+    return s.opens_at ? `Opens ${formatDate(s.opens_at, 'short')}` : 'Coming up'
+  }
+  const button = (s: EventStage) =>
+    s.kind === 'applications' ? s.cta || 'Apply' : s.kind === 'voting' ? 'Vote now' : bookLabel(event)
+  return (
+    <ol aria-label="Event stages" className="mt-6 grid gap-3 sm:grid-cols-3">
+      {stages.map((s, i) => (
+        <li
+          key={`${s.kind}-${i}`}
+          className={cn(
+            'relative rounded-2xl border p-4',
+            s.state === 'open' ? 'border-brand-300 bg-brand-50/60' : s.state === 'closed' ? 'border-ink-200 bg-ink-50 opacity-80' : 'border-ink-200 bg-white',
+          )}
+        >
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+            Step {i + 1} · {s.kind === 'applications' ? 'Applications' : s.kind === 'voting' ? 'Voting' : 'Event'}
+          </p>
+          <p className="mt-1 font-semibold text-ink-900">{s.title}</p>
+          <p className={cn('text-sm', s.state === 'open' ? 'font-medium text-brand-700' : 'text-ink-600')}>{label(s)}</p>
+          {s.state === 'open' && (
+            <ButtonLink to={s.href} size="sm" className="mt-3">
+              {button(s)}
+            </ButtonLink>
+          )}
+        </li>
+      ))}
+    </ol>
+  )
+}

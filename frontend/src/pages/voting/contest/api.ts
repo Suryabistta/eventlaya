@@ -641,6 +641,8 @@ export const contestApi = {
   updateContestant: (id: string, cid: string, body: ContestantInput) => request<Contestant>(`${C}${id}/contestants/${cid}/`, json('PATCH', body)),
   removeContestant: (id: string, cid: string) => request<null>(`${C}${id}/contestants/${cid}/`, json('DELETE')),
   bulkAdd: (id: string, contestants: ContestantInput[]) => request<Contestant[]>(`${C}${id}/contestants/bulk/`, json('POST', { contestants })),
+  /** Accepted applications of the event (applications stage) become contestants; already added ones are skipped */
+  fromApplications: (id: string) => request<Contestant[]>(`${C}${id}/contestants/from-applications/`, json('POST', {})),
   importCsv: (id: string, csv: string) => request<Contestant[]>(`${C}${id}/contestants/import/`, json('POST', { csv })),
   reorder: (id: string, ids: string[], renumber = false) => request<Contestant[]>(`${C}${id}/contestants/reorder/`, json('POST', { ids, renumber })),
 
