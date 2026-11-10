@@ -159,7 +159,7 @@ type Draft = Pick<
   | 'free_votes_enabled' | 'votes_per_voter' | 'votes_per_day' | 'votes_per_round' | 'votes_per_contestant' | 'contestant_cap_period'
   | 'allow_split' | 'max_votes_per_submit' | 'paid_votes_enabled' | 'price_per_vote' | 'max_packs_per_day' | 'buy_and_vote' | 'captcha_enabled' | 'ip_votes_per_minute'
   | 'device_votes_per_minute' | 'flag_ip_burst' | 'flag_subnet_burst' | 'flag_device_voters' | 'transparency_note' | 'show_transparency'
-  | 'judges_see_others' | 'show_judge_breakdown' | 'placement_titles' | 'rounds' | 'profile_fields' | 'vote_packs'
+  | 'judges_see_others' | 'show_judge_breakdown' | 'placement_titles' | 'rounds' | 'profile_fields' | 'vote_packs' | 'contestant_notify'
 > & { categories: (ContestCategory & { round_ref: string; criterion_ref: string })[] }
 
 const DRAFT_KEYS: (keyof Draft)[] = [
@@ -168,7 +168,7 @@ const DRAFT_KEYS: (keyof Draft)[] = [
   'votes_per_day', 'votes_per_round', 'votes_per_contestant', 'contestant_cap_period', 'allow_split', 'max_votes_per_submit',
   'paid_votes_enabled', 'price_per_vote', 'max_packs_per_day', 'buy_and_vote', 'captcha_enabled', 'ip_votes_per_minute', 'device_votes_per_minute', 'flag_ip_burst',
   'flag_subnet_burst', 'flag_device_voters', 'transparency_note', 'show_transparency', 'judges_see_others', 'show_judge_breakdown',
-  'placement_titles', 'rounds', 'profile_fields', 'vote_packs', 'categories',
+  'placement_titles', 'rounds', 'profile_fields', 'vote_packs', 'categories', 'contestant_notify',
 ]
 
 function toDraft(c: Contest): Draft {
@@ -834,6 +834,18 @@ const ResultsSection: React.FC<Omit<SectionProps, 'contest'>> = ({ draft, set })
       options={Object.entries(visibilityInfo).map(([value, label]) => ({ value, label }))}
     />
     {draft.results_visibility === 'top_n' && <LimitField label="How many to show" value={draft.results_top_n} onChange={(v) => set('results_top_n', v ?? 3)} className="max-w-xs" />}
+    <Select
+      label="Notify contestants"
+      hint="When they're added, when a round is decided and when winners are announced. Uses the email and phone from their application. SMS needs an Aakash SMS account on the server."
+      value={draft.contestant_notify ?? 'email'}
+      onChange={(e) => set('contestant_notify', e.target.value as Draft['contestant_notify'])}
+      containerClassName="max-w-md"
+    >
+      <option value="off">Off</option>
+      <option value="email">Email</option>
+      <option value="sms">SMS</option>
+      <option value="both">Email and SMS</option>
+    </Select>
     <Toggle label="Show the judges / public split in public results" hint="Only when vote counts are shown." checked={draft.show_judge_breakdown} onChange={(v) => set('show_judge_breakdown', v)} />
     <div className="space-y-2">
       <p className="text-sm font-medium text-ink-800">Placement titles (for the winner reveal)</p>

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { SalesSection } from './analytics/SalesSection'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { BarChart3, CalendarDays, ClipboardList, Download, ScanLine, Wallet } from 'lucide-react'
@@ -227,6 +228,7 @@ export default function EventAnalyticsPage() {
         ) : (
           <>
             <AttendanceSection analytics={analytics} />
+            <SalesSection analytics={analytics} />
             <TicketTypesSection analytics={analytics} />
           </>
         )}

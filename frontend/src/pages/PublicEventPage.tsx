@@ -1005,15 +1005,16 @@ const StageTimeline: React.FC<{ event: PublicEvent }> = ({ event }) => {
   const stages = event.stages ?? []
   const label = (s: EventStage) => {
     const when = s.closes_at ? new Date(s.closes_at) : s.opens_at ? new Date(s.opens_at) : null
+    if (s.kind === 'results') return s.opens_at ? `Announced ${formatDate(s.opens_at, 'short')}` : 'Announced'
     if (s.state === 'open') return s.closes_at ? `Open until ${formatDate(s.closes_at, 'short')}` : 'Open now'
     if (s.state === 'closed') return when ? `Closed ${formatDate(when, 'short')}` : 'Closed'
     if (s.kind === 'tickets') return s.date ? formatDate(s.date, 'medium') : 'Date to be announced'
     return s.opens_at ? `Opens ${formatDate(s.opens_at, 'short')}` : 'Coming up'
   }
   const button = (s: EventStage) =>
-    s.kind === 'applications' ? s.cta || 'Apply' : s.kind === 'voting' ? 'Vote now' : bookLabel(event)
+    s.kind === 'applications' ? s.cta || 'Apply' : s.kind === 'voting' ? 'Vote now' : s.kind === 'results' ? 'See winners' : bookLabel(event)
   return (
-    <ol aria-label="Event stages" className="mt-6 grid gap-3 sm:grid-cols-3">
+    <ol aria-label="Event stages" className={cn('mt-6 grid gap-3', stages.length > 3 ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3')}>
       {stages.map((s, i) => (
         <li
           key={`${s.kind}-${i}`}
@@ -1023,7 +1024,7 @@ const StageTimeline: React.FC<{ event: PublicEvent }> = ({ event }) => {
           )}
         >
           <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
-            Step {i + 1} · {s.kind === 'applications' ? 'Applications' : s.kind === 'voting' ? 'Voting' : 'Event'}
+            Step {i + 1} · {s.kind === 'applications' ? 'Applications' : s.kind === 'voting' ? 'Voting' : s.kind === 'results' ? 'Results' : 'Event'}
           </p>
           <p className="mt-1 font-semibold text-ink-900">{s.title}</p>
           <p className={cn('text-sm', s.state === 'open' ? 'font-medium text-brand-700' : 'text-ink-600')}>{label(s)}</p>

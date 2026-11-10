@@ -177,7 +177,10 @@ export const AttendanceSection: React.FC<{ analytics: EventAnalytics }> = ({ ana
                   <li key={gate}>
                     <div className="flex items-baseline justify-between gap-3 text-sm">
                       <span className="min-w-0 truncate font-medium text-ink-700">{gate}</span>
-                      <span className="font-semibold tabular text-ink-900">{count.toLocaleString()}</span>
+                      <span className="font-semibold tabular text-ink-900">
+                        {count.toLocaleString()}
+                        {analytics.gate_checkin?.[i] && <span className="ml-1.5 font-normal text-ink-500">({analytics.gate_checkin[i].rate_pct}% of registered)</span>}
+                      </span>
                     </div>
                     <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-ink-100" aria-hidden>
                       <div className="h-full rounded-full bg-brand-600" style={{ width: `${(count / max) * 100}%` }} />

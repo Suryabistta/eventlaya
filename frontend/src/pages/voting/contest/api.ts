@@ -142,6 +142,10 @@ export interface Contest {
   judges_see_others: boolean
   show_judge_breakdown: boolean
   placement_titles: string[]
+  /** Contestant notifications: added, round decided, winners announced */
+  contestant_notify: 'off' | 'email' | 'sms' | 'both'
+  announcement: string
+  winners_announced_at: string | null
   rounds: ContestRound[]
   categories: ContestCategory[]
   profile_fields: ProfileField[]
@@ -491,6 +495,9 @@ export interface PublicContestant {
 
 export interface PublicContest {
   id: string
+  /** Winners announced by the organizer (message shown above the results) */
+  winners_announced_at?: string | null
+  announcement?: string
   kind: 'contest'
   slug: string
   title: string
@@ -650,6 +657,9 @@ export const contestApi = {
     request<Contest | { message: string }>(`${C}${id}/rounds/${rid}/${action}/`, json('POST', body ?? {})),
 
   results: (id: string) => request<ContestResults>(`${C}${id}/results/`),
+  /** Announce winners (results public, placed contestants notified); {undo: true} takes it back */
+  announce: (id: string, body: { announcement?: string; undo?: boolean }) =>
+    request<{ winners_announced_at: string | null; winners?: { id: string; name: string; rank: number; title: string }[] }>(`${C}${id}/announce/`, json('POST', body)),
   roundResults: (id: string, rid: string) => request<Standings>(`${C}${id}/results/?round=${rid}`),
   dashboard: (id: string) => request<Dashboard>(`${C}${id}/dashboard/`),
 

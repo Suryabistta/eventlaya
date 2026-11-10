@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import { formatDateTime } from '@/lib/dates'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -248,6 +249,7 @@ const ResultsTab: React.FC<{ contest: Contest }> = ({ contest }) => {
 
   return (
     <div className="space-y-4">
+      <AnnouncePanel contest={contest} />
       <div className="-mx-4 overflow-x-auto px-4">
         <div className="flex w-max gap-1.5" role="group" aria-label="Show results for">
           {!contest.rounds.length && <Chip active={sel === 'overall'} onClick={() => setSel('overall')}>Overall</Chip>}
@@ -815,3 +817,48 @@ const PaidTab: React.FC<{ contest: Contest }> = ({ contest }) => {
 }
 
 export type { StandingRow }
+
+/** Announce winners: results become public, the event timeline shows Results, placed contestants are notified. */
+const AnnouncePanel: React.FC<{ contest: Contest }> = ({ contest }) => {
+  const toast = useToast()
+  const qc = useQueryClient()
+  const [text, setText] = useState(contest.announcement ?? '')
+  const announce = useMutation({
+    mutationFn: (undo: boolean) => contestApi.announce(contest.id, undo ? { undo: true } : { announcement: text }),
+    onSuccess: (r, undo) => {
+      void qc.invalidateQueries()
+      toast.success(undo ? 'Announcement taken back' : `Winners announced${r.winners?.length ? `: ${r.winners.map((w) => w.name).join(', ')}` : ''}`)
+    },
+    onError: (e: Error) => toast.error('Couldn’t announce', e.message),
+  })
+  if (contest.winners_announced_at) {
+    return (
+      <Card className="flex flex-wrap items-center justify-between gap-3 border-emerald-200 bg-emerald-50 p-4">
+        <p className="text-sm text-emerald-900">
+          <span className="font-semibold">Winners announced</span> {formatDateTime(contest.winners_announced_at)}. Results are public and on the event page.
+        </p>
+        <Button variant="secondary" size="sm" loading={announce.isPending} onClick={() => announce.mutate(true)}>
+          Take back
+        </Button>
+      </Card>
+    )
+  }
+  return (
+    <Card className="space-y-3 p-4">
+      <p className="text-sm font-semibold text-ink-900">Announce the winners</p>
+      <Textarea label="Message (optional)" rows={2} maxLength={2000} placeholder="Congratulations to Miss Koshi 2083 and the runners-up!" value={text} onChange={(e) => setText(e.target.value)} />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-ink-500">
+          Uses the decided final round (or the current standings). Results become public and placed contestants are notified
+          {contest.contestant_notify === 'off' ? ' (notifications are off)' : ''}.
+        </p>
+        <Button
+          loading={announce.isPending}
+          onClick={() => window.confirm('Announce the winners now? Everyone will see the results.') && announce.mutate(false)}
+        >
+          Announce winners
+        </Button>
+      </div>
+    </Card>
+  )
+}

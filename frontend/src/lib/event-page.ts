@@ -346,7 +346,7 @@ export interface PublicApplications {
 
 /** One stage of the event's timeline (apps.events.views.event_stages). */
 export interface EventStage {
-  kind: 'applications' | 'voting' | 'tickets'
+  kind: 'applications' | 'voting' | 'results' | 'tickets'
   title: string
   cta: string | null
   state: 'upcoming' | 'open' | 'closed'

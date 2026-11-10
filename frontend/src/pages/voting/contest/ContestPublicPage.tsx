@@ -259,6 +259,12 @@ const ContestHeader: React.FC<{ contest: PublicContest; slug: string }> = ({ con
           )}
         </div>
         <h1 className="font-display text-3xl font-bold text-ink-900 sm:text-4xl">{contest.title}</h1>
+        {contest.winners_announced_at && (
+          <div className="rounded-2xl border border-marigold-300 bg-marigold-50 px-5 py-4 text-marigold-950">
+            <p className="font-display text-lg font-bold">🏆 Winners announced</p>
+            {contest.announcement && <p className="mt-1 whitespace-pre-line">{contest.announcement}</p>}
+          </div>
+        )}
         {contest.description && <p className="max-w-3xl whitespace-pre-line text-ink-600">{contest.description}</p>}
       </div>
       <VotingStatusLine contest={contest} />

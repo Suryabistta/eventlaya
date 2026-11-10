@@ -467,6 +467,10 @@ export interface EventAnalytics {
     gate_in: number[]
     gate_out: number[]
   }
+  /** Ticket sales by day (Rs): received vs still due, online vs at the venue */
+  sales_chart?: { labels: string[]; received: number[]; due: number[]; online: number[]; venue: number[]; total: number }
+  /** Check-ins per gate as a share of everyone registered */
+  gate_checkin?: { gate: string; checked_in: number; rate_pct: number }[]
   gate_distribution_chart: {
     labels: string[]
     counts: number[]
