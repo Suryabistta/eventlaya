@@ -59,7 +59,9 @@ grep -q '^GA_MEASUREMENT_ID=' /srv/eventlaya/.env || echo 'GA_MEASUREMENT_ID=G-L
 mkdir -p /var/log/eventlaya && chown eventlaya:eventlaya /var/log/eventlaya
 install -m 644 /tmp/eventlaya-deploy/logrotate-eventlaya /etc/logrotate.d/eventlaya
 PAY_CRON='*/2 * * * * cd /srv/eventlaya/backend && set -a && . /srv/eventlaya/.env && set +a && .venv/bin/python manage.py expire_payments >> /var/log/eventlaya/payments.log 2>&1'
-( crontab -u eventlaya -l 2>/dev/null | grep -v 'manage.py expire_payments' || true; echo "$PAY_CRON" ) | crontab -u eventlaya -
+# Guest reminders (apps/events/guests.py): the day before and ~2 hours before each event, every 10 minutes
+REMIND_CRON='*/10 * * * * cd /srv/eventlaya/backend && set -a && . /srv/eventlaya/.env && set +a && .venv/bin/python manage.py send_event_reminders >> /var/log/eventlaya/reminders.log 2>&1'
+( crontab -u eventlaya -l 2>/dev/null | grep -v 'manage.py expire_payments' | grep -v 'manage.py send_event_reminders' || true; echo "$PAY_CRON"; echo "$REMIND_CRON" ) | crontab -u eventlaya -
 cd /srv/eventlaya/backend
 sudo -u eventlaya bash -c '
   set -euo pipefail

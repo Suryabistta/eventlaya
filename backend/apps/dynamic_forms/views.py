@@ -80,6 +80,9 @@ class EventRegisterView(APIView):
 
         if not name or not email:
             return Response({'error': 'Name and Email are required.'}, status=status.HTTP_400_BAD_REQUEST)
+        phone_problem = phone_error(phone, event.phone_required)
+        if phone_problem:
+            return Response({'error': phone_problem, 'field': 'phone'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             items = self._parse_items(request.data)
@@ -419,6 +422,9 @@ class ApplyView(APIView):
         phone = (request.data.get('phone') or '').strip()[:30]
         if not name or not email:
             return Response({'error': 'Name and email are required.'}, status=status.HTTP_400_BAD_REQUEST)
+        phone_problem = phone_error(phone, event.phone_required)
+        if phone_problem:
+            return Response({'error': phone_problem, 'field': 'phone'}, status=status.HTTP_400_BAD_REQUEST)
         form = event.application_form
         earlier = FormResponse.objects.filter(event=event, form=form, ticket__isnull=True, submitter_email__iexact=email).first()
         if earlier:
@@ -459,3 +465,15 @@ class EventApplicationsView(APIView):
             return Response({'error': 'Only the organizer can see applications.'}, status=status.HTTP_403_FORBIDDEN)
         qs = FormResponse.objects.filter(event=event, ticket__isnull=True).prefetch_related('answers', 'answers__field')
         return Response(FormResponseSerializer(qs, many=True).data)
+
+
+def phone_error(phone, required):
+    """Organizers need a number to reach guests (Event.phone_required, on by default)."""
+    if not required:
+        return None
+    if not phone:
+        return 'Enter your mobile number.'
+    digits = sum(c.isdigit() for c in phone)
+    if digits < 7 or digits > 15:
+        return 'Enter a valid mobile number.'
+    return None

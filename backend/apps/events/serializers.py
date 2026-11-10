@@ -21,6 +21,14 @@ class EventTicketSerializer(serializers.ModelSerializer):
             'order_reference', 'guest_number', 'payment', 'seat_number', 'pass_layout',
         ]
 
+    def to_representation(self, obj):
+        data = super().to_representation(obj)
+        # Guest tags and host notes are for organizers and gate staff only (context staff=True)
+        if self.context.get('staff'):
+            data['guest_tags'] = obj.guest_tags
+            data['host_note'] = obj.host_note
+        return data
+
     def get_seat_number(self, obj):
         """Attendee-facing by default; organizer and gate views pass context={'staff': True}."""
         from .seats import visible_seat
@@ -87,6 +95,8 @@ class EventSerializer(serializers.ModelSerializer):
     registration_open = serializers.SerializerMethodField()
     registration_closed_reason = serializers.SerializerMethodField()
     category_name = serializers.SerializerMethodField()
+    # New events ask for a phone number unless the organizer turns it off
+    phone_required = serializers.BooleanField(default=True)
 
     class Meta:
         model = Event
@@ -100,6 +110,7 @@ class EventSerializer(serializers.ModelSerializer):
             'max_tickets_per_order', 'show_spots_left',
             'managed_by', 'managed_by_logo', 'show_managed_by', 'managed_by_label', 'ticket_layout', 'show_seat_number', 'registration_mode', 'cta_label',
             'tickets_enabled', 'date_tba', 'applications_enabled', 'application_form', 'applications_close', 'application_cta',
+            'phone_required', 'arrival_alerts', 'reminders_enabled',
             'parent', 'parent_title',
         ]
         read_only_fields = ['id', 'organizer', 'is_featured', 'created_at', 'updated_at']

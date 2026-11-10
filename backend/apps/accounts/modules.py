@@ -52,6 +52,8 @@ MODULES = [
      'scanned at the gate like online passes.', 'Printer', 19, ['organizer', 'staff']),
     ('applications', 'Applications', 'Events take applications or submissions (film festivals, pageants, auditions) '
      'with their own form; organizers accept or decline each one.', 'FileCheck', 20, ['organizer', 'staff', 'attendee']),
+    ('guest_management', 'Guest management', 'Guest tags and notes, arrival alerts for the host, messages and reminders '
+     'to guests.', 'UserCheck', 21, ['organizer', 'staff']),
 ]
 
 # A module is only on when every module it requires is on too (for the same user).
@@ -72,6 +74,7 @@ PATH_MODULES = [
     (re.compile(r'^/api/events/my-assignment/'), 'gate_scanner'),
     (re.compile(r'^/api/events/[0-9a-f-]{36}/(gate|gates|tickets|export-attendees|broadcast)/'), 'gate_scanner'),
     (re.compile(r'^/api/events/[0-9a-f-]{36}/export-applications/'), 'applications'),
+    (re.compile(r'^/api/events/[0-9a-f-]{36}/(guests|guest-messages|arrivals)/'), 'guest_management'),
     (re.compile(r'^/api/events/'), 'events'),
     (re.compile(r'^/api/forms/events/[^/]+/register/'), 'events'),  # attendee registration belongs to events
     (re.compile(r'^/api/forms/events/[^/]+/upload/'), 'events'),  # files for registration and application answers

@@ -1,3 +1,4 @@
+from . import guests
 from . import batches
 from .seats import EventSeatsView
 from django.urls import path, include
@@ -51,5 +52,8 @@ urlpatterns = [
     path('<uuid:event_id>/broadcast/', EventBroadcastNotificationView.as_view(), name='event_broadcast'),
     path('<uuid:event_id>/export-attendees/', ExportAttendeesCSVView.as_view(), name='export_attendees_csv'),
     path('<uuid:event_id>/export-applications/', ExportApplicationsCSVView.as_view(), name='export_applications_csv'),
+    path('<uuid:pk>/guests/<uuid:ticket_id>/', guests.GuestUpdateView.as_view(), name='event_guest_update'),
+    path('<uuid:pk>/arrivals/', guests.ArrivalsView.as_view(), name='event_arrivals'),
+    path('<uuid:pk>/guest-messages/', guests.GuestMessagesView.as_view(), name='event_guest_messages'),
     path('', include(router.urls)),
 ]

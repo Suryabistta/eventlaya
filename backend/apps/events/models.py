@@ -115,6 +115,22 @@ class Event(models.Model):
     applications_close = models.DateTimeField(null=True, blank=True)
     application_cta = models.CharField(max_length=30, blank=True, help_text='Apply button text; blank = "Apply"')
 
+    # Guests (docs/plan-2026-11-guest-management.md)
+    # On for every event created in the app (EventSerializer default) and for events that existed before
+    phone_required = models.BooleanField(default=False, help_text='Registrations and applications must give a phone number')
+
+    class ArrivalAlerts(models.TextChoices):
+        TAGGED = 'tagged', 'Tagged guests only'
+        ALL = 'all', 'Every guest'
+        OFF = 'off', 'Off'
+
+    # Push to the organizer and staff when a guest is scanned in for the first time (module guest_management)
+    arrival_alerts = models.CharField(max_length=10, choices=ArrivalAlerts.choices, default=ArrivalAlerts.TAGGED)
+    # Reminder emails the day before and ~2 hours before the start (send_event_reminders, every 10 minutes)
+    reminders_enabled = models.BooleanField(default=True)
+    reminder_day_sent_at = models.DateTimeField(null=True, blank=True)
+    reminder_soon_sent_at = models.DateTimeField(null=True, blank=True)
+
     @property
     def registration_only(self):
         """No pass or check-in for the audience."""
@@ -315,6 +331,9 @@ class EventTicket(models.Model):
     order = models.ForeignKey('TicketOrder', null=True, blank=True, on_delete=models.SET_NULL, related_name='tickets')
     guest_number = models.PositiveSmallIntegerField(default=0)
     seat_number = models.CharField(max_length=20, blank=True)
+    # Guest management (module guest_management): tags like VIP / Press and a note only organizers and staff see
+    guest_tags = models.JSONField(default=list, blank=True)
+    host_note = models.TextField(blank=True)
     # Printed tickets for physical sales (TicketBatch); null for online registrations
     batch = models.ForeignKey('TicketBatch', null=True, blank=True, on_delete=models.SET_NULL, related_name='tickets')
     is_attended = models.BooleanField(default=False)
@@ -747,3 +766,19 @@ class TicketBatch(models.Model):
 
     def __str__(self):
         return f'{self.name} × {self.quantity}'
+
+
+class GuestMessage(models.Model):
+    """A message the organizer sent to guests (email, plus app push to guests with the app). Module guest_management."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='guest_messages')
+    subject = models.CharField(max_length=150)
+    body = models.TextField(max_length=3000)
+    # all | not_arrived | inside | tag:<tag> | type:<ticket type id>
+    audience = models.CharField(max_length=80, default='all')
+    recipients = models.PositiveIntegerField(default=0)
+    sent_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']

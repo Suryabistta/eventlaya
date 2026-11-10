@@ -92,7 +92,7 @@ class StagesTests(APITestCase):
         self.apply_url = f'/api/forms/events/{self.event.slug}/apply/'
 
     def apply(self, email='ram@x.com', link='https://vimeo.com/1'):
-        return self.client.post(self.apply_url, {'name': 'Ram', 'email': email, 'answers': {str(self.link.id): link}}, format='json')
+        return self.client.post(self.apply_url, {'name': 'Ram', 'email': email, 'phone': '9812345678', 'answers': {str(self.link.id): link}}, format='json')
 
     def test_applications_only_event_has_no_date_or_venue_yet(self):
         self.assertEqual((self.event.location, self.event.start_date), ('To be announced', self.close.date()))
@@ -131,6 +131,8 @@ class StagesTests(APITestCase):
         self.client.force_authenticate(None)
         self.assertEqual(self.apply().status_code, 201)
         r = self.client.post(f'/api/forms/events/{self.event.slug}/register/', {'name': 'Viewer', 'email': 'v@x.com'}, format='json')
+        self.assertEqual((r.status_code, r.data.get('field')), (400, 'phone'))  # phone is required by default
+        r = self.client.post(f'/api/forms/events/{self.event.slug}/register/', {'name': 'Viewer', 'email': 'v@x.com', 'phone': '9812345678'}, format='json')
         self.assertEqual(r.status_code, 201, r.data)
         self.assertEqual(EventTicket.objects.filter(event=self.event).count(), 1)  # only the viewer has a ticket
 

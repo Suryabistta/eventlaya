@@ -514,6 +514,10 @@ class GateScanView(APIView):
                 device_info=device_info
             )
 
+            if not is_reentry:
+                from .guests import notify_arrival
+                notify_arrival(ticket, gate_name)
+
             # Trigger capacity milestone notification if reached
             current_inside = event.tickets.filter(status=EventTicket.Status.CHECKED_IN).count()
             notify_capacity_milestone(event, current_inside, event.capacity)
