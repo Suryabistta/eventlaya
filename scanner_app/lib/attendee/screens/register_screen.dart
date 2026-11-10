@@ -157,6 +157,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   List<FormFieldSpec> get _mapped => _fields.where((f) => f.builtin != null && !f.isFileUpload).toList();
 
   /// Event questions asked on this page.
+  /// Questions this person is asked: conditions on their answers and the ticket types they chose.
+  List<FormFieldSpec> get _shown =>
+      _questions.where((f) => f.visible(_answers, _ticketed ? [for (final t in _chosen) t.id] : null)).toList();
+
   List<FormFieldSpec> get _questions =>
       _fields.where((f) => f.builtin == null && !f.isFileUpload && !(f.isConsent && f.required)).toList();
 
@@ -281,7 +285,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _validateExtras() {
     var ok = true;
     _choiceErrors.clear();
-    for (final f in _questions) {
+    for (final f in _shown) {
       if (!f.required) continue;
       final v = _answers[f.id];
       final empty = v == null || v == '' || (v is List && v.isEmpty);
@@ -339,6 +343,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     for (final f in _mapped) {
       answers[f.id] = switch (f.builtin) { 'name' => name, 'email' => email, _ => phone };
     }
+    // Answers to questions that ended up hidden are not sent
+    final shown = {for (final f in _shown) f.id};
+    answers.removeWhere((k, _) => _questions.any((q) => q.id == k) && !shown.contains(k));
     final count = _ticketed ? _total : 1;
     final due = _due;
     if (_payBlocked != null) {
@@ -874,10 +881,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
               ],
             ),
-          if (_questions.isNotEmpty)
+          if (_shown.isNotEmpty)
             GroupedSection(
               header: widget.form?.title.isNotEmpty == true ? widget.form!.title : 'Event questions',
-              children: [for (final f in _questions) _questionRow(f)],
+              children: [for (final f in _shown) _questionRow(f)],
             ),
           if (_consents.isNotEmpty)
             GroupedSection(

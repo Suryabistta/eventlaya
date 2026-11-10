@@ -365,6 +365,13 @@ class FormFieldSpec {
   final bool required;
   final List<String> options;
 
+  /// Conditional question: shown only when the answer to [showIfField] is one of [showIfValues] (any when empty).
+  final String? showIfField;
+  final List<String> showIfValues;
+
+  /// Only for buyers of these ticket types (empty = everyone).
+  final List<String> ticketTypes;
+
   const FormFieldSpec({
     required this.id,
     required this.type,
@@ -373,7 +380,20 @@ class FormFieldSpec {
     this.helpText = '',
     this.required = false,
     this.options = const [],
+    this.showIfField,
+    this.showIfValues = const [],
+    this.ticketTypes = const [],
   });
+
+  /// Same rule as the server's is_visible: ticket types chosen (when [typeIds] is given) and the condition holds.
+  bool visible(Map<String, dynamic> answers, [List<String>? typeIds]) {
+    if (typeIds != null && ticketTypes.isNotEmpty && !ticketTypes.any(typeIds.contains)) return false;
+    if (showIfField == null) return true;
+    final v = answers[showIfField];
+    if (v is List) return v.isNotEmpty && (showIfValues.isEmpty || v.any((x) => showIfValues.contains(x.toString())));
+    if (v == null || v == '' || v == false) return false;
+    return showIfValues.isEmpty || showIfValues.contains(v.toString());
+  }
 
   factory FormFieldSpec.fromJson(Map<String, dynamic> j) => FormFieldSpec(
         id: j['id']?.toString() ?? '',
@@ -382,6 +402,12 @@ class FormFieldSpec {
         placeholder: _str(j['placeholder']) ?? '',
         helpText: _str(j['help_text']) ?? '',
         required: j['required'] == true,
+        showIfField: j['show_if'] is Map ? _str((j['show_if'] as Map)['field']) : null,
+        showIfValues: [
+          if (j['show_if'] is Map && (j['show_if'] as Map)['values'] is List)
+            for (final v in (j['show_if'] as Map)['values'] as List) v.toString(),
+        ],
+        ticketTypes: [if (j['ticket_types'] is List) for (final t in j['ticket_types'] as List) t.toString()],
         options: [
           if (j['options'] is List)
             for (final o in j['options'] as List)

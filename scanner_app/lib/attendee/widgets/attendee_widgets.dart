@@ -303,6 +303,7 @@ TicketPass passWidget(StoredPass p, {Color notchColor = AppColors.background}) {
     notchColor: notchColor,
     landscape: p.isLandscape,
     fields: [
+      if (p.bibNumber.isNotEmpty && p.bibNumber != 'null') PassField('Bib', p.bibNumber),
       if (p.seatNumber.isNotEmpty) PassField('Seat', p.seatNumber),
       ...ticketTypeFields(p.ticketType),
       if (p.attendeeEmail.isNotEmpty) PassField('Email', p.attendeeEmail),

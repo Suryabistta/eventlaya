@@ -27,6 +27,9 @@ export interface Event {
   phone_required?: boolean
   arrival_alerts?: 'tagged' | 'all' | 'off'
   reminders_enabled?: boolean
+  /** Race bibs: each registration gets the next number from bib_start */
+  bib_numbers?: boolean
+  bib_start?: number
   /** Main button text set by the organizer ('' = from the registration type) */
   cta_label?: string
   title: string
@@ -92,6 +95,10 @@ export interface FormField {
   options?: string[]
   /** Checked on the website, in the app and on the server (apps/dynamic_forms/validation.py) */
   validation_rules?: FieldRules
+  /** Conditional question: shown only when that earlier answer is one of `values` (any value when empty) */
+  show_if?: { field?: string; values?: string[] }
+  /** Only for buyers of these ticket types (ids); empty = everyone */
+  ticket_types?: string[]
 }
 
 export interface FieldRules {
@@ -105,6 +112,8 @@ export interface FieldRules {
 
 export interface DynamicForm {
   id: string
+  /** Saved by the organizer to reuse on other events */
+  is_template?: boolean
   title: string
   slug: string
   description?: string
@@ -115,6 +124,8 @@ export interface DynamicForm {
 
 export interface Ticket {
   id: string
+  /** Race bib (events with bib numbers) */
+  bib_number?: number | null
   ticket_number: string
   qr_token: string
   attendee_name: string

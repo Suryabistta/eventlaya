@@ -6,7 +6,7 @@ import { request } from '@/services/api'
 import { eventPageApi } from '@/lib/event-page'
 import { useAuth } from '@/lib/auth'
 import { Button, ButtonLink, Card, EmptyState, ErrorState, Input, Skeleton } from '@/components/ui'
-import { DynamicField, EMAIL_RE, isEmpty, keyOf, ruleError } from './EventRegisterPage'
+import { DynamicField, EMAIL_RE, isEmpty, isVisible, keyOf, ruleError } from './EventRegisterPage'
 
 /**
  * Applications stage of an event (module `applications`): filmmakers, contestants and the like apply with the
@@ -59,7 +59,7 @@ export const ApplyPage: React.FC = () => {
     if (!EMAIL_RE.test(email.trim())) errs.email = 'Enter an email like name@example.com.'
     if (phoneRequired && (phone.replace(/\D/g, '').length < 7 || phone.replace(/\D/g, '').length > 15)) errs.phone = 'Enter your mobile number.'
     for (const f of fields) {
-      if (f.field_type === 'heading') continue
+      if (f.field_type === 'heading' || !isVisible(f, answers)) continue
       const v = answers[keyOf(f)]
       if (f.required && isEmpty(v)) errs[keyOf(f)] = ['image', 'file_upload'].includes(f.field_type) ? 'Upload a file.' : 'This field is required.'
       else if (!isEmpty(v)) {
@@ -175,7 +175,7 @@ export const ApplyPage: React.FC = () => {
                       autoComplete="tel"
                     />
                   </div>
-                  {fields.map((f) => (
+                  {fields.filter((f) => isVisible(f, answers)).map((f) => (
                     <DynamicField
                       key={keyOf(f)}
                       slug={slug}

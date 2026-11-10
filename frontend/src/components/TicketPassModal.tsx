@@ -125,6 +125,12 @@ const PassBody: React.FC<PassProps & { payLine: ReturnType<typeof passPaymentLin
               <dt className="text-xs text-ink-500">Status</dt>
               <dd className="font-semibold">{statusLabel[ticket.status] ?? ticket.status}</dd>
             </div>
+            {ticket.bib_number && (
+              <div className="col-span-2 min-w-0">
+                <dt className="text-xs text-ink-500">Bib</dt>
+                <dd className="font-display text-3xl font-bold tabular">{ticket.bib_number}</dd>
+              </div>
+            )}
             {ticket.seat_number && (
               <div className="col-span-2 min-w-0">
                 <dt className="text-xs text-ink-500">Seat</dt>

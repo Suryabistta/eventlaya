@@ -79,7 +79,7 @@ class _ApplyScreenState extends ConsumerState<ApplyScreen> {
   Future<void> _submit() async {
     _errors.clear();
     for (final f in _fields) {
-      if (!f.required || f.type == 'heading' || _text.containsKey(f.id)) continue;
+      if (!f.required || f.type == 'heading' || _text.containsKey(f.id) || !f.visible(_answers)) continue;
       final v = _answers[f.id];
       if (v == null || v == '' || (v is List && v.isEmpty)) _errors[f.id] = f.type == 'image' ? 'Add a photo' : 'Choose an answer';
     }
@@ -267,7 +267,7 @@ class _ApplyScreenState extends ConsumerState<ApplyScreen> {
                 ),
               ]),
               if (_fields.isNotEmpty)
-                GroupedSection(header: e.applicationForm?.title ?? 'Application', separatorInset: 16, children: [for (final f in _fields) _question(f)]),
+                GroupedSection(header: e.applicationForm?.title ?? 'Application', separatorInset: 16, children: [for (final f in _fields) if (f.visible(_answers)) _question(f)]),
               Padding(
                 padding: const EdgeInsets.fromLTRB(4, 8, 4, 24),
                 child: TextButton(

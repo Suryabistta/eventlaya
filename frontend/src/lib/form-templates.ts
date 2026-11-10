@@ -1,4 +1,4 @@
-import type { Event, FormField } from '@/services/api'
+import { api, type Event, type FormField } from '@/services/api'
 
 /** Ready-made registration forms by kind of event. Picking one adds the questions; the organizer edits from there. */
 export type TemplateField = Pick<FormField, 'label' | 'field_type' | 'required'> & Partial<Pick<FormField, 'options' | 'placeholder' | 'help_text' | 'validation_rules'>>
@@ -163,4 +163,22 @@ export function suggestedTemplate(event: Pick<Event, 'category' | 'registration_
       return by('wedding')
   }
   return undefined
+}
+
+/** Creates a template's questions on the form, after `afterOrder`, in order. */
+export async function addTemplateFields(formId: string, afterOrder: number, t: FormTemplate) {
+  let order = afterOrder
+  for (const f of t.fields) {
+    order += 1
+    await api.createFormField({ placeholder: '', help_text: '', options: [], validation_rules: {}, ...f, form: formId, order } as Partial<FormField>)
+  }
+}
+
+/** A published registration form from a template, linked to the event (used right after creating an event). */
+export async function createFormFromTemplate(event: Pick<Event, 'id' | 'title'>, t: FormTemplate) {
+  const slug = `${event.title}-registration`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'form'
+  const form = await api.createForm({ title: `${event.title} registration`, slug, event: event.id, status: 'published' })
+  await api.updateEvent(event.id, { registration_form: form.id })
+  await addTemplateFields(form.id, 0, t)
+  return form
 }

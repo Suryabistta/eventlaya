@@ -60,6 +60,9 @@ class StoredPass {
   /// Seat ("A-12"); empty when there is none or the event hides seats.
   final String seatNumber;
 
+  /// Race bib (events with bib numbers); empty when none.
+  final String bibNumber;
+
   /// 'vertical' (default) or 'landscape', chosen per event by the organizer.
   final String passLayout;
 
@@ -96,6 +99,7 @@ class StoredPass {
     this.paymentStatus,
     this.paymentLabel,
     this.seatNumber = '',
+    this.bibNumber = '',
     this.passLayout = 'vertical',
   });
 
@@ -135,6 +139,7 @@ class StoredPass {
       paymentStatus: _payStatus(t['payment']),
       paymentLabel: _payLabel(t['payment']),
       seatNumber: t['seat_number']?.toString() ?? '',
+      bibNumber: t['bib_number']?.toString() ?? '',
       passLayout: t['pass_layout']?.toString() ?? 'vertical',
     );
   }
@@ -185,6 +190,7 @@ class StoredPass {
       paymentStatus: _payStatus(t['payment']),
       paymentLabel: _payLabel(t['payment']),
       seatNumber: s(t, 'seat_number') ?? '',
+      bibNumber: s(t, 'bib_number') ?? '',
       passLayout: s(t, 'pass_layout') ?? 'vertical',
     );
   }
@@ -232,6 +238,7 @@ class StoredPass {
       paymentStatus: s('payment_status'),
       paymentLabel: s('payment_label'),
       seatNumber: s('seat_number') ?? '',
+      bibNumber: s('bib_number') ?? '',
       passLayout: s('pass_layout') ?? 'vertical',
     );
   }
@@ -267,6 +274,7 @@ class StoredPass {
         'payment_status': paymentStatus,
         'payment_label': paymentLabel,
         'seat_number': seatNumber,
+        'bib_number': bibNumber,
         'pass_layout': passLayout,
       };
 

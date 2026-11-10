@@ -304,6 +304,9 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
     return { lines, count, subtotal, discount: subtotal - total, total, promoCode: uses ? promo!.code : null, promoUnused: Boolean(promo && count > 0 && !uses) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [options, draft.quantities, promo])
+  // Questions this person is asked: conditions (show_if) on their answers, and the ticket types they chose
+  const chosenTypes = useMemo(() => pricing.lines.map((l) => l.type.id), [pricing.lines])
+  const shownQuestions = useMemo(() => questions.filter((f) => isVisible(f, draft.answers, chosenTypes)), [questions, draft.answers, chosenTypes])
 
   /** Highest quantity allowed for a type, given what else is in the order. */
   const maxFor = (t: TypeOption) => {
@@ -438,7 +441,7 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
       else if (draft.phone.trim() && draft.phone.replace(/\D/g, '').length < 7) e.phone = 'Enter a valid mobile number, e.g. +977 98XXXXXXXX.'
     }
     if (id === 'questions') {
-      for (const f of questions) {
+      for (const f of shownQuestions) {
         const k = keyOf(f)
         const v = draft.answers[k]
         if (f.field_type === 'heading') continue
@@ -489,7 +492,9 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
   const register = useMutation({
     mutationFn: () => {
       const builtinValue: Record<Builtin, string> = { name: draft.name.trim(), email: draft.email.trim(), phone: draft.phone.trim() }
-      const payload: Answers = { ...draft.answers }
+      // Answers to questions that ended up hidden are not sent
+      const shownIds = new Set(shownQuestions.map((f) => keyOf(f)))
+      const payload: Answers = Object.fromEntries(Object.entries(draft.answers).filter(([k]) => shownIds.has(k) || !questions.some((q) => keyOf(q) === k)))
       for (const f of mapped) payload[keyOf(f)] = builtinValue[builtinOf(f)!]
       return api.registerForEvent(slug, {
         ...builtinValue,
@@ -842,7 +847,7 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
                     )}
 
                     {step === 'questions' &&
-                      questions.map((f) => (
+                      shownQuestions.map((f) => (
                         <DynamicField key={keyOf(f)} slug={slug} field={f} value={draft.answers[keyOf(f)]} error={errors[keyOf(f)]} onChange={(v) => setAnswer(keyOf(f), v)} />
                       ))}
 
@@ -869,7 +874,7 @@ const Registration: React.FC<{ slug: string; event: PublicEvent; form: DynamicFo
                         pricing={pricing}
                         slots={slots}
                         draft={draft}
-                        questions={questions}
+                        questions={shownQuestions}
                         consents={consents}
                         errors={errors}
                         serverError={serverError}
@@ -1850,4 +1855,17 @@ const FileAnswer: React.FC<{ slug: string; field: FormField; value?: string; err
       {shown && <p className="text-xs font-medium text-red-600">{shown}</p>}
     </div>
   )
+}
+
+/** Whether a question is asked (same rule as the server's is_visible): its ticket types were chosen (when given)
+ * and its condition holds. `typeIds` undefined = don't filter by ticket type (Apply page). */
+export function isVisible(f: FormField, answers: Record<string, unknown>, typeIds?: string[]) {
+  if (typeIds && f.ticket_types?.length && !f.ticket_types.some((t) => typeIds.includes(t))) return false
+  const field = f.show_if?.field
+  if (!field) return true
+  const value = answers[field]
+  const wanted = f.show_if?.values ?? []
+  if (Array.isArray(value)) return value.length > 0 && (!wanted.length || value.some((v) => wanted.includes(String(v))))
+  if (value === undefined || value === null || value === '' || value === false) return false
+  return !wanted.length || wanted.includes(String(value))
 }

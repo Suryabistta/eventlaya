@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp, CalendarDays, Eye, FileText, LayoutTemplate, Lock, Pencil, Plus, Ticket as TicketIcon, Trash2, Upload } from 'lucide-react'
-import { FORM_TEMPLATES, suggestedTemplate, type FormTemplate } from '@/lib/form-templates'
+import { FORM_TEMPLATES, addTemplateFields, suggestedTemplate, type FormTemplate } from '@/lib/form-templates'
 import { api, request, type DynamicForm, type Event, type FieldRules, type FormField } from '@/services/api'
 import { useCurrentEvent } from '@/lib/event-context'
 import {
@@ -140,6 +140,16 @@ const NoForm: React.FC<{ event: Event; kind: FormKind }> = ({ event, kind }) => 
   const toast = useToast()
   const queryClient = useQueryClient()
   const [picking, setPicking] = useState(false)
+  // One of the organizer's saved forms: copied onto this event and linked
+  const reuse = useMutation({
+    mutationFn: (f: DynamicForm) => request<DynamicForm>(`/forms/${f.id}/duplicate/`, { method: 'POST', body: JSON.stringify({ event: event.id, link: kind }) }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['forms'] })
+      void queryClient.invalidateQueries({ queryKey: ['events'] })
+      toast.success('Form added from your template', 'Edit any question for this event.')
+    },
+    onError: (err: Error) => toast.error('Couldn’t use the template', err.message),
+  })
   const create = useMutation({
     mutationFn: async (template?: FormTemplate) => {
       const form = await api.createForm({
@@ -190,6 +200,10 @@ const NoForm: React.FC<{ event: Event; kind: FormKind }> = ({ event, kind }) => 
             setPicking(false)
             create.mutate(t)
           }}
+          onPickOwn={(f) => {
+            setPicking(false)
+            reuse.mutate(f)
+          }}
         />
       )}
     </Card>
@@ -205,10 +219,15 @@ interface FieldDraft {
   options: string
   /** Rule inputs as typed (empty = no rule) */
   rules: Record<keyof FieldRules, string>
+  /** Conditional: show only when this earlier question's answer is one of `showValues` */
+  showField: string
+  showValues: string[]
+  /** Only for buyers of these ticket types (empty = everyone) */
+  ticketTypes: string[]
 }
 
 const noRules: FieldDraft['rules'] = { min: '', max: '', max_length: '', min_age: '', max_age: '' }
-const blankDraft: FieldDraft = { label: '', field_type: 'text', placeholder: '', help_text: '', required: false, options: '', rules: noRules }
+const blankDraft: FieldDraft = { label: '', field_type: 'text', placeholder: '', help_text: '', required: false, options: '', rules: noRules, showField: '', showValues: [], ticketTypes: [] }
 
 /** Which rules apply to which answer type */
 const RULES_FOR: Partial<Record<FieldType, (keyof FieldRules)[]>> = {
@@ -235,6 +254,9 @@ const toDraft = (f: FormField): FieldDraft => ({
   required: f.required,
   options: (f.options ?? []).join('\n'),
   rules: Object.fromEntries(Object.keys(noRules).map((k) => [k, f.validation_rules?.[k as keyof FieldRules]?.toString() ?? ''])) as FieldDraft['rules'],
+  showField: f.show_if?.field ?? '',
+  showValues: f.show_if?.values ?? [],
+  ticketTypes: f.ticket_types ?? [],
 })
 
 const parseOptions = (s: string) =>
@@ -252,6 +274,18 @@ const Builder: React.FC<{ form: DynamicForm; event: Event; kind: FormKind }> = (
   const [draft, setDraft] = useState<FieldDraft>(blankDraft)
   const [busy, setBusy] = useState(false)
   const [picking, setPicking] = useState(false)
+
+  const saveAsTemplate = async () => {
+    const title = window.prompt('Name this template (you can reuse it on any event):', form.title)
+    if (!title?.trim()) return
+    try {
+      await request(`/forms/${form.id}/duplicate/`, { method: 'POST', body: JSON.stringify({ as_template: true, title: title.trim() }) })
+      void queryClient.invalidateQueries({ queryKey: ['forms'] })
+      toast.success('Saved to your templates', 'Pick it under “Your templates” when you start a form on another event.')
+    } catch (err) {
+      toast.error('Couldn’t save the template', (err as Error).message)
+    }
+  }
 
   const addTemplate = async (t: FormTemplate) => {
     setPicking(false)
@@ -288,6 +322,8 @@ const Builder: React.FC<{ form: DynamicForm; event: Event; kind: FormKind }> = (
         required: d.field_type === 'heading' ? false : d.required,
         options: hasOptions(d.field_type) ? parseOptions(d.options) : [],
         validation_rules: rulesBody(d),
+        show_if: d.showField ? { field: d.showField, values: d.showValues } : {},
+        ticket_types: d.ticketTypes,
       }
       if (editing === 'new') {
         const maxOrder = fields.reduce((m, f) => Math.max(m, f.order), 0)
@@ -461,6 +497,11 @@ const Builder: React.FC<{ form: DynamicForm; event: Event; kind: FormKind }> = (
               <Button size="sm" variant="ghost" icon={<LayoutTemplate className="h-4 w-4" />} disabled={busy} onClick={() => setPicking(true)}>
                 Add from template
               </Button>
+              {fields.length > 0 && (
+                <Button size="sm" variant="ghost" disabled={busy} onClick={() => saveAsTemplate()}>
+                  Save as template
+                </Button>
+              )}
             </div>
             {form.status === 'published' && (
               <Button size="sm" variant="ghost" loading={updateFormStatus.isPending} onClick={() => updateFormStatus.mutate('draft')}>
@@ -474,6 +515,8 @@ const Builder: React.FC<{ form: DynamicForm; event: Event; kind: FormKind }> = (
           <FieldEditor
             key={editing}
             isNew={editing === 'new'}
+            earlier={fields.filter((f) => f.id !== editing && ['select', 'radio', 'checkbox'].includes(f.field_type) && (f.options?.length ?? 0) > 0 && (editing === 'new' || f.order < (editingField?.order ?? 0)))}
+            ticketTypes={kind === 'registration' ? (event.ticket_types ?? []).map((t) => ({ id: t.id, name: t.name })) : []}
             draft={draft}
             onChange={setDraft}
             saving={saveField.isPending}
@@ -506,12 +549,15 @@ const RULE_LABEL: Record<keyof FieldRules, { label: string; hint: string }> = {
 
 const FieldEditor: React.FC<{
   isNew: boolean
+  /** Earlier choice questions a condition can depend on */
+  earlier: FormField[]
+  ticketTypes: { id: string; name: string }[]
   draft: FieldDraft
   onChange: (d: FieldDraft) => void
   saving: boolean
   onSave: () => void
   onCancel: () => void
-}> = ({ isNew, draft, onChange, saving, onSave, onCancel }) => {
+}> = ({ isNew, earlier, ticketTypes, draft, onChange, saving, onSave, onCancel }) => {
   const toast = useToast()
   const [submitted, setSubmitted] = useState(false)
   const set = <K extends keyof FieldDraft>(key: K, value: FieldDraft[K]) => onChange({ ...draft, [key]: value })
@@ -596,6 +642,63 @@ const FieldEditor: React.FC<{
           onChange={(e) => set('help_text', e.target.value)}
           hint="Optional"
         />
+        {earlier.length > 0 && (
+          <div className="space-y-2 rounded-xl border border-ink-200 p-3">
+            <Select
+              label="Show this question"
+              value={draft.showField}
+              onChange={(e) => onChange({ ...draft, showField: e.target.value, showValues: [] })}
+            >
+              <option value="">Always</option>
+              {earlier.map((f) => (
+                <option key={f.id} value={f.id}>
+                  Only if “{f.label}” is…
+                </option>
+              ))}
+            </Select>
+            {draft.showField && (
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Answers that show it">
+                {(earlier.find((f) => f.id === draft.showField)?.options ?? []).map((o) => {
+                  const on = draft.showValues.includes(o)
+                  return (
+                    <button
+                      key={o}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => set('showValues', on ? draft.showValues.filter((v) => v !== o) : [...draft.showValues, o])}
+                      className={cn('h-8 rounded-full border px-3 text-sm font-semibold', on ? 'border-ink-900 bg-ink-900 text-white' : 'border-ink-200 text-ink-700')}
+                    >
+                      {o}
+                    </button>
+                  )
+                })}
+                <p className="w-full text-xs text-ink-500">Pick the answers that show it. None picked = any answer.</p>
+              </div>
+            )}
+          </div>
+        )}
+        {ticketTypes.length > 1 && (
+          <div>
+            <p className="text-sm font-medium text-ink-800">Ask only buyers of</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {ticketTypes.map((t) => {
+                const on = draft.ticketTypes.includes(t.id)
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => set('ticketTypes', on ? draft.ticketTypes.filter((x) => x !== t.id) : [...draft.ticketTypes, t.id])}
+                    className={cn('h-8 rounded-full border px-3 text-sm font-semibold', on ? 'border-ink-900 bg-ink-900 text-white' : 'border-ink-200 text-ink-700')}
+                  >
+                    {t.name}
+                  </button>
+                )
+              })}
+            </div>
+            <p className="mt-1 text-xs text-ink-500">None picked = everyone.</p>
+          </div>
+        )}
         {draft.field_type !== 'heading' && (
         <label className="flex items-center gap-2.5 text-sm font-medium text-ink-800">
           <input
@@ -750,17 +853,18 @@ const ChoicePreview: React.FC<{ f: FormField; hint?: string }> = ({ f, hint }) =
         </fieldset>
 )
 
-/** Creates a template's questions on the form, after `afterOrder`, in order. */
-async function addTemplateFields(formId: string, afterOrder: number, t: FormTemplate) {
-  let order = afterOrder
-  for (const f of t.fields) {
-    order += 1
-    await api.createFormField({ placeholder: '', help_text: '', options: [], validation_rules: {}, ...f, form: formId, order } as Partial<FormField>)
-  }
-}
 
 /** Ready-made question sets by kind of event (lib/form-templates.ts); the one that fits the event comes first. */
-const TemplatePicker: React.FC<{ event: Event; onClose: () => void; onPick: (t: FormTemplate) => void; adding?: boolean }> = ({ event, onClose, onPick, adding }) => {
+const TemplatePicker: React.FC<{
+  event: Event
+  onClose: () => void
+  onPick: (t: FormTemplate) => void
+  /** The organizer's saved forms (only when starting a new form) */
+  onPickOwn?: (f: DynamicForm) => void
+  adding?: boolean
+}> = ({ event, onClose, onPick, onPickOwn, adding }) => {
+  const { data: forms = [] } = useQuery({ queryKey: ['forms'], queryFn: api.getForms, enabled: Boolean(onPickOwn) })
+  const own = forms.filter((f) => f.is_template)
   const suggested = suggestedTemplate(event)
   const list = suggested ? [suggested, ...FORM_TEMPLATES.filter((t) => t.id !== suggested.id)] : FORM_TEMPLATES
   return (
@@ -771,6 +875,26 @@ const TemplatePicker: React.FC<{ event: Event; onClose: () => void; onPick: (t: 
       title={adding ? 'Add questions from a template' : 'Start from a template'}
       description="Pick the closest match. You can edit, reorder or delete every question afterwards."
     >
+      {onPickOwn && own.length > 0 && (
+        <div className="mb-5">
+          <p className="mb-2 text-sm font-semibold text-ink-900">Your templates</p>
+          <ul className="grid gap-3 sm:grid-cols-2">
+            {own.map((f) => (
+              <li key={f.id}>
+                <button
+                  type="button"
+                  onClick={() => onPickOwn(f)}
+                  className="flex h-full w-full flex-col rounded-xl border border-brand-200 bg-brand-50/40 p-4 text-left hover:border-brand-400"
+                >
+                  <span className="font-semibold text-ink-900">{f.title}</span>
+                  <span className="mt-2 text-xs text-ink-500">{(f.fields ?? []).filter((x) => x.field_type !== 'heading').length} questions</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="mb-2 mt-5 text-sm font-semibold text-ink-900">Ready-made</p>
+        </div>
+      )}
       <ul className="grid gap-3 sm:grid-cols-2">
         {list.map((t) => (
           <li key={t.id}>

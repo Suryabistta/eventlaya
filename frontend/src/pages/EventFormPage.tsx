@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { FORM_TEMPLATES, createFormFromTemplate } from '@/lib/form-templates'
 import { formatDate } from '@/lib/dates'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -60,6 +61,10 @@ interface EventDraft {
   applications_close: string // datetime-local value
   application_cta: string
   phone_required: boolean
+  bib_numbers: boolean
+  bib_start: string
+  /** New events: start the registration form from this template ('' = none) */
+  form_template: string
   arrival_alerts: 'tagged' | 'all' | 'off'
   reminders_enabled: boolean
   parent: string
@@ -140,6 +145,9 @@ const emptyDraft: EventDraft = {
   applications_close: '',
   application_cta: '',
   phone_required: true,
+  bib_numbers: false,
+  bib_start: '1',
+  form_template: '',
   arrival_alerts: 'tagged',
   reminders_enabled: true,
   parent: '',
@@ -213,6 +221,9 @@ function fromEvent(ev: Event, page?: EventPageContent): EventDraft {
     applications_close: toLocalInput(ev.applications_close ?? undefined),
     application_cta: ev.application_cta ?? '',
     phone_required: ev.phone_required ?? true,
+    bib_numbers: ev.bib_numbers ?? false,
+    bib_start: String(ev.bib_start ?? 1),
+    form_template: '',
     arrival_alerts: ev.arrival_alerts ?? 'tagged',
     reminders_enabled: ev.reminders_enabled ?? true,
     parent: ev.parent ?? '',
@@ -282,7 +293,7 @@ const localToday = () => {
 const FIELD_STEP: Record<string, StepId> = {
   title: 'basics', tagline: 'basics', parent: 'basics', category: 'basics', description: 'basics', banner: 'basics', banner_url: 'basics',
   start_date: 'when', start_time: 'when', end_date: 'when', end_time: 'when', location: 'when', map_query: 'when',
-  capacity: 'registration', limit_spots: 'registration', show_spots_left: 'registration', status: 'registration', registration_deadline: 'registration', ticket_price: 'registration', is_paid: 'registration', allow_registration: 'registration', ticket_layout: 'registration', show_seat_number: 'registration', registration_mode: 'registration', cta_label: 'registration', tickets_enabled: 'stages', applications_enabled: 'stages', applications_close: 'stages', application_cta: 'stages', date_tba: 'when', phone_required: 'registration', arrival_alerts: 'registration', reminders_enabled: 'registration',
+  capacity: 'registration', limit_spots: 'registration', show_spots_left: 'registration', status: 'registration', registration_deadline: 'registration', ticket_price: 'registration', is_paid: 'registration', allow_registration: 'registration', ticket_layout: 'registration', show_seat_number: 'registration', registration_mode: 'registration', cta_label: 'registration', tickets_enabled: 'stages', applications_enabled: 'stages', applications_close: 'stages', application_cta: 'stages', date_tba: 'when', phone_required: 'registration', bib_numbers: 'registration', bib_start: 'registration', form_template: 'registration', arrival_alerts: 'registration', reminders_enabled: 'registration',
   managed_by: 'page', managed_by_label: 'page', managed_by_logo: 'page', show_managed_by: 'page',
 }
 
@@ -545,6 +556,8 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
         applications_close: draft.applications_close ? new Date(draft.applications_close).toISOString() : null,
         application_cta: draft.application_cta.trim(),
         phone_required: draft.phone_required,
+        bib_numbers: draft.bib_numbers,
+        bib_start: Math.max(1, Number(draft.bib_start) || 1),
         ...(guestsOn ? { arrival_alerts: draft.arrival_alerts, reminders_enabled: draft.reminders_enabled } : {}),
         ...(subEventsOn ? { parent: draft.parent || null } : {}),
         managed_by: draft.managed_by.trim(),
@@ -557,6 +570,15 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
         banner_url: draft.banner === initial.banner ? undefined : (draft.banner ?? ''),
       }
       const saved = event ? await api.updateEvent(event.id, body as unknown as Partial<Event>) : await api.createEvent(body as unknown as Partial<Event>)
+      // New event with a chosen template: its registration form is ready to edit in Forms
+      const template = !event && draft.form_template ? FORM_TEMPLATES.find((t) => t.id === draft.form_template) : undefined
+      if (template) {
+        try {
+          await createFormFromTemplate(saved, template)
+        } catch {
+          toast.error('Event saved, but the form wasn’t created', 'Add it from Forms.')
+        }
+      }
       try {
         await eventPageApi.put(saved.id, {
           map_query: draft.map_query.trim(),
@@ -916,6 +938,30 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
 
                 {step.id === 'registration' && (
                   <>
+                    {!isEdit && (
+                      <Select
+                        label="Registration form"
+                        hint="Start the questions from a ready-made form; you can edit them in Forms after saving."
+                        value={draft.form_template}
+                        onChange={(e) => set('form_template', e.target.value)}
+                      >
+                        <option value="">Name, email and phone only (add questions later)</option>
+                        {FORM_TEMPLATES.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name}
+                          </option>
+                        ))}
+                      </Select>
+                    )}
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Checkbox
+                        label="Bib numbers"
+                        hint="For runs and races: each registration gets the next number, shown on the pass."
+                        checked={draft.bib_numbers}
+                        onChange={(v) => set('bib_numbers', v)}
+                      />
+                      {draft.bib_numbers && <Input label="First bib number" type="number" min={1} {...bind('bib_start')} />}
+                    </div>
                     <Checkbox
                       label="Phone number required"
                       hint="Guests and applicants must give a mobile number so you can call or message them."

@@ -942,7 +942,10 @@ const AttendeesCard: React.FC<{
                         </div>
                       </div>
                     </td>
-                    <td className="hidden whitespace-nowrap px-4 py-3 font-mono text-xs text-ink-600 2xl:table-cell">{t.ticket_number}</td>
+                    <td className="hidden whitespace-nowrap px-4 py-3 font-mono text-xs text-ink-600 2xl:table-cell">
+                      {t.ticket_number}
+                      {t.bib_number ? <span className="ml-2 font-sans font-semibold text-ink-900">Bib {t.bib_number}</span> : null}
+                    </td>
                     {hasSeats && <td className="whitespace-nowrap px-4 py-3 font-semibold text-ink-800">{t.seat_number || '–'}</td>}
                     <td className="px-4 py-3">
                       <Badge tone={s.tone} dot>
