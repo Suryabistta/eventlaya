@@ -57,6 +57,8 @@ grep -q '^GA_MEASUREMENT_ID=' /srv/eventlaya/.env || echo 'GA_MEASUREMENT_ID=G-L
 # Online payments: close expired holds / catch late payments every 2 minutes (docs/payments.md §6), and rotate the
 # app's cron logs weekly (/var/log/eventlaya). Both idempotent.
 mkdir -p /var/log/eventlaya && chown eventlaya:eventlaya /var/log/eventlaya
+# Private uploads (application PDFs): outside the code folder (rsync --delete) and outside /media (never served)
+mkdir -p /srv/eventlaya/private_media && chown eventlaya:eventlaya /srv/eventlaya/private_media && chmod 750 /srv/eventlaya/private_media
 install -m 644 /tmp/eventlaya-deploy/logrotate-eventlaya /etc/logrotate.d/eventlaya
 PAY_CRON='*/2 * * * * cd /srv/eventlaya/backend && set -a && . /srv/eventlaya/.env && set +a && .venv/bin/python manage.py expire_payments >> /var/log/eventlaya/payments.log 2>&1'
 # Guest reminders (apps/events/guests.py): the day before and ~2 hours before each event, every 10 minutes

@@ -388,3 +388,46 @@ class OnlineTicketTests(APITestCase):
         self.client.force_authenticate(self.org)
         rep = self.client.get('/api/payments/organizer/summary/').data
         self.assertEqual(rep['events'][0]['collected'], '1000.00')
+
+
+class AuditFixTests(OnlineTicketTests):
+    """Fixes from the 2026-11 review: bibs for online payers, emails on release/refund/cancel, gate hardening."""
+
+    def test_online_payers_get_bibs_and_released_holds_are_emailed(self):
+        Event.objects.filter(pk=self.event.pk).update(bib_numbers=True, bib_start=50)
+        r = self.register()
+        self.pay_test(r.data['payment']['id'])
+        self.assertEqual(sorted(EventTicket.objects.values_list('bib_number', flat=True)), [50, 51])
+        r = self.register(email='late@test.com')
+        with self.captureOnCommitCallbacks(execute=True):
+            self.pay_test(r.data['payment']['id'], outcome='cancelled')
+        self.assertTrue(any('tickets were released' in m.subject for m in mail.outbox))
+
+    def test_cancelling_the_event_emails_ticket_holders(self):
+        self.register(method='venue')
+        self.client.force_authenticate(self.org)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.patch(f'/api/events/{self.event.id}/', {'status': 'cancelled'}, format='json')
+        self.assertTrue(any('Event cancelled' in m.subject for m in mail.outbox))
+
+    def test_gate_ignores_future_client_time_and_hides_other_events_guests(self):
+        self.register(method='venue')
+        t = EventTicket.objects.first()
+        self.client.force_authenticate(self.org)
+        future = '2099-01-01T10:00:00+05:45'
+        r = self.client.post(f'/api/events/{self.event.id}/gate/scan/', {'qr_token': t.qr_token, 'scan_type': 'gate_in', 'scanned_at_client': future}, format='json')
+        self.assertEqual(r.status_code, 200, r.data)  # server time is used, so the date check passes
+        other_org = User.objects.create_user(username='o2', email='o2@test.com', password='x', role='organizer')
+        other = Event.objects.create(organizer=other_org, title='Other', slug='other', location='Dharan', start_date=date.today(), status='published')
+        self.client.force_authenticate(other_org)
+        r = self.client.post(f'/api/events/{other.id}/gate/scan/', {'qr_token': t.qr_token, 'scan_type': 'gate_in'}, format='json')
+        self.assertEqual(r.data['result'], 'wrong_event')
+        self.assertNotIn('ticket', r.data)
+        self.assertNotIn('Asha', str(r.data))
+
+    def test_registration_only_events_have_no_gate(self):
+        Event.objects.filter(pk=self.event.pk).update(registration_mode='form')
+        self.client.force_authenticate(self.org)
+        r = self.client.post(f'/api/events/{self.event.id}/gate/scan/', {'qr_token': 'TKT-ANY-0001', 'scan_type': 'gate_in'}, format='json')
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('registration only', r.data['message'])

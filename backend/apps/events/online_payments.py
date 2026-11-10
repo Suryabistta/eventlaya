@@ -137,6 +137,9 @@ def release_order(order, note):
     order.payment_status = P.FAILED
     order.add_note(note)
     order.save(update_fields=['payment_status', 'payment_notes', 'updated_at'])
+    _email_buyer(order, 'Your tickets were released',
+                 'Your online payment did not go through in time, so the tickets we held for you were released.',
+                 'Nothing was charged. You can register again from the event page while spots are left.')
     return True
 
 
@@ -203,6 +206,10 @@ def on_ticket_paid(intent):
             order.add_note('Late payment: released tickets taken back')
     if deliver:
         EventTicket.objects.filter(order=order, status__in=[T.RESERVED, T.CANCELLED]).update(status=T.VALID)
+        if order.event.bib_numbers:
+            # Bibs are given when the ticket becomes valid, so online payers get theirs too
+            from apps.dynamic_forms.views import assign_bibs
+            assign_bibs(order.event, list(order.tickets.filter(bib_number__isnull=True).order_by('guest_number')))
     order.payment_method = TicketOrder.PaymentMethod.ONLINE
     order.payment_status = P.PAID
     order.paid_via = intent.provider
@@ -244,6 +251,16 @@ def _refund_order(order, note, user=None):
     order.needs_attention = ''
     order.add_note(f'Refunded: {note}', user)
     order.save()
+    _email_buyer(order, 'Your tickets were refunded', f'Your order {order.reference} was refunded and its tickets cancelled.',
+                 'The money goes back the way you paid; your bank or wallet may take a few days to show it.')
+
+
+def _email_buyer(order, subject, line1, line2):
+    """Tell the buyer what happened to their order (after the transaction commits)."""
+    from apps.core.email import send_simple_event_email
+    order_id = order.pk
+    transaction.on_commit(lambda: send_simple_event_email(
+        TicketOrder.objects.select_related('event').get(pk=order_id).event, order.buyer_email, order.buyer_name, subject, line1, line2))
 
 
 def describe_ticket_order(intent):

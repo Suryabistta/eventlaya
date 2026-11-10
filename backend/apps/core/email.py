@@ -249,6 +249,16 @@ def send_application_received(response, event):
                         "The organizer will review it and you'll get an email when it's accepted or not.", signature)
 
 
+def send_simple_event_email(event, to, name, subject, line1, line2):
+    """A short plain message about an event (released tickets, refunds, cancellations, contestant updates)."""
+    if not to:
+        return False
+    from apps.events.sub_events import display_title
+    brand, powered = email_brand(event)
+    signature = 'Organized via Eventlaya' if brand == 'Eventlaya' else (brand + ('\nPowered by Eventlaya' if powered else ''))
+    return _send_simple(event, to, f'{subject}: {display_title(event)}', name or 'there', line1, line2, signature)
+
+
 def send_review_email(response, event):
     """Open calls: tell the applicant their application was accepted or not (with the organizer's note)."""
     from apps.events.sub_events import display_title

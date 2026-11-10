@@ -42,7 +42,8 @@ class GuestManagementTests(APITestCase):
         self.client.patch(f'{self.base}/guests/{self.vip.id}/', {'tags': ['VIP']}, format='json')
         with mock.patch('apps.core.fcm.send_push_to_event_staff', return_value=1) as push:
             for t in (self.guest, self.vip):
-                self.client.post(f'{self.base}/gate/scan/', {'qr_token': t.qr_token, 'scan_type': 'gate_in'}, format='json')
+                with self.captureOnCommitCallbacks(execute=True):  # the alert goes out after the scan is saved
+                    self.client.post(f'{self.base}/gate/scan/', {'qr_token': t.qr_token, 'scan_type': 'gate_in'}, format='json')
         self.assertEqual(push.call_count, 1)
         self.assertIn('Hari Rai (VIP) is IN', push.call_args[0][1])
         arrivals = self.client.get(f'{self.base}/arrivals/').data

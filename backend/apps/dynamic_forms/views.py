@@ -109,7 +109,7 @@ class EventRegisterView(APIView):
 
         name = (request.data.get('name') or '').strip()
         email = (request.data.get('email') or '').strip().lower()
-        phone = (request.data.get('phone') or '').strip()
+        phone = (request.data.get('phone') or '').strip()[:30]
         if user is not None:  # signed in: the account fills in what the form left out
             name = name or user.get_full_name() or user.organization_name or user.email.split('@')[0]
             email = email or user.email.lower()
@@ -178,11 +178,12 @@ class EventRegisterView(APIView):
                             status=status.HTTP_409_CONFLICT)
 
         form = event.registration_form
+        from apps.events.ticketing import default_ticket_type_id as _default_type
+        chosen_types = chosen = {str(i['ticket_type_id'] or _default_type(event) or '') for i in items}
 
         # Validate required form fields if dynamic form is attached
         if form and form.status == Form.Status.PUBLISHED:
-            from apps.events.ticketing import default_ticket_type_id as _default_type
-            chosen = {str(i['ticket_type_id'] or _default_type(event) or '') for i in items}
+            chosen = chosen_types
             problem = check_answers(form, answers_map, event, chosen)
             if problem:
                 return Response({'error': problem}, status=status.HTTP_400_BAD_REQUEST)
@@ -192,12 +193,22 @@ class EventRegisterView(APIView):
         owner = self._owner_for(request, email)
         try:
             with transaction.atomic():
+                # 0. One registration at a time per event: the capacity check and ticket numbers can't race
+                Event.objects.select_for_update().filter(pk=event.pk).first()
+                if event.capacity > 0 and event.registered_count + quantity > event.capacity:
+                    left = max(0, event.capacity - event.registered_count)
+                    return Response({'error': f'Only {left} spot{"" if left == 1 else "s"} left for this event.' if left else 'Event has reached maximum capacity.'},
+                                    status=status.HTTP_409_CONFLICT)
                 # 1. Ticket types + promo code (locks the types so their quantities can't oversell)
                 if len(items) == 1 and not items[0]['ticket_type_id']:
                     items[0]['ticket_type_id'] = default_ticket_type_id(event)
-                lines, promo = resolve_order(event, items, None if event.registration_only else request.data.get('promo_code'))
                 if event.registration_only:
-                    lines, promo = [(ticket_type, Decimal('0')) for ticket_type, _ in lines], None
+                    # Free, one per person: no ticket-type sales windows, sold-out tiers or promo codes apply
+                    from apps.events.models import TicketType
+                    tt = TicketType.objects.filter(pk=items[0]['ticket_type_id'], event=event).first() if items[0]['ticket_type_id'] else None
+                    lines, promo = [(tt, Decimal('0'))], None
+                else:
+                    lines, promo = resolve_order(event, items, request.data.get('promo_code'))
                 total = sum((price for _, price in lines), Decimal('0'))
                 # 2. How it's paid: free, at the venue, or online (tickets held until the payment is confirmed)
                 method, provider = online_payments.choose_payment(event, user, lines, total, payment_method, provider)
@@ -231,7 +242,7 @@ class EventRegisterView(APIView):
                     ))
                 if event.bib_numbers and not online:
                     assign_bibs(event, tickets)
-                form_response = self._save_answers(form, event, tickets[0], name, email, phone, answers_map)
+                form_response = self._save_answers(form, event, tickets[0], name, email, phone, answers_map, chosen)
         except TicketError as e:
             return Response({'error': e.message}, status=e.code)
         except online_payments.PaymentChoiceError as e:
@@ -314,7 +325,7 @@ class EventRegisterView(APIView):
         return items
 
     @staticmethod
-    def _save_answers(form, event, ticket, name, email, phone, answers_map):
+    def _save_answers(form, event, ticket, name, email, phone, answers_map, ticket_type_ids=None):
         """Record the dynamic form response and answers, if the event has a form."""
         if not form:
             return None
@@ -330,7 +341,7 @@ class EventRegisterView(APIView):
         )
         from .validation import is_visible
         for field in form.fields.all():
-            if str(field.id) in answers_map and is_visible(field, answers_map):
+            if str(field.id) in answers_map and is_visible(field, answers_map, ticket_type_ids):
                 FormAnswer.objects.create(
                     response=form_response,
                     field=field,
@@ -370,6 +381,13 @@ class ResponseReviewView(APIView):
         resp.review_status = new
         resp.rejection_note = note if new == FormResponse.ReviewStatus.REJECTED else ''
         resp.save(update_fields=['review_status', 'rejection_note', 'updated_at'])
+        if changed:
+            # A contestant who came from this application follows the decision (no votes for a rejected applicant)
+            from apps.voting.models import Candidate
+            if new == FormResponse.ReviewStatus.REJECTED:
+                Candidate.objects.filter(application_id=resp.pk, status=Candidate.Status.ACTIVE).update(status=Candidate.Status.WITHDRAWN)
+            elif new == FormResponse.ReviewStatus.ACCEPTED:
+                Candidate.objects.filter(application_id=resp.pk, status=Candidate.Status.WITHDRAWN).update(status=Candidate.Status.ACTIVE)
         if changed and new != FormResponse.ReviewStatus.PENDING:
             from apps.core.email import send_review_email
             send_review_email(resp, resp.event)
@@ -421,8 +439,15 @@ class FormUploadView(APIView):
             upload.seek(0)
             if not ext:
                 return Response({'error': 'Use a JPG, PNG or WebP photo, or a PDF.'}, status=status.HTTP_400_BAD_REQUEST)
-        path = default_storage.save(f'uploads/forms/{event.id}/{uuid.uuid4().hex}.{ext}', upload)
-        return Response({'url': default_storage.url(path), 'name': upload.name[:120], 'size': upload.size}, status=status.HTTP_201_CREATED)
+        name = f'{uuid.uuid4().hex}.{ext}'
+        if ext == 'pdf':
+            # Documents stay private: only the event's organizers and staff can open them (PrivateFileView)
+            private_storage().save(f'forms/{event.id}/{name}', upload)
+            url = f'/api/forms/files/{event.id}/{name}'
+        else:
+            # Photos are public (contestant pages, the organizer's review) under an unguessable name
+            url = default_storage.url(default_storage.save(f'uploads/forms/{event.id}/{name}', upload))
+        return Response({'url': url, 'name': upload.name[:120], 'size': upload.size}, status=status.HTTP_201_CREATED)
 
 
 def check_answers(form, answers_map, event, ticket_type_ids=None):
@@ -467,16 +492,18 @@ class ApplyView(APIView):
         if phone_problem:
             return Response({'error': phone_problem, 'field': 'phone'}, status=status.HTTP_400_BAD_REQUEST)
         form = event.application_form
-        earlier = FormResponse.objects.filter(event=event, form=form, ticket__isnull=True, submitter_email__iexact=email).first()
-        if earlier:
-            return Response({'message': f'You already applied to {event.title}.', 'already_applied': True,
-                             'application': application_data(earlier)}, status=status.HTTP_200_OK)
         answers = request.data.get('answers', {})
         problem = check_answers(form, answers, event)
         if problem:
             return Response({'error': problem}, status=status.HTTP_400_BAD_REQUEST)
         with transaction.atomic():
-            n = FormResponse.objects.select_for_update().filter(event=event, form=form, ticket__isnull=True).count() + 1
+            # One application at a time per event: no duplicate submissions or numbers
+            Event.objects.select_for_update().filter(pk=event.pk).first()
+            earlier = FormResponse.objects.filter(event=event, form=form, ticket__isnull=True, submitter_email__iexact=email).first()
+            if earlier:
+                return Response({'message': f'You already applied to {event.title}.', 'already_applied': True,
+                                 'application': application_data(earlier)}, status=status.HTTP_200_OK)
+            n = FormResponse.objects.filter(event=event, form=form, ticket__isnull=True).count() + 1
             resp = FormResponse.objects.create(
                 form=form, event=event, submitter_name=name, submitter_email=email, submitter_phone=phone,
                 review_status=FormResponse.ReviewStatus.PENDING, number=f'APP-{str(event.id)[:4].upper()}-{n:04d}',
@@ -532,3 +559,29 @@ def assign_bibs(event, tickets):
         t.bib_number = nxt
         t.save(update_fields=['bib_number'])
         nxt += 1
+
+
+def private_storage():
+    from django.conf import settings
+    from django.core.files.storage import FileSystemStorage
+    return FileSystemStorage(location=settings.PRIVATE_MEDIA_ROOT)
+
+
+class PrivateFileView(APIView):
+    """GET /api/forms/files/<event id>/<name>: a document attached to an answer, for the event's organizers and staff."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, event_id, name):
+        import re as _re
+        from django.http import FileResponse
+        from apps.events.views import can_operate_event
+        event = get_object_or_404(Event, pk=event_id)
+        if not can_operate_event(request.user, event):
+            return Response({'error': 'Only the event team can open this file.'}, status=status.HTTP_403_FORBIDDEN)
+        if not _re.fullmatch(r'[0-9a-f]{32}\.pdf', name):
+            return Response({'error': 'File not found.'}, status=status.HTTP_404_NOT_FOUND)
+        storage = private_storage()
+        path = f'forms/{event_id}/{name}'
+        if not storage.exists(path):
+            return Response({'error': 'File not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return FileResponse(storage.open(path, 'rb'), content_type='application/pdf', filename=name)

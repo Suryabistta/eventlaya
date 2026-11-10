@@ -227,7 +227,8 @@ class EventSerializer(serializers.ModelSerializer):
             close = get('applications_close')
             if not close:
                 raise serializers.ValidationError({'applications_close': 'Set when applications close.'})
-            if 'applications_close' in attrs and close < timezone.now() and not self.instance:
+            changed = 'applications_close' in attrs and (self.instance is None or attrs['applications_close'] != self.instance.applications_close)
+            if changed and close < timezone.now():
                 raise serializers.ValidationError({'applications_close': 'The closing time can’t be in the past.'})
         if get('date_tba', False) and get('tickets_enabled', True):
             raise serializers.ValidationError({'date_tba': 'Set the date and venue before turning on tickets or registration.'})
@@ -250,7 +251,7 @@ class EventSerializer(serializers.ModelSerializer):
 
         # Date validations
         start_date = attrs.get('start_date') or (self.instance.start_date if self.instance else None)
-        end_date = attrs.get('end_date') or (self.instance.end_date if self.instance else None)
+        end_date = attrs['end_date'] if 'end_date' in attrs else (self.instance.end_date if self.instance else None)
         start_time = attrs.get('start_time') or (self.instance.start_time if self.instance else None)
         end_time = attrs.get('end_time') or (self.instance.end_time if self.instance else None)
         reg_deadline = attrs.get('registration_deadline') or (self.instance.registration_deadline if self.instance else None)

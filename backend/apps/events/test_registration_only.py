@@ -176,3 +176,33 @@ def _png():
     buf = io.BytesIO()
     Image.new('RGB', (4, 4)).save(buf, 'PNG')
     return SimpleUploadedFile('p.png', buf.getvalue())
+
+
+class AuditStageFixTests(StagesTests):
+    def test_date_tba_is_upcoming_and_close_time_cannot_move_into_the_past(self):
+        from datetime import datetime as dt
+        self.assertEqual(self.event.phase(now=self.close + timedelta(days=3)), 'upcoming')  # not "ended"
+        self.client.force_authenticate(self.organizer)
+        past = (dt.now().astimezone() - timedelta(days=1)).isoformat()
+        r = self.client.patch(f'/api/events/{self.event.id}/', {'applications_close': past}, format='json')
+        self.assertEqual(r.status_code, 400)
+
+    def test_rejecting_an_imported_applicant_withdraws_the_contestant(self):
+        from apps.dynamic_forms.models import FormField
+        from apps.voting.models import Candidate, Poll
+        doc = FormField.objects.create(form=self.form, label='Citizenship document', field_type='image', order=2)
+        face = FormField.objects.create(form=self.form, label='Portrait photo', field_type='image', order=3)
+        up = lambda: self.client.post(f'/api/forms/events/{self.event.slug}/upload/', {'file': _png()}, format='multipart').data['url']  # noqa: E731
+        id_url, face_url = up(), up()
+        r = self.client.post(self.apply_url, {'name': 'Sita', 'email': 's@x.com', 'phone': '9812345678',
+                                              'answers': {str(self.link.id): 'https://vimeo.com/1', str(doc.id): id_url, str(face.id): face_url}}, format='json')
+        app_id = r.data['application']['id']
+        poll = Poll.objects.create(event=self.event, title='Vote', kind=Poll.Kind.CONTEST, status=Poll.Status.OPEN)
+        self.client.force_authenticate(self.organizer)
+        self.client.post(f'/api/forms/responses/{app_id}/review/', {'status': 'accepted'}, format='json')
+        added = self.client.post(f'/api/voting/contests/{poll.id}/contestants/from-applications/').data
+        self.assertEqual((added[0]['photo_url'], added[0]['gallery']), (face_url, []))  # never the ID document
+        self.client.post(f'/api/forms/responses/{app_id}/review/', {'status': 'rejected'}, format='json')
+        self.assertEqual(Candidate.objects.get(application_id=app_id).status, 'withdrawn')
+        self.client.post(f'/api/forms/responses/{app_id}/review/', {'status': 'accepted'}, format='json')
+        self.assertEqual(Candidate.objects.get(application_id=app_id).status, 'active')

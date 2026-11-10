@@ -135,6 +135,9 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
 # Production keeps uploads on a mounted block-storage volume (see deploy/).
 MEDIA_ROOT = os.environ.get('MEDIA_ROOT') or BASE_DIR / 'media'
+# Files people attach to applications and registrations (PDFs: IDs, certificates). Outside MEDIA_ROOT so the web
+# server never serves them; only the event's organizers and staff download them (apps.dynamic_forms.PrivateFileView).
+PRIVATE_MEDIA_ROOT = os.environ.get('PRIVATE_MEDIA_ROOT') or BASE_DIR.parent / 'private_media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:printing/printing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../attendee/data/attendee_api.dart' show friendlyError;
@@ -100,6 +103,20 @@ class _ApplicationDetailState extends ConsumerState<_ApplicationDetail> {
   Widget _value(dynamic raw) {
     final v = raw is Map && raw.containsKey('value') ? raw['value'] : raw;
     final text = v is List ? v.join(', ') : (v ?? '').toString();
+    if (text.startsWith('/api/forms/files/')) {
+      // Private document: fetched with the organizer's sign-in, then shared / opened as a PDF
+      return InkWell(
+        onTap: () async {
+          try {
+            final bytes = await ref.read(_api).getBytes(text);
+            await Printing.sharePdf(bytes: Uint8List.fromList(bytes), filename: 'document.pdf');
+          } catch (e) {
+            if (mounted) AppToast.error(context, friendlyError(e));
+          }
+        },
+        child: Text('Open document', style: AppType.body(14, weight: FontWeight.w600, color: AppColors.brand)),
+      );
+    }
     final isLink = text.startsWith('http') || text.startsWith('/media/');
     if (!isLink) return Text(text.isEmpty ? '–' : text, style: AppType.body(14));
     return InkWell(

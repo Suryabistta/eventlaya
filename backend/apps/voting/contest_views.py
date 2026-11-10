@@ -1,5 +1,6 @@
 """Organizer API for contests: /api/voting/contests/…  (all under the `voting` module)."""
 import csv
+import re
 import io
 from datetime import timedelta
 
@@ -830,18 +831,7 @@ class ContestantFromApplicationsView(OrganizerView):
                 .exclude(pk__in=done).prefetch_related('answers__field').order_by('submitted_at'))
         rows, ids = [], []
         for a in apps:
-            photos, bio, city = [], '', ''
-            for ans in sorted(a.answers.all(), key=lambda x: x.field.order):
-                v = ans.value.get('value') if isinstance(ans.value, dict) else ans.value
-                t = ans.field.field_type
-                if t == 'image' and isinstance(v, str) and v:
-                    photos.append(v)
-                elif t == 'paragraph' and not bio and isinstance(v, str):
-                    bio = v.strip()[:2000]
-                elif not city and 'city' in ans.field.label.lower() and isinstance(v, str):
-                    city = v.strip()[:255]
-            rows.append({'name': a.submitter_name, 'subtitle': city, 'description': bio,
-                         'photo_url': photos[0] if photos else '', 'gallery': photos[1:20]})
+            rows.append(contestant_from_application(a, request.data.get('photo_field')))
             ids.append(a.pk)
         if not rows:
             return Response({'error': 'No new accepted applications to add.'}, status=400)
@@ -859,3 +849,29 @@ class ContestantFromApplicationsView(OrganizerView):
         audit(poll, request.user, 'contestants_added', f'{len(created)} contestants added from applications')
         return Response(ContestantSerializer(contestants_qs(poll).filter(pk__in=[c.pk for c in created]), many=True,
                                              context={'poll': poll}).data, status=201)
+
+
+PRIVATE_IMAGE = re.compile(r'\b(id|identity|citizenship|nagarikta|passport|licen[cs]e|document|receipt|voucher|payment|signature)\b', re.I)
+PORTRAIT = re.compile(r'\b(portrait|profile|headshot|photo|picture|face)\b', re.I)
+BIO = re.compile(r'\b(bio|about|introduce|introduction|yourself|description|story)\b', re.I)
+PLACE = re.compile(r'\b(city|hometown|home town|district|address|municipality|from)\b', re.I)
+
+
+def contestant_from_application(app, photo_field=None):
+    """Contestant fields from an accepted application. Photos: never from questions that look like documents
+    (ID, citizenship, receipt…); the main photo is `photo_field` if given, else a portrait-like question, else the
+    first other photo. Bio and place come from questions labelled that way (whole words, so "Ethnicity" isn't a city)."""
+    answers = sorted(app.answers.all(), key=lambda x: x.field.order)
+    def text(ans):
+        v = ans.value.get('value') if isinstance(ans.value, dict) else ans.value
+        return v.strip() if isinstance(v, str) else ''
+    photos = [(ans.field, text(ans)) for ans in answers
+              if ans.field.field_type == 'image' and text(ans) and not PRIVATE_IMAGE.search(ans.field.label)]
+    main = next((url for f, url in photos if photo_field and str(f.id) == str(photo_field)), None) \
+        or next((url for f, url in photos if PORTRAIT.search(f.label)), None) \
+        or (photos[0][1] if photos else '')
+    gallery = [url for _, url in photos if url != main][:19]
+    paragraphs = [ans for ans in answers if ans.field.field_type == 'paragraph' and text(ans)]
+    bio = next((text(a) for a in paragraphs if BIO.search(a.field.label)), text(paragraphs[0]) if paragraphs else '')
+    place = next((text(a) for a in answers if a.field.field_type in ('text', 'select', 'radio') and PLACE.search(a.field.label)), '')
+    return {'name': app.submitter_name, 'subtitle': place[:255], 'description': bio[:2000], 'photo_url': main, 'gallery': gallery}

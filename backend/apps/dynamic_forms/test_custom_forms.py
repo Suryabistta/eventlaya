@@ -55,7 +55,14 @@ class CustomFormTests(APITestCase):
         self.assertEqual(r.status_code, 201, r.data)
         self.assertIn(f'/uploads/forms/{self.event.id}/', r.data['url'])
         self.assertEqual(self.submit(photo=r.data['url']).status_code, 201)
-        self.assertEqual(self.upload(b'%PDF-1.4 test', 'cv.pdf').status_code, 201)
+        pdf = self.upload(b'%PDF-1.4 test', 'cv.pdf')
+        self.assertTrue(pdf.data['url'].startswith(f'/api/forms/files/{self.event.id}/'))  # documents are private
+        self.assertEqual(self.client.get(pdf.data['url']).status_code, 401)
+        self.client.force_authenticate(self.event.organizer)
+        self.assertEqual(self.client.get(pdf.data['url']).status_code, 200)
+        self.client.force_authenticate(User.objects.create_user(username='x', email='x@x.com', password='x'))
+        self.assertEqual(self.client.get(pdf.data['url']).status_code, 403)
+        self.client.force_authenticate(None)
         self.assertEqual(self.upload(b'not a file', 'x.exe').status_code, 400)
 
 
@@ -112,3 +119,13 @@ class PhaseBTests(APITestCase):
         r = self.client.post(f"/api/forms/{tpl['id']}/duplicate/", {'event': str(other.id), 'link': 'registration'}, format='json')
         other.refresh_from_db()
         self.assertEqual((r.status_code, str(other.registration_form_id), r.data['status']), (201, r.data['id'], 'published'))
+
+
+class ChainedConditionTests(PhaseBTests):
+    def test_question_under_a_hidden_question_is_hidden_too(self):
+        pace = FormField.objects.create(form=self.form, label='Pace group', field_type=T.SELECT, options=['Fast', 'Easy'], required=True,
+                                        order=4, show_if={'field': str(self.time.id), 'values': []})
+        # 5K runner: "Best 21K time" is hidden, so "Pace group" (shown when it has any answer) is hidden too
+        r = self.register('z@x.com', self.general, {self.race: '5K', self.time: '1:50'})
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertIsNotNone(pace.pk)

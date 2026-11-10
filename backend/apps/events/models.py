@@ -219,6 +219,8 @@ class Event(models.Model):
             return 'draft'
         if self.status == self.Status.CANCELLED:
             return 'cancelled'
+        if self.date_tba and self.status != self.Status.COMPLETED:
+            return 'upcoming'  # its date is only the applications deadline until the real date is set
         if self.status == self.Status.COMPLETED or now >= self.ends_at:
             return 'ended'
         if self.status == self.Status.ONGOING or now >= self.starts_at:

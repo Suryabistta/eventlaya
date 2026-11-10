@@ -69,3 +69,4 @@ scanner_app/.dart_tool/
 # Firebase client config (per-environment; see scanner_app/FIREBASE_SETUP.md)
 google-services.json
 GoogleService-Info.plist
+private_media/

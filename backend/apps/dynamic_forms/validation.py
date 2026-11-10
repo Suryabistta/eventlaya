@@ -55,8 +55,9 @@ def answer_error(field, value, event_id=None):
         return None if URL.match(text) and len(text) <= 1000 else f'Enter a full link starting with https:// for “{label}”.'
     if field.field_type in (T.FILE_UPLOAD, T.IMAGE):
         # Only files uploaded through this form's upload endpoint
-        prefix = f'{settings.MEDIA_URL}uploads/forms/{event_id or field.form.event_id or "none"}/'
-        return None if text.startswith(prefix) and '..' not in text else f'Upload the file for “{label}” again.'
+        eid = event_id or field.form.event_id or 'none'
+        ok = (text.startswith(f'{settings.MEDIA_URL}uploads/forms/{eid}/') or text.startswith(f'/api/forms/files/{eid}/')) and '..' not in text
+        return None if ok else f'Upload the file for “{label}” again.'
     if field.field_type == T.DATE:
         try:
             d = date.fromisoformat(text)
@@ -74,7 +75,7 @@ def answer_error(field, value, event_id=None):
     return None
 
 
-def is_visible(field, answers, ticket_type_ids=None):
+def is_visible(field, answers, ticket_type_ids=None, _depth=0):
     """Whether the question is asked: its ticket types (if any) were chosen, and its condition (show_if) holds."""
     types = [str(t) for t in (field.ticket_types or [])]
     if types and ticket_type_ids is not None and not (set(types) & {str(t) for t in ticket_type_ids}):
@@ -82,6 +83,10 @@ def is_visible(field, answers, ticket_type_ids=None):
     cond = field.show_if if isinstance(field.show_if, dict) else {}
     if not cond.get('field'):
         return True
+    # A question under a hidden question is hidden too (chains of conditions)
+    parent = field.form.fields.filter(pk=cond['field']).first() if field.form_id else None
+    if parent is not None and parent.pk != field.pk and _depth < 10 and not is_visible(parent, answers, ticket_type_ids, _depth + 1):
+        return False
     value = (answers or {}).get(str(cond['field']))
     wanted = [str(v) for v in (cond.get('values') or [])]
     if isinstance(value, list):

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import { downloadApiFile } from '@/lib/download'
 import { formatDate } from '@/lib/dates'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, Download, FileText, Search, X } from 'lucide-react'
@@ -47,6 +48,19 @@ export const AnswerValue: React.FC<{ value: unknown }> = ({ value }) => {
   const v = value && typeof value === 'object' && !Array.isArray(value) && 'value' in value ? (value as { value: unknown }).value : value
   if (Array.isArray(v)) return <>{v.join(', ') || '–'}</>
   const text = v == null ? '' : String(v)
+  if (text.startsWith('/api/forms/files/')) {
+    // Private document (PDF): downloaded with the organizer's sign-in
+    return (
+      <button
+        type="button"
+        onClick={() => void downloadApiFile(text.replace(/^\/api/, ''), 'document.pdf')}
+        className="inline-flex items-center gap-1 font-medium text-brand-700 hover:underline"
+      >
+        <FileText className="h-4 w-4 shrink-0" aria-hidden />
+        Download document
+      </button>
+    )
+  }
   if (/^(https?:\/\/|\/media\/)/.test(text)) {
     return (
       <a href={text} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 break-all font-medium text-brand-700 hover:underline">

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timedelta
 from django.utils import timezone
-from django.db import models
+from django.db import models, transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets, permissions, status
 from rest_framework.views import APIView
@@ -96,7 +96,17 @@ class EventViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         before = (serializer.instance.is_paid, serializer.instance.ticket_price)
+        was_cancelled = serializer.instance.status == Event.Status.CANCELLED
         event = serializer.save()
+        if event.status == Event.Status.CANCELLED and not was_cancelled:
+            # Everyone holding a ticket hears it from us, not at the gate (one email per address, plus app push)
+            from .guests import _recipients, audience_tickets, send_to_guests
+            recipients = _recipients(audience_tickets(event, 'all'))
+            if recipients:
+                transaction.on_commit(lambda: send_to_guests(
+                    event, 'Event cancelled',
+                    f'{event.title} has been cancelled by the organizer. Your ticket will not be used. '
+                    'If you paid, the organizer will contact you about a refund.', recipients))
         # Older screens edit one event price: apply it when there's a single ticket type.
         if (event.is_paid, event.ticket_price) != before:
             types = list(event.ticket_types.filter(is_active=True))
@@ -253,10 +263,18 @@ class GateScanView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, event_id):
+        # One scan at a time per ticket (locked below): two gates scanning together can't both let someone in
+        with transaction.atomic():
+            return self._scan(request, event_id)
+
+    def _scan(self, request, event_id):
         import json
         event = get_object_or_404(Event, id=event_id)
         if not can_operate_event(request.user, event):
             return Response(NO_ACCESS, status=status.HTTP_403_FORBIDDEN)
+        if event.registration_only:
+            return Response({'status': 'invalid', 'result': 'invalid',
+                             'message': 'This event is registration only: there are no passes to scan.'}, status=status.HTTP_400_BAD_REQUEST)
         raw_token = request.data.get('qr_token', '').strip()
         scan_type = request.data.get('scan_type', GateScanLog.ScanType.GATE_IN)
         gate_name = request.data.get('gate_name', 'Main Gate').strip() or 'Main Gate'
@@ -316,9 +334,12 @@ class GateScanView(APIView):
 
         now = timezone.now()
         if scanned_at_client:
+            # Offline scans sync later with the time they happened; only believe a recent, timezone-aware past time
             try:
-                now = datetime.fromisoformat(scanned_at_client.replace('Z', '+00:00'))
-            except Exception:
+                claimed = datetime.fromisoformat(scanned_at_client.replace('Z', '+00:00'))
+                if claimed.tzinfo is not None and now - timedelta(hours=48) <= claimed <= now + timedelta(minutes=2):
+                    now = claimed
+            except (ValueError, TypeError):
                 pass
 
         # 2. Event Status & Lifecycle Validation
@@ -364,7 +385,7 @@ class GateScanView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
         # 4. Look up ticket by qr_token or ticket_number (case-insensitive for manual entry)
-        ticket = EventTicket.objects.filter(event=event).filter(
+        ticket = EventTicket.objects.select_for_update().filter(event=event).filter(
             models.Q(qr_token__iexact=qr_token) | models.Q(ticket_number__iexact=qr_token)
         ).first()
 
@@ -378,9 +399,8 @@ class GateScanView(APIView):
                 return Response({
                     'status': 'wrong_event',
                     'result': 'wrong_event',
-                    'message': f"⛔ Wrong Event Checkpoint: Ticket is issued for '{other_ticket.event.title}', NOT '{event.title}'. Please redirect attendee.",
-                    'ticket': EventTicketSerializer(other_ticket, context={'staff': True}).data,
-                    'attendee_name': other_ticket.attendee_name,
+                    # Another organizer's guest: say which event, never their details
+                    'message': f"⛔ Wrong event: this ticket is for '{other_ticket.event.title}', not '{event.title}'. Please redirect the attendee.",
                     'expected_event': other_ticket.event.title,
                     'gate_name': gate_name,
                     'scan_type': scan_type,
@@ -518,7 +538,7 @@ class GateScanView(APIView):
 
             if not is_reentry:
                 from .guests import notify_arrival
-                notify_arrival(ticket, gate_name)
+                transaction.on_commit(lambda: notify_arrival(ticket, gate_name))
 
             # Trigger capacity milestone notification if reached
             current_inside = event.tickets.filter(status=EventTicket.Status.CHECKED_IN).count()
