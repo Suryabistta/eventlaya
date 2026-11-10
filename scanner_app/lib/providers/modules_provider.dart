@@ -12,6 +12,8 @@ class AppModule {
   static const marketplace = 'marketplace';
   static const reviews = 'reviews';
   static const chat = 'chat';
+  static const guestManagement = 'guest_management';
+  static const applications = 'applications';
 
   /// Contests / pageants (needs [voting]).
   static const contests = 'contests';

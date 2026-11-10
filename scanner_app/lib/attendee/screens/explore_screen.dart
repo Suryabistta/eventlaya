@@ -11,6 +11,9 @@ import 'event_detail_screen.dart';
 
 /// Explore: search, "Happening now", category filter and upcoming events.
 /// Works signed out (public API).
+
+/// Pill value for events taking applications (film submissions, pageants) rather than selling tickets.
+const _openCalls = '__open_calls';
 class ExploreScreen extends ConsumerStatefulWidget {
   const ExploreScreen({super.key});
 
@@ -65,7 +68,9 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
           for (final c in {for (final e in all) if (e.category != null && e.category != 'other') e.category!})
             EventType(c, EventCategories.label(c)),
         ];
-    final filtered = _category.isEmpty ? all : all.where((e) => e.category == _category).toList();
+    final filtered = _category.isEmpty
+        ? all
+        : all.where((e) => _category == _openCalls ? e.isOpenCall : e.category == _category).toList();
     final live = _when == 'upcoming' ? filtered.where((e) => e.isLive).toList() : const <PublicEvent>[];
     final rest = _when == 'upcoming' ? filtered.where((e) => !e.isLive).toList() : filtered;
     final bottomPad = MediaQuery.paddingOf(context).bottom;
@@ -111,14 +116,14 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                     ),
                   ),
                 )),
-                if (types.isNotEmpty)
-                  SliverToBoxAdapter(
+                SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.only(top: 12),
                       child: FilterPills<String>(
                         padding: EdgeInsets.symmetric(horizontal: gutter),
                         segments: [
                           const Segment('', 'All'),
+                          const Segment(_openCalls, 'Open calls'),
                           for (final t in types) Segment(t.slug, t.name),
                         ],
                         selected: _category,

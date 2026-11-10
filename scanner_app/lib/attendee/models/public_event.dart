@@ -165,6 +165,10 @@ class PublicEvent {
   String get categoryLabel => (categoryName?.isNotEmpty ?? false) ? categoryName! : EventCategories.label(category);
   final String? bannerUrl;
   final String organizerName;
+
+  /// Partner credit ("Co-organized by Koshi Media"): wording and name; null when the organizer didn't turn it on.
+  final String? partnerLabel;
+  final String? partnerName;
   final String? organizerLogo;
   final bool organizerVerified;
 
@@ -225,6 +229,8 @@ class PublicEvent {
     this.isFeatured = false,
     this.bannerUrl,
     this.organizerName = '',
+    this.partnerLabel,
+    this.partnerName,
     this.organizerLogo,
     this.organizerVerified = false,
     this.parent,
@@ -269,6 +275,8 @@ class PublicEvent {
       isFeatured: j['is_featured'] == true,
       bannerUrl: mediaUrl(_str(j['banner']) ?? j['banner_absolute']),
       organizerName: _str(org?['name']) ?? _str(j['organizer_name']) ?? '',
+      partnerLabel: j['managed_by_info'] is Map ? (_str((j['managed_by_info'] as Map)['label']) ?? 'Managed by') : null,
+      partnerName: j['managed_by_info'] is Map ? _str((j['managed_by_info'] as Map)['name']) : null,
       organizerLogo: mediaUrl(org?['logo']),
       organizerVerified: org?['verified'] == true || j['organizer_verified'] == true,
       parent: j['parent'] is Map ? (j['parent']['title'].toString(), j['parent']['slug'].toString()) : null,

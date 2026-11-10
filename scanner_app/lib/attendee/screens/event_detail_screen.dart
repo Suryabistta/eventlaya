@@ -352,6 +352,10 @@ class _TitleBlock extends StatelessWidget {
               ],
             ]),
           ],
+          if (event.partnerName != null) ...[
+            const SizedBox(height: 2),
+            Text('${event.partnerLabel} ${event.partnerName}', style: AppType.body(13, color: AppColors.ink600)),
+          ],
         ],
       ),
     );

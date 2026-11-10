@@ -1,4 +1,6 @@
 import 'applications_screen.dart';
+import 'event_settings_screen.dart';
+import 'guest_messages_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/legal.dart';
@@ -132,6 +134,21 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                 chevron: true,
                 onTap: () => _push(const ApplicationsScreen()),
               ),
+              ListRow(
+                leading: const RowIcon(Icons.tune_rounded, background: AppColors.ink600),
+                title: 'Event settings',
+                subtitle: 'Tickets, registration, applications, reminders',
+                chevron: true,
+                onTap: () => _push(const EventSettingsScreen()),
+              ),
+              if (ref.watch(moduleEnabledProvider(AppModule.guestManagement)))
+                ListRow(
+                  leading: const RowIcon(Icons.campaign_rounded, background: AppColors.success),
+                  title: 'Message guests',
+                  subtitle: 'Email everyone, or only who has or hasn\'t arrived',
+                  chevron: true,
+                  onTap: () => _push(const GuestMessagesScreen()),
+                ),
               if (chat)
                 ListRow(
                   leading: const RowIcon(Icons.task_alt_rounded, background: AppColors.success),

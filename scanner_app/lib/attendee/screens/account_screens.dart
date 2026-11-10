@@ -1,3 +1,6 @@
+import '../../core/api_client.dart';
+import 'package:printing/printing.dart';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/photo_picker.dart';
@@ -389,6 +392,24 @@ class _MyInquiriesScreenState extends ConsumerState<MyInquiriesScreen> {
         Align(alignment: Alignment.centerLeft, child: StatusBadge(label, tone: tone)),
         const SizedBox(height: 12),
         Text(q['message']?.toString() ?? '', style: AppType.body(14, height: 1.5)),
+        if (q['status'] == 'booked' && q['agreed_amount'] != null) ...[
+          const SizedBox(height: 12),
+          Text('Agreed Rs ${q['agreed_amount']} · Paid Rs ${q['paid'] ?? 0}', style: AppType.body(14, weight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          PrimaryButton(
+            label: 'Receipt (PDF)',
+            icon: Icons.receipt_long_rounded,
+            tonal: true,
+            onPressed: () async {
+              try {
+                final bytes = await ApiClient().getBytes('/api/me/inquiries/${q['kind']}/${q['id']}/receipt/');
+                await Printing.sharePdf(bytes: Uint8List.fromList(bytes), filename: 'receipt.pdf');
+              } catch (e) {
+                if (ctx.mounted) AppToast.error(ctx, friendlyError(e));
+              }
+            },
+          ),
+        ],
         const SizedBox(height: 20),
         if (reviews && q['can_review'] == true) ...[
           PrimaryButton(
