@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react'
 import { formatDate } from '@/lib/dates'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Bar, Line } from 'react-chartjs-2'
+import { Line } from 'react-chartjs-2'
 import type { ChartOptions } from 'chart.js'
 import {
   Users,
@@ -17,29 +17,25 @@ import {
   UserCheck,
   Wallet,
   ListChecks,
-  ArrowRight,
-  Circle,
-  CheckCircle2,
-  Copy,
   QrCode,
   Armchair,
   FileText,
   Send,
   UserCog,
 } from 'lucide-react'
-import { api, request, tokenStore, type Event, type Ticket, type EventTask } from '@/services/api'
+import { api, request, tokenStore, type Event, type Ticket } from '@/services/api'
 import { eventPhase, startsInText } from '@/lib/phase'
 import { useAuth } from '@/lib/auth'
 import { useCurrentEvent } from '@/lib/event-context'
 import { TicketPassModal } from '@/components/TicketPassModal'
 import { RegistrationQrModal } from '@/components/RegistrationQrModal'
-import { AnswerValue, ApplicationsCard, type Answer } from '@/components/ApplicationsCard'
+import { AnswerValue, type Answer } from '@/components/ApplicationsCard'
+import { ApplicationsSummary, PageChecklist } from '@/components/EventNextSteps'
 import { ArrivalsCard, GuestEditModal, MessageGuestsModal, type GuestTicket } from '@/components/GuestTools'
 import { SeatsModal } from '@/components/SeatsModal'
 import { useModuleEnabled } from '@/lib/modules'
 import { Badge, Button, ButtonLink, Card, CardHeader, EmptyState, ErrorState, Modal, Skeleton, useToast } from '@/components/ui'
-import { chartColors, fmtNpr, lineOptions } from '@/pages/analytics/charts'
-import { ChartCard, Legend } from '@/pages/analytics/shared'
+import { chartColors } from '@/pages/analytics/charts'
 import { cn } from '@/lib/utils'
 
 /* ------------------------------------------------------------------ */
@@ -86,19 +82,6 @@ const sparkOptions: ChartOptions<'line'> = {
   scales: { x: { display: false }, y: { display: false, beginAtZero: true } },
 }
 
-const trafficOptions: ChartOptions<'bar'> = {
-  responsive: true,
-  maintainAspectRatio: false,
-  interaction: { mode: 'index', intersect: false },
-  plugins: {
-    legend: { display: false },
-    tooltip: { backgroundColor: chartColors.ink900, padding: 10, cornerRadius: 8, boxPadding: 4, usePointStyle: true },
-  },
-  scales: {
-    y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: chartColors.grid }, border: { display: false } },
-    x: { grid: { display: false }, border: { color: chartColors.grid } },
-  },
-}
 
 /* ------------------------------------------------------------------ */
 
@@ -110,6 +93,8 @@ export const DashboardPage: React.FC = () => {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const isOrganizer = user?.role === 'organizer' || user?.role === 'superadmin'
   const formOnly = currentEvent?.registration_mode === 'form'
+  // Pageants and open calls before tickets: applications, not guests
+  const appsOnly = Boolean(currentEvent?.applications_enabled) && currentEvent?.tickets_enabled === false
   const guestsOn = useModuleEnabled('guest_management')
 
   const eventId = currentEvent?.id
@@ -119,7 +104,7 @@ export const DashboardPage: React.FC = () => {
     enabled: Boolean(eventId),
     refetchInterval: 5000,
   })
-  const { data: analytics, isLoading: analyticsLoading } = useQuery({
+  const { data: analytics } = useQuery({
     queryKey: ['analytics', eventId],
     queryFn: () => api.getEventAnalytics(eventId!),
     enabled: Boolean(eventId) && isOrganizer,
@@ -178,7 +163,6 @@ export const DashboardPage: React.FC = () => {
   const inside = gateStats?.currently_inside ?? att?.currently_inside ?? currentEvent.checked_in_count
   const left = gateStats?.total_checked_out ?? att?.checked_out ?? 0
   const checkedIn = att?.checked_in ?? inside + left
-  const notArrived = tickets.length ? tickets.filter((t) => t.status === 'valid').length : Math.max(registered - checkedIn, 0)
   const capacity = currentEvent.capacity
   const timing = eventTiming(currentEvent)
   const publicUrl = `${window.location.origin}/e/${currentEvent.slug}`
@@ -226,19 +210,22 @@ export const DashboardPage: React.FC = () => {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" icon={<Link2 className="h-4 w-4" />} onClick={copyLink}>
-            Copy registration link
+            Copy event link
           </Button>
           <Button variant="secondary" icon={<QrCode className="h-4 w-4" />} onClick={() => setQrOpen(true)}>
-            Registration QR
+            Event QR
           </Button>
           <RegistrationQrModal open={qrOpen} onClose={() => setQrOpen(false)} url={publicUrl} title={currentEvent.title} />
-          <ButtonLink to="/app/scanner" icon={<ScanLine className="h-4 w-4" />}>
-            Open gate scanner
-          </ButtonLink>
+          {!formOnly && !appsOnly && (
+            <ButtonLink to="/app/scanner" icon={<ScanLine className="h-4 w-4" />}>
+              Open gate scanner
+            </ButtonLink>
+          )}
         </div>
       </div>
 
       {/* KPI band (registration-only events have no check-in, so no arrival figures) */}
+      {!appsOnly && (
       <Card className="grid grid-cols-2 divide-ink-100 overflow-hidden md:grid-cols-3 xl:grid-cols-5 xl:divide-x [&>*]:border-ink-100 max-xl:[&>*]:border-b max-md:[&>*:last-child:nth-child(odd)]:col-span-2">
         <Kpi
           icon={<Users className="h-4 w-4" />}
@@ -308,172 +295,18 @@ export const DashboardPage: React.FC = () => {
           />
         )}
       </Card>
-
-      {/* Trend + attendance breakdown */}
-      {isOrganizer && (
-        <div className="grid gap-6 xl:grid-cols-12">
-          <ChartCard
-            className="xl:col-span-8"
-            title="Registrations"
-            description="Total sign-ups over time"
-            height="h-72"
-            summary={growth ? growth.labels.map((l, i) => `${l}: ${growth.counts[i]} new`).join('; ') : 'Loading'}
-            actions={
-              <Link to="/app/analytics" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:underline">
-                Full analytics <ArrowRight className="h-4 w-4" aria-hidden />
-              </Link>
-            }
-            empty={
-              analyticsLoading ? (
-                <div className="p-5">
-                  <Skeleton className="h-72" />
-                </div>
-              ) : registered === 0 ? (
-                <EmptyState
-                  icon={<Users className="h-6 w-6" />}
-                  title="No registrations yet"
-                  description="Share your registration link. Sign-ups appear here day by day."
-                  action={<Button variant="secondary" size="sm" icon={<Link2 className="h-4 w-4" />} onClick={copyLink}>Copy registration link</Button>}
-                />
-              ) : undefined
-            }
-          >
-            {growth && (
-              <Line
-                options={{
-                  ...lineOptions,
-                  plugins: {
-                    ...lineOptions.plugins,
-                    tooltip: {
-                      ...(lineOptions.plugins?.tooltip as object),
-                      callbacks: {
-                        label: (ctx) => ` ${ctx.parsed.y} registered (${growth.counts[ctx.dataIndex]} new that day)`,
-                      },
-                    },
-                  },
-                }}
-                data={{
-                  labels: growth.labels,
-                  datasets: [
-                    {
-                      label: 'Registered',
-                      data: cumulative(growth.counts),
-                      borderColor: chartColors.brand,
-                      backgroundColor: 'rgba(194, 33, 90, 0.08)',
-                      fill: 'origin',
-                      pointBackgroundColor: chartColors.brand,
-                    },
-                  ],
-                }}
-              />
-            )}
-          </ChartCard>
-
-          {!formOnly && (
-          <Card className="xl:col-span-4">
-            <CardHeader title="Attendance breakdown" description="Where every registration stands" />
-            <div className="space-y-4 p-5">
-              <FunnelRow label="Registered" value={registered} of={registered} color="bg-brand-600" />
-              <FunnelRow label="Checked in at least once" value={checkedIn} of={registered} color="bg-emerald-600" />
-              <FunnelRow label="Inside now" value={inside} of={registered} color="bg-emerald-400" />
-              <FunnelRow label="Left the venue" value={left} of={registered} color="bg-marigold-500" />
-              <FunnelRow label="Not arrived yet" value={notArrived} of={registered} color="bg-ink-300" />
-              {analytics && (
-                <div className="flex items-center gap-4 border-t border-ink-100 pt-4 text-sm">
-                  <span className="inline-flex items-center gap-1.5 text-ink-700">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden />
-                    {analytics.scan_audit.success ?? 0} accepted scans
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 text-ink-700">
-                    <Copy className="h-4 w-4 text-marigold-600" aria-hidden />
-                    {analytics.scan_audit.duplicate ?? 0} duplicates stopped
-                  </span>
-                </div>
-              )}
-            </div>
-          </Card>
-          )}
-        </div>
       )}
 
-      {/* Gate traffic + gates + budget */}
-      {isOrganizer && analytics && (
-        <div className="grid gap-6 xl:grid-cols-12">
-          <ChartCard
-            className="xl:col-span-5"
-            title="Gate traffic"
-            description="Scans per hour"
-            height="h-64"
-            summary={analytics.velocity_chart.labels.map((l, i) => `${l}: ${analytics.velocity_chart.gate_in[i]} in, ${analytics.velocity_chart.gate_out[i]} out`).join('; ')}
-            actions={
-              <Legend
-                items={[
-                  { label: 'In', color: chartColors.emerald },
-                  { label: 'Out', color: chartColors.marigold },
-                ]}
-              />
-            }
-            empty={checkedIn === 0 ? <EmptyState icon={<ScanLine className="h-6 w-6" />} title="No gate scans yet" description="Traffic appears here once your crew starts scanning." /> : undefined}
-          >
-            <Bar
-              options={trafficOptions}
-              data={{
-                labels: analytics.velocity_chart.labels,
-                datasets: [
-                  { label: 'In', data: analytics.velocity_chart.gate_in, backgroundColor: chartColors.emerald, borderRadius: 4, borderSkipped: 'start', maxBarThickness: 22 },
-                  { label: 'Out', data: analytics.velocity_chart.gate_out, backgroundColor: chartColors.marigold, borderRadius: 4, borderSkipped: 'start', maxBarThickness: 22 },
-                ],
-              }}
-            />
-          </ChartCard>
+      {/* Applications: a short summary here; reviewing happens on the Applications page */}
+      {currentEvent.applications_enabled && <ApplicationsSummary eventId={currentEvent.id} />}
 
-          <Card className="xl:col-span-3">
-            <CardHeader title="Entries by gate" />
-            {checkedIn === 0 ? (
-              <EmptyState title="No entries yet" description="Each gate's share appears after the first scans." />
-            ) : (
-              <ul className="space-y-3.5 p-5">
-                {analytics.gate_distribution_chart.labels.map((g, i) => {
-                  const count = analytics.gate_distribution_chart.counts[i] ?? 0
-                  const max = Math.max(...analytics.gate_distribution_chart.counts, 1)
-                  return (
-                    <li key={g}>
-                      <div className="flex justify-between gap-3 text-sm">
-                        <span className="truncate text-ink-700">{g}</span>
-                        <span className="font-semibold tabular text-ink-900">{count}</span>
-                      </div>
-                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-ink-100">
-                        <div className="h-full rounded-full bg-brand-600" style={{ width: `${Math.max(pct(count, max), 3)}%` }} />
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </Card>
+      {isOrganizer && <PageChecklist event={currentEvent} />}
 
-          <Card className="xl:col-span-4">
-            <CardHeader
-              title="Budget"
-              description="Raised against target"
-              actions={
-                <Link to="/app/analytics?tab=budget" className="text-sm font-semibold text-brand-700 hover:underline">
-                  Edit
-                </Link>
-              }
-            />
-            <BudgetSnapshot funding={analytics.funding} />
-          </Card>
-        </div>
-      )}
-
-      {/* Applications stage: participants to review (module `applications`) */}
-      {currentEvent.applications_enabled && <ApplicationsCard eventId={currentEvent.id} />}
-
-      {/* Attendees + activity + tasks */}
+      {/* Guests + gate activity (an applications-only event has no guests yet) */}
+      {!appsOnly && (
       <div className="grid gap-6 xl:grid-cols-12">
         <AttendeesCard
-          className="xl:col-span-8"
+          className={formOnly ? 'xl:col-span-12' : 'xl:col-span-8'}
           eventId={currentEvent.id}
           tickets={tickets}
           loading={ticketsLoading}
@@ -485,10 +318,11 @@ export const DashboardPage: React.FC = () => {
           onCopyLink={copyLink}
         />
 
+        {!formOnly && (
         <div className="space-y-6 xl:col-span-4">
-          {guestsOn && <ArrivalsCard eventId={currentEvent.id} />}
-          {isOrganizer && <TasksCard tasks={tasks} />}
+          {guestsOn && !formOnly && <ArrivalsCard eventId={currentEvent.id} />}
 
+          {!formOnly && (
           <Card className="flex flex-col overflow-hidden">
             <CardHeader
               title="Gate activity"
@@ -528,8 +362,11 @@ export const DashboardPage: React.FC = () => {
               )}
             </div>
           </Card>
+          )}
         </div>
+        )}
       </div>
+      )}
 
       {selectedTicket && (
         <TicketPassModal
@@ -610,131 +447,6 @@ const Kpi: React.FC<KpiProps> = ({ icon, tone, label, value, sub, spark, meter, 
     </Link>
   ) : (
     <div className={cls}>{body}</div>
-  )
-}
-
-const FunnelRow: React.FC<{ label: string; value: number; of: number; color: string }> = ({ label, value, of, color }) => (
-  <div>
-    <div className="flex items-baseline justify-between gap-3 text-sm">
-      <span className="text-ink-700">{label}</span>
-      <span className="tabular">
-        <span className="font-semibold text-ink-900">{value}</span>
-        <span className="ml-1.5 text-ink-500">{pct(value, of)}%</span>
-      </span>
-    </div>
-    <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-ink-100" aria-hidden>
-      <div className={cn('h-full rounded-full transition-[width] duration-500', color)} style={{ width: `${value ? Math.max(pct(value, of), 2) : 0}%` }} />
-    </div>
-  </div>
-)
-
-const BudgetSnapshot: React.FC<{ funding: NonNullable<Awaited<ReturnType<typeof api.getEventAnalytics>>>['funding'] }> = ({ funding }) => {
-  if (!funding.target_budget && !funding.total_funding && !funding.total_expenses) {
-    return <EmptyState icon={<Wallet className="h-6 w-6" />} title="No budget yet" description="Add your target, sponsorships and costs to track the balance." />
-  }
-  const raisedPct = pct(funding.total_funding, funding.target_budget)
-  const top = Object.entries(funding.expenses_breakdown)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-  return (
-    <div className="space-y-4 p-5">
-      <div>
-        <div className="flex items-baseline justify-between gap-3">
-          <p className="font-display text-2xl font-bold tabular text-ink-900">{fmtNpr(funding.total_funding)}</p>
-          <p className="text-sm text-ink-500">of {fmtNpr(funding.target_budget)}</p>
-        </div>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-ink-100" aria-label={`${raisedPct}% of target raised`} role="img">
-          <div className="h-full rounded-full bg-brand-600" style={{ width: `${Math.min(raisedPct, 100)}%` }} />
-        </div>
-      </div>
-      <dl className="grid grid-cols-2 gap-3 text-sm">
-        <div className="rounded-xl bg-ink-50 p-3">
-          <dt className="text-ink-500">Spent</dt>
-          <dd className="mt-0.5 font-semibold tabular text-ink-900">{fmtNpr(funding.total_expenses)}</dd>
-        </div>
-        <div className="rounded-xl bg-ink-50 p-3">
-          <dt className="text-ink-500">Balance</dt>
-          <dd className={cn('mt-0.5 font-semibold tabular', funding.net_balance < 0 ? 'text-red-700' : 'text-emerald-700')}>
-            {fmtNpr(funding.net_balance)}
-          </dd>
-        </div>
-      </dl>
-      {top.length > 0 && (
-        <div>
-          <p className="text-xs font-medium text-ink-500">Biggest costs</p>
-          <ul className="mt-2 space-y-1.5 text-sm">
-            {top.map(([k, v]) => (
-              <li key={k} className="flex justify-between gap-3">
-                <span className="truncate text-ink-700">{k}</span>
-                <span className="tabular text-ink-900">{fmtNpr(v)}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  )
-}
-
-const taskStatusMeta: Record<EventTask['status'], { label: string; color: string }> = {
-  todo: { label: 'To do', color: 'bg-ink-300' },
-  in_progress: { label: 'In progress', color: 'bg-marigold-500' },
-  completed: { label: 'Done', color: 'bg-emerald-500' },
-}
-
-const priorityTone = { urgent: 'danger', high: 'warning', medium: 'neutral', low: 'neutral' } as const
-
-const TasksCard: React.FC<{ tasks: EventTask[] }> = ({ tasks }) => {
-  const open = tasks.filter((t) => t.status !== 'completed')
-  const order = { urgent: 0, high: 1, medium: 2, low: 3 }
-  const next = [...open].sort((a, b) => order[a.priority] - order[b.priority]).slice(0, 4)
-  return (
-    <Card>
-      <CardHeader
-        title="Crew tasks"
-        actions={
-          <Link to="/app/tasks" className="text-sm font-semibold text-brand-700 hover:underline">
-            View board
-          </Link>
-        }
-      />
-      {tasks.length === 0 ? (
-        <EmptyState icon={<ListChecks className="h-6 w-6" />} title="No tasks yet" description="Assign stage, gate and hospitality jobs to your crew." />
-      ) : (
-        <div className="p-5">
-          <div className="flex h-2.5 gap-0.5 overflow-hidden rounded-full" role="img" aria-label={(['todo', 'in_progress', 'completed'] as const).map((s) => `${taskStatusMeta[s].label}: ${tasks.filter((t) => t.status === s).length}`).join(', ')}>
-            {(['completed', 'in_progress', 'todo'] as const).map((s) => {
-              const n = tasks.filter((t) => t.status === s).length
-              return n ? <div key={s} className={taskStatusMeta[s].color} style={{ width: `${pct(n, tasks.length)}%` }} /> : null
-            })}
-          </div>
-          <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-600">
-            {(['completed', 'in_progress', 'todo'] as const).map((s) => (
-              <li key={s} className="inline-flex items-center gap-1.5">
-                <span className={cn('h-2 w-2 rounded-full', taskStatusMeta[s].color)} aria-hidden />
-                {taskStatusMeta[s].label} {tasks.filter((t) => t.status === s).length}
-              </li>
-            ))}
-          </ul>
-          {next.length > 0 && (
-            <ul className="mt-4 divide-y divide-ink-100 border-t border-ink-100">
-              {next.map((t) => (
-                <li key={t.id} className="flex items-start gap-3 py-3">
-                  <Circle className={cn('mt-0.5 h-4 w-4 shrink-0', t.status === 'in_progress' ? 'text-marigold-500' : 'text-ink-300')} aria-hidden />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-ink-900">{t.title}</p>
-                    <p className="truncate text-xs text-ink-500">{t.assigned_name || 'Unassigned'}</p>
-                  </div>
-                  {(t.priority === 'urgent' || t.priority === 'high') && (
-                    <Badge tone={priorityTone[t.priority]}>{t.priority === 'urgent' ? 'Urgent' : 'High'}</Badge>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-    </Card>
   )
 }
 

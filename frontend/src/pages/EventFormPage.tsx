@@ -1160,23 +1160,14 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                         auto={bookLabel({ ...(event ?? {}), registration_mode: draft.registration_mode, is_paid: draft.is_paid, ticket_price: draft.ticket_price, ticket_types: event?.ticket_types, cta_label: '', tickets_enabled: true } as Event)}
                         onChange={(v) => set('cta_label', v)}
                       />
-                      {draft.limit_spots && (
+                      {/* Ticketed events set this on Tickets & prices */}
+                      {draft.limit_spots && kind === 'registration' && (
                         <Checkbox
                           label="Show how many spots are left"
                           hint="People still see Fully booked / Sold out."
                           checked={draft.show_spots_left}
                           onChange={(v) => set('show_spots_left', v)}
                         />
-                      )}
-                      {!isEdit && kind !== 'registration' && (
-                        <Select label="Questions for buyers" hint="Extra questions besides name, email and phone." value={draft.form_template} onChange={(e) => set('form_template', e.target.value)}>
-                          <option value="">None</option>
-                          {FORM_TEMPLATES.map((t) => (
-                            <option key={t.id} value={t.id}>
-                              {t.name}
-                            </option>
-                          ))}
-                        </Select>
                       )}
                       {draft.registration_mode === 'pass' && (
                         <Select

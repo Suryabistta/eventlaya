@@ -65,8 +65,11 @@ export const FormBuilderPage: React.FC = () => {
   const { data: forms = [], isLoading, isError, error, refetch } = useQuery({ queryKey: ['forms'], queryFn: api.getForms })
 
   // Two forms per event: the audience registration form and, with the applications stage on, the application form
+  // A pageant / open call only has the application form; an event with tickets and applications shows both tabs
+  const appsOnly = Boolean(currentEvent?.applications_enabled) && currentEvent?.tickets_enabled === false
   const [which, setWhich] = useState<FormKind>('registration')
-  const kind: FormKind = which === 'application' && currentEvent?.applications_enabled ? 'application' : 'registration'
+  const kind: FormKind = appsOnly || (which === 'application' && currentEvent?.applications_enabled) ? 'application' : 'registration'
+  const audienceTitle = currentEvent?.registration_mode === 'form' ? 'Sign-up form' : 'Buyer questions'
   const form = useMemo(() => {
     if (!currentEvent) return undefined
     if (kind === 'application') return forms.find((f) => f.id === currentEvent.application_form)
@@ -95,24 +98,24 @@ export const FormBuilderPage: React.FC = () => {
 
   return wrap(
     <>
-      {currentEvent?.applications_enabled && (
+      {currentEvent?.applications_enabled && !appsOnly && (
         <Segmented
           label="Form"
           value={kind}
           onChange={(v) => setWhich(v as FormKind)}
           options={[
-            { value: 'registration', label: 'Audience registration' },
+            { value: 'registration', label: audienceTitle },
             { value: 'application', label: 'Applications' },
           ]}
         />
       )}
       <PageHeader
-        title={kind === 'application' ? 'Application form' : 'Registration form'}
+        title={kind === 'application' ? 'Application form' : audienceTitle}
         description={
           currentEvent
             ? kind === 'application'
               ? `Questions participants answer when they apply to ${currentEvent.title} (film details, photos, bio…). Name, email and phone are always asked.`
-              : `Questions attendees answer when they register for ${currentEvent.title}. Name, email and phone are always asked.`
+              : `Extra questions people answer when they ${currentEvent.registration_mode === 'form' ? 'sign up for' : 'get tickets for'} ${currentEvent.title}. Name, email and phone are always asked.`
             : 'Questions attendees answer when they register.'
         }
       />

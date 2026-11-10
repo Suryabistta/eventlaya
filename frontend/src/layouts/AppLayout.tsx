@@ -89,8 +89,12 @@ interface NavExtras {
   /** Applications page: current event takes applications; badge = waiting for review */
   applications: boolean
   applicationsPending: number
+  /** The current event's kind (null without one): the event menu shows only what that kind needs */
+  kind: 'ticketing' | 'registration' | 'pageant' | null
+  ticketsOn: boolean
+  passes: boolean
 }
-const noExtras: NavExtras = { chat: false, chatUnread: 0, reviews: false, marketplace: true, whiteLabel: true, payments: true, printedTickets: false, contests: false, applications: false, applicationsPending: 0 }
+const noExtras: NavExtras = { chat: false, chatUnread: 0, reviews: false, marketplace: true, whiteLabel: true, payments: true, printedTickets: false, contests: false, applications: false, applicationsPending: 0, kind: null, ticketsOn: false, passes: false }
 
 /** Modules on for this user + chat unread count, for the sidebar, More sheet and tab bar. */
 function useNavExtras(): NavExtras {
@@ -104,7 +108,11 @@ function useNavExtras(): NavExtras {
     queryFn: () => request<{ review_status: string }[]>(`/forms/events/${currentEvent!.id}/applications/`),
     enabled: appsOn,
   })
+  const ev = currentEvent
   return {
+    kind: !ev ? null : ev.applications_enabled && ev.tickets_enabled === false ? 'pageant' : (ev.event_kind ?? 'ticketing'),
+    ticketsOn: Boolean(ev) && ev!.tickets_enabled !== false,
+    passes: Boolean(ev) && ev!.tickets_enabled !== false && ev!.registration_mode !== 'form',
     applications: appsOn,
     applicationsPending: appsOn ? (applications ?? []).filter((a) => a.review_status === 'pending').length : 0,
     chat: chat.available,
@@ -127,9 +135,18 @@ type ShellUser = AuthUser & { marketplace_access?: 'none' | 'pending' | 'approve
 const isVendor = (u: ShellUser | null) => u?.role === 'vendor'
 const hasBusinessPortal = (u: ShellUser | null) => isVendor(u) || u?.marketplace_access === 'approved'
 
-const eventTools = (x: NavExtras): NavGroup => ({
-  label: 'Run your event',
-  items: [
+/** The event menu follows the selected event: ticketing, free registration or pageant each see only their own tools. */
+const eventTools = (x: NavExtras): NavGroup => {
+  const k = x.kind
+  const formLabel = k === 'pageant' ? 'Application form' : k === 'registration' ? 'Sign-up form' : 'Buyer questions'
+  const checkIn: NavItem = {
+    label: 'Check-in',
+    to: '/app/scanner',
+    end: true,
+    icon: ScanLine,
+    children: [{ label: 'Gates & scanners', to: '/app/gates', icon: DoorOpen, roles: ORGANIZER }],
+  }
+  const items: NavItem[] = [
     { label: 'Overview', to: '/app', icon: LayoutDashboard, end: true },
     {
       label: 'Events',
@@ -143,23 +160,30 @@ const eventTools = (x: NavExtras): NavGroup => ({
         ...(x.contests ? [{ label: 'Pageants', to: '/app/events/pageants', icon: Crown }] : []),
       ],
     },
-    { label: 'Tickets', to: '/app/tickets', icon: Ticket, roles: ORGANIZER },
-    ...(x.printedTickets ? [{ label: 'Printed tickets', to: '/app/printed-tickets', icon: Printer, roles: ORGANIZER }] : []),
-    ...(x.applications
-      ? [{ label: 'Applications', to: '/app/applications', icon: Inbox, roles: ORGANIZER, badge: x.applicationsPending }]
-      : []),
-    { label: 'Payments', to: '/app/payments', icon: Wallet, roles: ORGANIZER },
-    { label: 'Registration forms', to: '/app/forms', icon: FileText, roles: ORGANIZER },
-    { label: 'Gate scanner', to: '/app/scanner', icon: ScanLine },
-    { label: 'Gates & staff', to: '/app/gates', icon: DoorOpen, roles: ORGANIZER },
-    { label: 'Team', to: '/app/team', icon: UsersRound, roles: ORGANIZER },
-    { label: 'Live voting', to: '/app/voting', icon: Vote, roles: ORGANIZER },
+  ]
+  if (k === 'pageant' || x.applications) {
+    items.push({ label: 'Applications', to: '/app/applications', icon: Inbox, roles: ORGANIZER, badge: x.applicationsPending })
+  }
+  if (k) items.push({ label: formLabel, to: '/app/forms', icon: FileText, roles: ORGANIZER })
+  if (k === 'pageant') items.push({ label: 'Contest & voting', to: '/app/voting', icon: Vote, roles: ORGANIZER })
+  if (x.ticketsOn && k !== 'registration') {
+    items.push({ label: k === 'pageant' ? 'Finale tickets' : 'Tickets & prices', to: '/app/tickets', icon: Ticket, roles: ORGANIZER })
+    items.push({ label: 'Orders & payments', to: '/app/payments', icon: Wallet, roles: ORGANIZER })
+    if (x.printedTickets) items.push({ label: 'Printed tickets', to: '/app/printed-tickets', icon: Printer, roles: ORGANIZER })
+  }
+  if (x.passes) items.push(checkIn)
+  if (k && k !== 'pageant') items.push({ label: 'Polls', to: '/app/voting', icon: Vote, roles: ORGANIZER })
+  if (k) items.push({ label: 'Analytics', to: '/app/analytics', icon: BarChart3, roles: ORGANIZER })
+  items.push(
+    { label: 'Team members', to: '/app/team', icon: UsersRound, roles: ORGANIZER },
     { label: 'Tasks', to: '/app/tasks', icon: ListChecks, roles: ORGANIZER },
-    { label: 'Analytics', to: '/app/analytics', icon: BarChart3, roles: ORGANIZER },
     ...(x.chat ? [{ label: 'Messages', to: '/app/messages', icon: MessageCircle, roles: TEAM_CHAT, badge: x.chatUnread }] : []),
     ...(x.reviews ? [{ label: 'Reviews', to: '/app/reviews', icon: Star, roles: ORGANIZER }] : []),
-  ],
-})
+  )
+  // Gate staff only ever scan, whatever the event
+  if (!x.passes) items.push({ ...checkIn, roles: ['staff'] })
+  return { label: 'Run your event', items }
+}
 
 /** Navigation depends on what the account is: event company, vendor, both, gate staff or platform admin. */
 function buildNav(user: ShellUser | null, pending: PendingApprovals = noPending, x: NavExtras = noExtras): NavGroup[] {
@@ -370,11 +394,15 @@ const Shell: React.FC = () => {
 /* ------------------------------------------------------------------ */
 /* Mobile navigation                                                    */
 
-const organizerTabs: NavItem[] = [
+const organizerTabs = (x: NavExtras): NavItem[] => [
   { label: 'Overview', to: '/app', icon: LayoutDashboard, end: true },
   { label: 'Events', to: '/app/events', icon: CalendarDays },
-  { label: 'Scan', to: '/app/scanner', icon: ScanLine },
-  { label: 'Voting', to: '/app/voting', icon: Vote },
+  x.kind === 'pageant'
+    ? { label: 'Applications', to: '/app/applications', icon: Inbox, badge: x.applicationsPending }
+    : x.passes
+      ? { label: 'Scan', to: '/app/scanner', icon: ScanLine }
+      : { label: 'Form', to: '/app/forms', icon: FileText },
+  x.kind === 'pageant' ? { label: 'Voting', to: '/app/voting', icon: Vote } : { label: 'Analytics', to: '/app/analytics', icon: BarChart3 },
 ]
 
 const vendorTabs: NavItem[] = [
@@ -416,7 +444,7 @@ const BottomTabBar: React.FC<{ moreOpen: boolean; onMore: () => void }> = ({ mor
         ? attendeeTabs(x)
         : user && ORGANIZER.includes(user.role)
           ? // With chat on, Messages takes Voting's tab (Voting stays in More)
-            [...organizerTabs.slice(0, x.chat ? 3 : 4), ...(user.role === 'organizer' ? messagesTab(x) : [])]
+            [...organizerTabs(x).slice(0, x.chat ? 3 : 4), ...(user.role === 'organizer' ? messagesTab(x) : [])]
           : [...staffTabs, ...messagesTab(x)]
   // "More" is active when the current page isn't one of the tabs
   const onTab = tabs.some((t) => (t.end ? location.pathname === t.to : location.pathname.startsWith(t.to)))
@@ -599,7 +627,7 @@ const MoreSheet: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onC
                   <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-100 text-ink-600">
                     <ExternalLink className="h-[18px] w-[18px]" aria-hidden />
                   </span>
-                  <span className="flex-1">Registration page</span>
+                  <span className="flex-1">Event page</span>
                 </a>
               </li>
             )}
@@ -763,13 +791,15 @@ const SidebarContent: React.FC<{ collapsed: boolean; onToggleCollapse?: () => vo
 /** The current event at a glance: who's inside right now, one tap to the scanner. */
 const LiveEventCard: React.FC = () => {
   const { currentEvent } = useCurrentEvent()
+  // Only events with QR passes have people to scan in
+  const hasPasses = Boolean(currentEvent) && currentEvent!.tickets_enabled !== false && currentEvent!.registration_mode !== 'form'
   const { data: stats } = useQuery({
     queryKey: ['gateStats', currentEvent?.id],
     queryFn: () => api.getGateStats(currentEvent!.id),
-    enabled: Boolean(currentEvent?.id),
+    enabled: hasPasses,
     refetchInterval: 5000,
   })
-  if (!currentEvent) return null
+  if (!currentEvent || !hasPasses) return null
 
   const inside = stats?.currently_inside ?? currentEvent.checked_in_count
   const capacity = currentEvent.capacity
@@ -888,7 +918,7 @@ const Topbar: React.FC = () => {
             rel="noopener noreferrer"
             className="hidden items-center gap-1.5 rounded-[10px] px-3 py-2 text-sm font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900 md:inline-flex"
           >
-            Registration page
+            Event page
             <ExternalLink className="h-3.5 w-3.5" aria-hidden />
             <span className="sr-only">(opens in a new tab)</span>
           </a>

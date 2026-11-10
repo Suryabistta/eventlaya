@@ -47,7 +47,7 @@ export const VotingPage: React.FC = () => {
   return (
     <div className={wrapClass}>
       <PageHeader
-        title="Live voting"
+        title={currentEvent?.applications_enabled && currentEvent.tickets_enabled === false ? 'Contest & voting' : 'Polls & voting'}
         description={currentEvent ? `Audience polls and contests for ${currentEvent.title}. Counts refresh on their own.` : 'Audience polls and contests for your event.'}
         actions={
           <>

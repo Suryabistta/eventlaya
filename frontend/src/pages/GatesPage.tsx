@@ -44,7 +44,7 @@ export const GatesPage: React.FC = () => {
   if (!currentEvent) {
     return wrap(
       <>
-        <PageHeader title="Gates and staff" />
+        <PageHeader title="Gates & scanners" />
         <Card>
           <EmptyState
             icon={<CalendarPlus className="h-6 w-6" aria-hidden />}
@@ -64,7 +64,7 @@ export const GatesPage: React.FC = () => {
   return wrap(
     <>
       <PageHeader
-        title="Gates and staff"
+        title="Gates & scanners"
         description={`The entrances and exits at ${currentEvent.location}, and who scans at each one.`}
         actions={
           <ButtonLink to="/app/scanner" variant="secondary" size="sm" icon={<ScanLine className="h-4 w-4" aria-hidden />}>

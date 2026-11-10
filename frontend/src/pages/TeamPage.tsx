@@ -52,7 +52,7 @@ export const TeamPage: React.FC = () => {
   return (
     <div className="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 2xl:px-10">
       <PageHeader
-        title="Team"
+        title="Team members"
         description={
           team.length
             ? `${activeCount} active staff member${activeCount === 1 ? '' : 's'}. Add people here, then put them on a gate in Gates & staff.`

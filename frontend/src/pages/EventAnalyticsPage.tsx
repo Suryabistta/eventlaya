@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { SalesSection } from './analytics/SalesSection'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { BarChart3, CalendarDays, ClipboardList, Download, ScanLine, Wallet } from 'lucide-react'
+import { BarChart3, CalendarDays, Download, ScanLine, Wallet } from 'lucide-react'
 import { api, tokenStore } from '@/services/api'
 import { useCurrentEvent } from '@/lib/event-context'
 import { Button, ButtonLink, Card, EmptyState, ErrorState, PageHeader, Skeleton, useToast } from '@/components/ui'
@@ -10,7 +10,6 @@ import { cn } from '@/lib/utils'
 import { PhaseNotice } from '@/components/PhaseBadge'
 import { AttendanceSection } from './analytics/AttendanceSection'
 import { FundingSection } from './analytics/FundingSection'
-import { TasksSection } from './analytics/TasksSection'
 import { TicketTypesSection } from './analytics/TicketTypesSection'
 
 const tabs = [
@@ -26,7 +25,6 @@ const tabs = [
     short: 'Budget',
     icon: Wallet,
   },
-  { id: 'crew', label: 'Crew tasks', short: 'Crew tasks', icon: ClipboardList },
 ] as const
 
 type TabId = (typeof tabs)[number]['id']
@@ -146,7 +144,7 @@ export default function EventAnalyticsPage() {
   if (!eventsLoading && !currentEvent) {
     return (
       <div className="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 2xl:px-10">
-        <PageHeader title="Analytics and crew" />
+        <PageHeader title="Analytics" />
         <Card>
           <EmptyState
             icon={<CalendarDays className="h-6 w-6" />}
@@ -162,7 +160,7 @@ export default function EventAnalyticsPage() {
   return (
     <div className="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 2xl:px-10">
       <PageHeader
-        title="Analytics and crew"
+        title="Analytics"
         description={
           currentEvent ? (
             currentEvent.title
@@ -217,9 +215,7 @@ export default function EventAnalyticsPage() {
       </div>
 
       <div role="tabpanel" id={`panel-${activeTab}`} aria-labelledby={`tab-${activeTab}`}>
-        {activeTab === 'crew' && eventId ? (
-          <TasksSection eventId={eventId} />
-        ) : analyticsError ? (
+        {analyticsError ? (
           <ErrorState message={(analyticsErr as Error)?.message} onRetry={() => void refetchAnalytics()} />
         ) : eventsLoading || analyticsLoading || !analytics || !eventId ? (
           <PageSkeleton />
