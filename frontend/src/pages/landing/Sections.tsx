@@ -15,12 +15,15 @@ import {
   Speaker,
   Flower2,
   Building2,
+  Store,
   UtensilsCrossed,
   Plus,
   ArrowRight,
   Check,
 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { buttonClass } from '@/components/ui/Button'
+import { api } from '@/services/api'
 import { cn } from '@/lib/utils'
 import { Reveal } from './ProductTour'
 import { usePublicNumbers } from './data'
@@ -246,15 +249,34 @@ export const NumbersBand: React.FC = () => {
 
 /* ------------------------------------------------------------------ */
 
-const vendorKinds = [
-  { icon: Building2, label: 'Halls and venues', note: 'Banquets, auditoriums, lawns' },
-  { icon: Speaker, label: 'Sound and stage', note: 'PA, lights, LED walls' },
-  { icon: Camera, label: 'Photo and video', note: 'Coverage and livestreams' },
-  { icon: Flower2, label: 'Decoration', note: 'Stage, mandap, florals' },
-  { icon: UtensilsCrossed, label: 'Catering', note: 'Buffets and snacks' },
+// Shown until the categories load (and in prerendered pages); venues first, like the marketplace chips
+const vendorKinds: { icon: React.ElementType; label: string; note: string; to: string }[] = [
+  { icon: Building2, label: 'Halls and venues', note: 'Banquets, auditoriums, lawns', to: '/marketplace?show=venues' },
+  { icon: Speaker, label: 'Sound and stage', note: 'PA, lights, LED walls', to: '/marketplace' },
+  { icon: Camera, label: 'Photo and video', note: 'Coverage and livestreams', to: '/marketplace' },
+  { icon: Flower2, label: 'Decoration', note: 'Stage, mandap, florals', to: '/marketplace' },
+  { icon: UtensilsCrossed, label: 'Catering', note: 'Buffets and snacks', to: '/marketplace' },
 ]
+const KIND_ICONS: Record<string, React.ElementType> = { Camera, Flower2, Speaker, Music: Speaker, Utensils: UtensilsCrossed, UtensilsCrossed, Sparkles: Flower2 }
 
-export const MarketplaceBand: React.FC = () => (
+/** Venues plus the superadmin's vendor categories (the same list as the marketplace chips), each linking to its filter. */
+function useKinds() {
+  const { data: categories } = useQuery({ queryKey: ['marketplaceCategories'], queryFn: api.getCategories, staleTime: 10 * 60_000 })
+  if (!categories?.length) return vendorKinds
+  return [
+    vendorKinds[0],
+    ...categories.slice(0, 5).map((c) => ({
+      icon: KIND_ICONS[c.icon] ?? Store,
+      label: c.name,
+      note: c.vendors_count ? `${c.vendors_count} listed` : 'Coming soon',
+      to: `/marketplace?category=${c.slug}`,
+    })),
+  ]
+}
+
+export const MarketplaceBand: React.FC = () => {
+  const kinds = useKinds()
+  return (
   <section className="bg-brand-50 py-20 sm:py-28">
     <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-[0.9fr_1.1fr]">
       <Reveal className="max-w-lg">
@@ -272,7 +294,7 @@ export const MarketplaceBand: React.FC = () => (
         </div>
       </Reveal>
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {vendorKinds.map((v, i) => (
+        {kinds.map((v, i) => (
           <motion.li
             key={v.label}
             initial={{ opacity: 0, y: 20 }}
@@ -282,15 +304,18 @@ export const MarketplaceBand: React.FC = () => (
             transition={{ duration: 0.5, delay: i * 0.06, ease }}
             className={cn('rounded-2xl border border-brand-100 bg-white p-5 shadow-2xs', i === 0 && 'sm:col-span-2')}
           >
-            <v.icon className="h-6 w-6 text-brand-600" aria-hidden />
-            <p className="mt-3 font-semibold text-ink-900">{v.label}</p>
-            <p className="text-sm text-ink-500">{v.note}</p>
+            <Link to={v.to} className="block">
+              <v.icon className="h-6 w-6 text-brand-600" aria-hidden />
+              <p className="mt-3 font-semibold text-ink-900">{v.label}</p>
+              <p className="text-sm text-ink-500">{v.note}</p>
+            </Link>
           </motion.li>
         ))}
       </ul>
     </div>
   </section>
-)
+  )
+}
 
 /* ------------------------------------------------------------------ */
 
