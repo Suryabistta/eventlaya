@@ -47,6 +47,9 @@ class VendorProfile(models.Model):
     featured_image = models.CharField(max_length=500, blank=True)
     is_verified = models.BooleanField(default=False)
     is_featured = models.BooleanField(default=False)
+    # Owner's reusable time slots for opening dates, e.g. [{"name": "Morning", "start": "07:00", "end": "11:00"}];
+    # empty = whole day only (docs/plan-2026-11-bookings-and-bs.md)
+    slot_presets = models.JSONField(default=list, blank=True)
     rating = models.DecimalField(max_digits=3, decimal_places=2, default=5.00)
     listing_status = models.CharField(max_length=20, choices=ListingStatus.choices, default=ListingStatus.PENDING, db_index=True)
     review_note = models.TextField(blank=True)
@@ -101,6 +104,9 @@ class VenueListing(models.Model):
     
     is_verified = models.BooleanField(default=False)
     is_featured = models.BooleanField(default=False)
+    # Owner's reusable time slots for opening dates, e.g. [{"name": "Morning", "start": "07:00", "end": "11:00"}];
+    # empty = whole day only (docs/plan-2026-11-bookings-and-bs.md)
+    slot_presets = models.JSONField(default=list, blank=True)
     rating = models.DecimalField(max_digits=3, decimal_places=2, default=4.8)
     review_count = models.PositiveIntegerField(default=0)
 
@@ -186,6 +192,10 @@ class VenueInquiry(models.Model):
     )
     package = models.ForeignKey('ServicePackage', on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
     owner_note = models.TextField(blank=True, help_text='Message from the owner when confirming/declining')
+    # Booking management (status booked): agreed price, payments (BookingPayment), done, and where it came from
+    agreed_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    source = models.CharField(max_length=10, default='request', help_text='request (from the site) or manual (owner added)')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -217,6 +227,10 @@ class VendorInquiry(models.Model):
     )
     package = models.ForeignKey('ServicePackage', on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
     owner_note = models.TextField(blank=True, help_text='Message from the owner when confirming/declining')
+    # Booking management (status booked): agreed price, payments (BookingPayment), done, and where it came from
+    agreed_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    source = models.CharField(max_length=10, default='request', help_text='request (from the site) or manual (owner added)')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -395,3 +409,34 @@ class ServicePackage(models.Model):
     @property
     def owner_id(self):
         return self.vendor.user_id if self.vendor_id else self.venue.owner_id
+
+
+class BookingPayment(models.Model):
+    """A payment the owner received for a booking, outside Eventlaya (cash, bank...). Records only; no money moves here."""
+
+    class Method(models.TextChoices):
+        CASH = 'cash', 'Cash'
+        BANK = 'bank', 'Bank transfer'
+        WALLET = 'wallet', 'eSewa / Khalti (direct)'
+        CHEQUE = 'cheque', 'Cheque'
+        OTHER = 'other', 'Other'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    venue_booking = models.ForeignKey(VenueInquiry, null=True, blank=True, on_delete=models.CASCADE, related_name='payments')
+    vendor_booking = models.ForeignKey(VendorInquiry, null=True, blank=True, on_delete=models.CASCADE, related_name='payments')
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    method = models.CharField(max_length=10, choices=Method.choices, default=Method.CASH)
+    received_on = models.DateField()
+    note = models.CharField(max_length=200, blank=True)
+    recorded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['received_on', 'created_at']
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(venue_booking__isnull=False, vendor_booking__isnull=True)
+                | models.Q(venue_booking__isnull=True, vendor_booking__isnull=False),
+                name='booking_payment_one_booking',
+            ),
+        ]

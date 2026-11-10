@@ -135,6 +135,25 @@ Eventlaya
           _data(inquiry, kind, 'booking_cancelled'))
 
 
+def _owner_cancelled(inquiry):
+    kind, name, _owner_id, _owner_email, when = _describe(inquiry)
+    note = f'\nMessage from {name}: {inquiry.owner_note}\n' if inquiry.owner_note else ''
+    if inquiry.sender_email:
+        _email(inquiry.sender_email, f'Your booking with {name} was cancelled', f"""Namaste {inquiry.sender_name},
+
+{name} has cancelled your booking for {when}.
+{note}
+Contact them if you have questions.
+
+Eventlaya
+""")
+    _push(inquiry.user_id, 'Booking cancelled', f'{name} · {when}', _data(inquiry, kind, 'booking_cancelled'))
+
+
+def notify_owner_cancelled(inquiry):
+    _after_commit(_owner_cancelled, inquiry)
+
+
 def notify_new_request(inquiry):
     _after_commit(_new_request, inquiry)
 

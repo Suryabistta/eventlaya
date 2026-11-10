@@ -160,6 +160,12 @@ def owner_decision(inquiry, action, note=None):
             inquiry.save(update_fields=['owner_note', 'updated_at'])
         return new_status, False
     old = change_request_status(inquiry, new_status, note)
+    if new_status == S.BOOKED and inquiry.agreed_amount is None:
+        # Booking management starts from the slot or package price; the owner can change it
+        price = (inquiry.slot.price if inquiry.slot_id else None) or (inquiry.package.price if inquiry.package_id else None)
+        if price is not None:
+            inquiry.agreed_amount = price
+            inquiry.save(update_fields=['agreed_amount', 'updated_at'])
     return old, True
 
 

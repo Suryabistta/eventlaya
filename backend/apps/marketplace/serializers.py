@@ -96,7 +96,26 @@ class VendorCategorySerializer(serializers.ModelSerializer):
         read_only_fields = ['slug']
 
 
+def validate_slot_presets(value):
+    """[{name, start "HH:MM", end "HH:MM"}], up to 8; empty = whole day only."""
+    import datetime
+    if not isinstance(value, list) or len(value) > 8:
+        raise serializers.ValidationError('Up to 8 time slots.')
+    out = []
+    for p in value:
+        try:
+            name = str(p['name']).strip()[:40]
+            start, end = datetime.time.fromisoformat(p['start']), datetime.time.fromisoformat(p['end'])
+        except (KeyError, TypeError, ValueError):
+            raise serializers.ValidationError('Each slot needs a name, a start and an end time.')
+        if not name or end <= start:
+            raise serializers.ValidationError(f'“{name or "Slot"}”: the end must be after the start.')
+        out.append({'name': name, 'start': start.strftime('%H:%M'), 'end': end.strftime('%H:%M')})
+    return out
+
+
 class VendorProfileSerializer(AdminOnlyFieldsMixin, serializers.ModelSerializer):
+    validate_slot_presets = staticmethod(validate_slot_presets)
     ADMIN_ONLY_FIELDS = ('is_verified', 'is_featured', 'rating')
     category_name = serializers.CharField(source='category.name', read_only=True)
     category_slug = serializers.CharField(source='category.slug', read_only=True)
@@ -107,7 +126,7 @@ class VendorProfileSerializer(AdminOnlyFieldsMixin, serializers.ModelSerializer)
             'id', 'user', 'business_name', 'logo', 'category', 'category_name',
             'category_slug', 'city', 'address', 'phone', 'email',
             'description', 'starting_price', 'portfolio_images', 'featured_image',
-            'is_verified', 'is_featured', 'rating', 'listing_status', 'review_note', 'is_paused', 'created_at'
+            'is_verified', 'is_featured', 'rating', 'listing_status', 'review_note', 'is_paused', 'slot_presets', 'created_at'
         ]
         # listing_status/review_note change only through the platform approval endpoints
         read_only_fields = ['id', 'user', 'listing_status', 'review_note', 'created_at']
@@ -178,6 +197,7 @@ class VenueInquirySerializer(BookingRequestFieldsMixin, serializers.ModelSeriali
 
 
 class VenueListingSerializer(AdminOnlyFieldsMixin, serializers.ModelSerializer):
+    validate_slot_presets = staticmethod(validate_slot_presets)
     owner_name = serializers.CharField(source='owner.organization_name', read_only=True)
     inquiries_count = serializers.IntegerField(source='inquiries.count', read_only=True)
     venue_type_display = serializers.CharField(source='get_venue_type_display', read_only=True)
@@ -196,7 +216,7 @@ class VenueListingSerializer(AdminOnlyFieldsMixin, serializers.ModelSerializer):
             'contact_person', 'contact_phone', 'contact_email',
             'description', 'rules_policy', 'is_verified', 'is_featured',
             'rating', 'review_count', 'inquiries_count', 'spaces',
-            'listing_status', 'review_note', 'is_paused', 'created_at', 'updated_at'
+            'listing_status', 'review_note', 'is_paused', 'slot_presets', 'created_at', 'updated_at'
         ]
         # slug is generated on create (see VenueListingViewSet.perform_create);
         # listing_status/review_note change only through the platform approval endpoints

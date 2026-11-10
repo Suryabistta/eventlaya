@@ -1,4 +1,5 @@
 """Attendee-facing: marketplace inquiries / booking requests the signed-in user sent (venues and vendors)."""
+from decimal import Decimal
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import permissions, status
 from rest_framework.response import Response
@@ -22,6 +23,9 @@ def _common(q, user, review_id, owner_id):
         'budget_range': q.budget_range, 'message': q.message, 'status': q.status,
         'slot': slot_summary(q.slot) if q.slot_id else None,
         'owner_note': q.owner_note,
+        # Confirmed bookings: what was agreed and what the owner recorded as paid (offline payments)
+        'agreed_amount': str(q.agreed_amount) if q.agreed_amount is not None else None,
+        'paid': str(sum((p.amount for p in q.payments.all()), Decimal('0')).quantize(Decimal('0.01'))) if q.status == 'booked' else None,
         'can_cancel': customer_cancel_block(q) is None,
         'created_at': q.created_at, 'updated_at': q.updated_at,
         'my_review_id': str(review_id) if review_id else None,
