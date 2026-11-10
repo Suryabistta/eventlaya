@@ -237,7 +237,7 @@ const Editor: React.FC<{ initial: AdminPost; options?: Awaited<ReturnType<typeof
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
         {/* Main column */}
         <div className="min-w-0 space-y-6">
           <Card className="space-y-4 p-5">
