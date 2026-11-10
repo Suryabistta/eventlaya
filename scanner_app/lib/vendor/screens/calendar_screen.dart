@@ -216,7 +216,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 const SizedBox(width: 8),
                 Expanded(child: _Count(label: 'Requested', value: countOf(SlotStatus.held), tone: Tone.warning)),
                 const SizedBox(width: 8),
-                Expanded(child: _Count(label: 'Booked', value: countOf(SlotStatus.booked), tone: Tone.brand)),
+                Expanded(child: _Count(label: 'Booked', value: countOf(SlotStatus.booked), tone: Tone.danger)),
                 const SizedBox(width: 8),
                 Expanded(child: _Count(label: 'Blocked', value: countOf(SlotStatus.blocked), tone: Tone.neutral)),
               ]),

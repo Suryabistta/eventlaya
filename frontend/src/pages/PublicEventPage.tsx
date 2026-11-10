@@ -593,7 +593,7 @@ const TicketList: React.FC<{ types: PublicTicketType[]; canRegister: boolean; re
               {t.description && <p className={cn('mt-1 text-sm', open ? 'text-ink-600' : 'text-ink-400')}>{t.description}</p>}
               <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
                 {unavailable ? (
-                  <Badge tone={t.availability === 'not_started' ? 'info' : 'neutral'}>{unavailable}</Badge>
+                  <Badge tone={t.availability === 'not_started' ? 'info' : t.availability === 'sold_out' ? 'danger' : 'neutral'}>{unavailable}</Badge>
                 ) : (
                   <Badge tone="success" dot>
                     On sale

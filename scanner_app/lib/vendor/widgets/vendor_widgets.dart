@@ -13,10 +13,11 @@ Tone requestTone(String status) => switch (status) {
       _ => Tone.neutral,
     };
 
+/// Same colours as the website: green open, amber on hold, red booked, dark grey blocked.
 Tone slotTone(String status) => switch (status) {
       SlotStatus.open => Tone.success,
       SlotStatus.held => Tone.warning,
-      SlotStatus.booked => Tone.brand,
+      SlotStatus.booked => Tone.danger,
       _ => Tone.neutral,
     };
 
@@ -24,8 +25,8 @@ Tone slotTone(String status) => switch (status) {
 Color slotColor(String status) => switch (status) {
       SlotStatus.open => AppColors.success,
       SlotStatus.held => AppColors.marigold,
-      SlotStatus.booked => AppColors.brand,
-      _ => AppColors.ink400,
+      SlotStatus.booked => AppColors.danger,
+      _ => AppColors.ink700,
     };
 
 /// "Sat 12 Apr" (adds the year when it isn't this year).

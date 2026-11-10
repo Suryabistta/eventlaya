@@ -27,6 +27,12 @@ export const usePublicAvailability = (kind: ListingKind, id: string) => {
 }
 
 const TAKEN_LABEL: Record<string, string> = { held: 'On hold', booked: 'Booked', blocked: 'Unavailable' }
+const TAKEN_CHIP: Record<string, string> = { held: 'bg-marigold-100 text-marigold-900', booked: 'bg-red-100 text-red-800', blocked: 'bg-ink-200 text-ink-700' }
+const TAKEN_DAY: Record<string, string> = {
+  held: 'border-marigold-200 bg-marigold-50 text-marigold-800',
+  booked: 'border-red-200 bg-red-50 text-red-700',
+  blocked: 'border-ink-200 bg-ink-200 text-ink-500',
+}
 
 /**
  * "Availability" card on a venue / vendor page: a 60-day strip and the open slots grouped by date.
@@ -119,6 +125,8 @@ export const AvailabilitySection: React.FC<{
               const list = byDate.get(d) ?? []
               const open = list.filter((s) => s.available).length
               const taken = list.length > 0 && open === 0
+              // A full day is amber while a request is pending on it, red once booked, grey when only closed
+              const takenTone = list.some((s) => s.status === 'booked') ? 'booked' : list.some((s) => s.status === 'held') ? 'held' : 'blocked'
               const date = parseIso(d)
               const bs = system === 'bs' ? toBs(date) : null
               const dayNum = bs ? bs.day : date.getDate()
@@ -139,7 +147,7 @@ export const AvailabilitySection: React.FC<{
                       : open
                         ? 'border-emerald-200 bg-emerald-50 text-emerald-900 hover:border-emerald-400'
                         : taken
-                          ? 'border-ink-100 bg-ink-100 text-ink-400'
+                          ? TAKEN_DAY[takenTone]
                           : 'border-transparent text-ink-300',
                   )}
                 >
@@ -156,8 +164,16 @@ export const AvailabilitySection: React.FC<{
               Open slots
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-sm bg-ink-200" aria-hidden />
-              Booked or unavailable
+              <span className="h-2.5 w-2.5 rounded-sm border border-marigold-300 bg-marigold-100" aria-hidden />
+              On hold
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm border border-red-300 bg-red-100" aria-hidden />
+              Booked
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm bg-ink-300" aria-hidden />
+              Unavailable
             </span>
           </div>
         </div>
@@ -206,7 +222,7 @@ const SlotChoice: React.FC<{ slot: PublicSlot; selected: boolean; onChoose: () =
           <span className="line-through">{slotTime(slot)}</span>
           {slot.space_name && <span> · {slot.space_name}</span>}
         </span>
-        <span className="text-xs font-semibold">{TAKEN_LABEL[slot.status] ?? 'Unavailable'}</span>
+        <span className={cn('rounded-full px-2 py-0.5 text-xs font-semibold', TAKEN_CHIP[slot.status] ?? TAKEN_CHIP.blocked)}>{TAKEN_LABEL[slot.status] ?? 'Unavailable'}</span>
       </div>
     )
   }

@@ -203,7 +203,7 @@ const EventRow: React.FC<{
             {ev.registered_count}
             <span className="font-normal text-ink-500">{ev.capacity ? ` / ${ev.capacity}` : ''} registered</span>
           </span>
-          {full && <span className="text-xs font-semibold text-marigold-800">Full</span>}
+          {full && <span className="text-xs font-semibold text-red-700">Full</span>}
         </p>
         {ev.capacity > 0 ? (
           <div
@@ -214,7 +214,7 @@ const EventRow: React.FC<{
             aria-valuemax={ev.capacity}
             aria-valuenow={ev.registered_count}
           >
-            <div className={cn('h-full rounded-full', full ? 'bg-marigold-500' : 'bg-brand-600')} style={{ width: `${pct}%` }} />
+            <div className={cn('h-full rounded-full', full ? 'bg-red-500' : 'bg-brand-600')} style={{ width: `${pct}%` }} />
           </div>
         ) : (
           <p className="mt-0.5 text-xs text-ink-500">No capacity limit</p>

@@ -232,11 +232,12 @@ export const fmtPrice = (value: string | number | null | undefined) =>
 
 /* ------------------------------------------------------------------ Display */
 
+// Calendar colours: green = open, amber = on hold / pending, red = booked (taken), dark grey = blocked (closed)
 export const SLOT_STATUS: Record<SlotStatus, { label: string; chip: string; dot: string }> = {
   open: { label: 'Open', chip: 'bg-emerald-50 text-emerald-800 border-emerald-200', dot: 'bg-emerald-500' },
   held: { label: 'Pending request', chip: 'bg-marigold-50 text-marigold-900 border-marigold-200', dot: 'bg-marigold-500' },
-  booked: { label: 'Booked', chip: 'bg-brand-50 text-brand-800 border-brand-200', dot: 'bg-brand-600' },
-  blocked: { label: 'Blocked', chip: 'bg-ink-100 text-ink-600 border-ink-200', dot: 'bg-ink-400' },
+  booked: { label: 'Booked', chip: 'bg-red-50 text-red-800 border-red-200', dot: 'bg-red-500' },
+  blocked: { label: 'Blocked', chip: 'bg-ink-200 text-ink-700 border-ink-300', dot: 'bg-ink-700' },
 }
 
 /** User-facing text for an API error, including DRF field errors like `{end_time: ["…"]}`. */

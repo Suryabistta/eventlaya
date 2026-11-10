@@ -1236,7 +1236,7 @@ const TicketsStep: React.FC<{
                 {t.description && <p className={cn('mt-0.5 text-xs', disabled ? 'text-ink-400' : 'text-ink-500')}>{t.description}</p>}
                 {(reason || t.unlocked || extras.length > 0) && (
                   <p className="mt-1.5 flex flex-wrap gap-1">
-                    {reason && <span className="rounded-full bg-ink-200/70 px-2 py-0.5 text-[11px] font-medium text-ink-600">{reason}</span>}
+                    {reason && <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', t.availability === 'sold_out' ? 'bg-red-100 text-red-800' : 'bg-ink-200/70 text-ink-600')}>{reason}</span>}
                     {t.unlocked && <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-medium text-brand-800">Unlocked by your code</span>}
                     {extras.map((x) => (
                       <span key={x} className="rounded-full bg-ink-100 px-2 py-0.5 text-[11px] font-medium text-ink-700">
