@@ -340,7 +340,13 @@ class RoundActionView(OrganizerView):
                 if request.data.get('confirm') is not True:
                     return Response({'error': 'Send {"confirm": true} to advance and eliminate contestants.'}, status=400)
                 ids = request.data.get('contestant_ids')
-                return Response(decide_round(rnd, request.user, ids if isinstance(ids, list) else None))
+                result = decide_round(rnd, request.user, ids if isinstance(ids, list) else None)
+                if result.get('advanced') is not None:  # placements are told when winners are announced
+                    from . import notify
+                    nxt = ContestRound.objects.filter(pk=result.get('next_round')).first()
+                    notify.round_decided(poll, {'advanced_ids': result['advanced'], 'eliminated_ids': result['eliminated'],
+                                                'next_round_name': nxt.name if nxt else None})
+                return Response(result)
             elif action == 'undo':
                 return Response(undo_round(rnd, request.user))
             elif action == 'entries':
@@ -837,16 +843,21 @@ class ContestantFromApplicationsView(OrganizerView):
             return Response({'error': 'No new accepted applications to add.'}, status=400)
         created, errors = [], {}
         with transaction.atomic():
+            contacts = {a.pk: (a.submitter_email, a.submitter_phone) for a in apps}
             for i, (row, app_id) in enumerate(zip(rows, ids)):
                 ser = ContestantSerializer(data=row, context={'poll': poll})
                 if ser.is_valid():
-                    created.append(ser.save(application_id=app_id))
+                    email, phone = contacts.get(app_id, ('', ''))
+                    created.append(ser.save(application_id=app_id, contact_email=email or '', contact_phone=(phone or '')[:30]))
                 else:
                     errors[row['name'] or i + 1] = ser.errors
             if errors:
                 transaction.set_rollback(True)
                 return Response({'error': f'{len(errors)} applications could not be added. Nothing was added.', 'rows': errors}, status=400)
         audit(poll, request.user, 'contestants_added', f'{len(created)} contestants added from applications')
+        from . import notify
+        for c in created:
+            notify.added(c)
         return Response(ContestantSerializer(contestants_qs(poll).filter(pk__in=[c.pk for c in created]), many=True,
                                              context={'poll': poll}).data, status=201)
 
@@ -875,3 +886,37 @@ def contestant_from_application(app, photo_field=None):
     bio = next((text(a) for a in paragraphs if BIO.search(a.field.label)), text(paragraphs[0]) if paragraphs else '')
     place = next((text(a) for a in answers if a.field.field_type in ('text', 'select', 'radio') and PLACE.search(a.field.label)), '')
     return {'name': app.submitter_name, 'subtitle': place[:255], 'description': bio[:2000], 'photo_url': main, 'gallery': gallery}
+
+
+class AnnounceWinnersView(OrganizerView):
+    """POST contests/<pk>/announce/ {announcement?}: winners are announced. Results become public, the event timeline
+    shows Results, and placed contestants are notified (Poll.contestant_notify). {undo: true} takes it back."""
+
+    def post(self, request, pk):
+        from django.utils import timezone
+        from . import notify
+        from .scoring import round_standings
+        poll = get_contest(request, pk)
+        if request.data.get('undo'):
+            poll.winners_announced_at = None
+            poll.save(update_fields=['winners_announced_at'])
+            audit(poll, request.user, 'winners_unannounced', 'Winners announcement taken back')
+            return Response({'winners_announced_at': None})
+        first_time = poll.winners_announced_at is None
+        poll.winners_announced_at = timezone.now()
+        poll.announcement = (request.data.get('announcement') or poll.announcement or '').strip()[:2000]
+        if poll.results_visibility == Poll.ResultsVisibility.HIDDEN:
+            poll.results_visibility = Poll.ResultsVisibility.TOP_N  # the public can now see who won
+        poll.save(update_fields=['winners_announced_at', 'announcement', 'results_visibility'])
+        # Placement: the decided final round when there is one, else the overall standings
+        final = poll.rounds.exclude(finalized_at=None).order_by('-order').first()
+        rows = round_standings(poll, final, detail=False)['rows'] if final else round_standings(poll, None, detail=False)['rows']
+        titles = poll.placement_titles or []
+        top = [r for r in rows if r.get('status') != Candidate.Status.WITHDRAWN][:max(poll.results_top_n or 3, 1)]
+        by_id = {str(c.pk): c for c in poll.candidates.filter(pk__in=[r['contestant_id'] for r in top])}
+        placed = [(by_id[str(r['contestant_id'])], i + 1, titles[i] if i < len(titles) else '') for i, r in enumerate(top) if str(r['contestant_id']) in by_id]
+        audit(poll, request.user, 'winners_announced', 'Winners announced')
+        if first_time:
+            notify.winners_announced(poll, placed)
+        return Response({'winners_announced_at': poll.winners_announced_at, 'announcement': poll.announcement,
+                         'winners': [{'id': str(c.pk), 'name': c.name, 'rank': rank, 'title': title} for c, rank, title in placed]})

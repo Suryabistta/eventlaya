@@ -431,3 +431,18 @@ class AuditFixTests(OnlineTicketTests):
         r = self.client.post(f'/api/events/{self.event.id}/gate/scan/', {'qr_token': 'TKT-ANY-0001', 'scan_type': 'gate_in'}, format='json')
         self.assertEqual(r.status_code, 400)
         self.assertIn('registration only', r.data['message'])
+
+
+class SalesAnalyticsTests(OnlineTicketTests):
+    def test_sales_by_day_and_gate_checkin_rates(self):
+        r = self.register()  # 2 × Rs 500 online
+        self.pay_test(r.data['payment']['id'])
+        self.register(method='venue', email='venue@test.com', items=[{'ticket_type_id': str(self.vip.id), 'quantity': 1}])
+        self.scan(EventTicket.objects.filter(order__payment_status=P.PAID).first())
+        self.client.force_authenticate(self.org)
+        data = self.client.get(f'/api/events/{self.event.id}/analytics/').data
+        sales = data['sales_chart']
+        self.assertEqual((sales['total'], sum(sales['received']), sum(sales['due'])), (2500.0, 1000.0, 1500.0))
+        self.assertEqual((sum(sales['online']), sum(sales['venue'])), (1000.0, 1500.0))
+        self.assertEqual(data['gate_checkin'][0]['checked_in'], 1)
+        self.assertEqual(data['gate_checkin'][0]['rate_pct'], round(100 / 3, 1))

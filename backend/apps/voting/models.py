@@ -102,6 +102,18 @@ class Poll(models.Model):
 
     # --- Contest: paid vote packs (stored now; payment collection is wired by apps.payments later)
     paid_votes_enabled = models.BooleanField(default=False)
+
+    # Contestant notifications (apps.voting.notify): added, round decided, winners announced. Optional per contest.
+    class Notify(models.TextChoices):
+        OFF = 'off', 'Off'
+        EMAIL = 'email', 'Email'
+        SMS = 'sms', 'SMS'
+        BOTH = 'both', 'Email and SMS'
+
+    contestant_notify = models.CharField(max_length=5, choices=Notify.choices, default=Notify.EMAIL)
+    # Winners announced: results become public, the event timeline shows Results, winners are notified
+    winners_announced_at = models.DateTimeField(null=True, blank=True)
+    announcement = models.TextField(blank=True, max_length=2000)
     price_per_vote = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     currency = models.CharField(max_length=3, default='NPR')
     max_packs_per_day = models.PositiveIntegerField(default=10, help_text='Vote-pack purchases per voter per day (0 = no limit)')
@@ -200,6 +212,9 @@ class Candidate(models.Model):
     profile = models.JSONField(default=dict, blank=True, help_text='Values of the contest\'s custom profile fields, by key')
     # Added from an accepted application (event applications stage): that FormResponse, so it isn't imported twice
     application_id = models.UUIDField(null=True, blank=True)
+    # For contestant notifications (from the application, or typed by the organizer); never shown publicly
+    contact_email = models.EmailField(blank=True)
+    contact_phone = models.CharField(max_length=30, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

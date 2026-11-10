@@ -138,6 +138,8 @@ MEDIA_ROOT = os.environ.get('MEDIA_ROOT') or BASE_DIR / 'media'
 # Files people attach to applications and registrations (PDFs: IDs, certificates). Outside MEDIA_ROOT so the web
 # server never serves them; only the event's organizers and staff download them (apps.dynamic_forms.PrivateFileView).
 PRIVATE_MEDIA_ROOT = os.environ.get('PRIVATE_MEDIA_ROOT') or BASE_DIR.parent / 'private_media'
+# Aakash SMS (apps.core.sms): optional contestant notifications by SMS; empty = SMS off
+AAKASH_SMS_TOKEN = os.environ.get('AAKASH_SMS_TOKEN', '')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

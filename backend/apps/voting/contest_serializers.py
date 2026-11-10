@@ -52,7 +52,7 @@ class ContestantSerializer(serializers.ModelSerializer):
         model = Candidate
         fields = ['id', 'poll', 'name', 'subtitle', 'description', 'photo_url', 'gallery', 'social_links', 'profile',
                   'number', 'display_number', 'slug', 'status', 'order', 'votes', 'categories', 'rounds',
-                  'created_at', 'updated_at']
+                  'contact_email', 'contact_phone', 'created_at', 'updated_at']
         read_only_fields = ['id', 'poll', 'display_number', 'votes', 'categories', 'rounds', 'created_at', 'updated_at']
         extra_kwargs = {'slug': {'required': False}, 'order': {'required': False}}
 
@@ -333,7 +333,7 @@ SETTINGS_FIELDS = [
     'max_packs_per_day', 'buy_and_vote',
     'captcha_enabled', 'ip_votes_per_minute', 'device_votes_per_minute', 'flag_ip_burst', 'flag_subnet_burst',
     'flag_device_voters', 'transparency_note', 'show_transparency', 'judges_see_others', 'show_judge_breakdown',
-    'placement_titles',
+    'placement_titles', 'contestant_notify', 'announcement',
 ]
 
 
@@ -359,8 +359,8 @@ class ContestSerializer(serializers.ModelSerializer):
         model = Poll
         fields = ['id', 'event', 'event_title', 'event_slug', 'kind', 'preset', *SETTINGS_FIELDS,
                   'rounds', 'categories', 'profile_fields', 'vote_packs', 'stats', 'judges', 'has_votes',
-                  'captcha_available', 'sms_provider', 'payments', 'brand', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'kind', 'preset', 'created_at', 'updated_at']
+                  'captcha_available', 'sms_provider', 'payments', 'brand', 'winners_announced_at', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'kind', 'preset', 'winners_announced_at', 'created_at', 'updated_at']
         extra_kwargs = {'slug': {'required': False}}
 
     def get_stats(self, obj):

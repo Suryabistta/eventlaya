@@ -1134,6 +1134,13 @@ class EventAnalyticsView(APIView):
                 'labels': gate_labels,
                 'counts': gate_series,
             },
+            # Ticket sales by day (orders, not refunded or released): received vs still due, online vs at the venue
+            'sales_chart': sales_by_day(event),
+            # Check-ins by gate as a share of everyone registered
+            'gate_checkin': [
+                {'gate': g, 'checked_in': n, 'rate_pct': round(100 * n / total_registered, 1) if total_registered else 0}
+                for g, n in zip(gate_labels, gate_series)
+            ],
             'registration_growth_chart': {
                 'labels': reg_labels,
                 'counts': reg_series,
@@ -1244,6 +1251,9 @@ def event_stages(event, data):
             state = {'open': 'open', 'closed': 'closed'}.get(poll.status, 'upcoming')
             stages.append({'kind': 'voting', 'title': poll.title or 'Voting', 'cta': 'Vote', 'state': state,
                            'opens_at': poll.opens_at, 'closes_at': poll.closes_at, 'href': f'/e/{event.slug}/vote/{poll.slug or poll.id}'})
+            if poll.winners_announced_at:
+                stages.append({'kind': 'results', 'title': f'{poll.title or "Contest"} results', 'cta': 'See winners', 'state': 'open',
+                               'opens_at': poll.winners_announced_at, 'closes_at': None, 'href': f'/e/{event.slug}/vote/{poll.slug or poll.id}'})
     if event.tickets_enabled or stages:
         phase = data.get('phase')
         state = 'closed' if phase in ('ended', 'cancelled') else ('open' if data.get('registration_open') else 'upcoming')
@@ -1252,3 +1262,30 @@ def event_stages(event, data):
                        'closes_at': None, 'date': None if event.date_tba else event.start_date,
                        'href': f'/e/{event.slug}/register'})
     return stages if len(stages) > 1 else []
+
+
+def sales_by_day(event):
+    """{labels, received, due, online, venue, total}: per day the order was placed (Nepal time), in Rs."""
+    from django.db.models import Sum
+    from .models import TicketOrder
+    P = TicketOrder.PaymentStatus
+    rows = (TicketOrder.objects.filter(event=event).exclude(payment_status__in=[P.FAILED, P.REFUNDED])
+            .annotate(day=TruncDate('created_at')).values('day', 'payment_status', 'payment_method')
+            .annotate(amount=Sum('total')).order_by('day'))
+    days = {}
+    for r in rows:
+        if not r['day'] or not r['amount']:
+            continue
+        d = days.setdefault(r['day'], {'received': 0.0, 'due': 0.0, 'online': 0.0, 'venue': 0.0})
+        amount = float(r['amount'])
+        d['received' if r['payment_status'] == P.PAID else 'due'] += amount
+        d['online' if r['payment_method'] == TicketOrder.PaymentMethod.ONLINE else 'venue'] += amount
+    keys = sorted(days)
+    return {
+        'labels': [k.isoformat() for k in keys],
+        'received': [round(days[k]['received'], 2) for k in keys],
+        'due': [round(days[k]['due'], 2) for k in keys],
+        'online': [round(days[k]['online'], 2) for k in keys],
+        'venue': [round(days[k]['venue'], 2) for k in keys],
+        'total': round(sum(days[k]['received'] + days[k]['due'] for k in keys), 2),
+    }

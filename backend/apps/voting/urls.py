@@ -25,6 +25,7 @@ urlpatterns = [
     path(C + 'status/<str:action>/', cv.ContestStatusView.as_view(), name='contest_status'),
     path(C + 'contestants/', cv.ContestantListView.as_view(), name='contestants'),
     path(C + 'contestants/bulk/', cv.ContestantBulkView.as_view(), name='contestants_bulk'),
+    path(C + 'announce/', cv.AnnounceWinnersView.as_view(), name='contest_announce'),
     path(C + 'contestants/from-applications/', cv.ContestantFromApplicationsView.as_view(), name='contestants_from_applications'),
     path(C + 'contestants/import/', cv.ContestantImportView.as_view(), name='contestants_import'),
     path(C + 'contestants/reorder/', cv.ContestantReorderView.as_view(), name='contestants_reorder'),

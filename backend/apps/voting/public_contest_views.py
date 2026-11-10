@@ -97,6 +97,8 @@ def contest_public_data(poll, request=None, with_contestants=True):
     fields = list(poll.profile_fields.all())
     data = {
         'id': str(poll.id), 'kind': 'contest', 'slug': poll.slug, 'title': poll.title, 'description': poll.description,
+        # Winners announced (organizer's announcement shown above the results)
+        'winners_announced_at': poll.winners_announced_at, 'announcement': poll.announcement if poll.winners_announced_at else '',
         'cover_url': poll.cover_url, 'status': poll.status, 'opens_at': poll.opens_at, 'closes_at': poll.closes_at,
         'event': {'title': poll.event.title, 'slug': poll.event.slug},
         'vote_mode': poll.vote_mode, 'require_checked_in': poll.require_checked_in,

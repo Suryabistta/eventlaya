@@ -206,3 +206,32 @@ class AuditStageFixTests(StagesTests):
         self.assertEqual(Candidate.objects.get(application_id=app_id).status, 'withdrawn')
         self.client.post(f'/api/forms/responses/{app_id}/review/', {'status': 'accepted'}, format='json')
         self.assertEqual(Candidate.objects.get(application_id=app_id).status, 'active')
+
+
+class ContestNotifyTests(StagesTests):
+    def test_contestants_are_notified_and_winners_announced_with_a_results_stage(self):
+        from unittest import mock
+        from apps.voting.models import Candidate, Poll
+        poll = Poll.objects.create(event=self.event, title='Miss Koshi', kind=Poll.Kind.CONTEST, status=Poll.Status.OPEN,
+                                   contestant_notify='both', results_visibility='hidden_to_public')
+        a = Candidate.objects.create(poll=poll, name='Asha', number=1, contact_email='asha@x.com', contact_phone='9812345678')
+        Candidate.objects.create(poll=poll, name='Bina', number=2, contact_email='bina@x.com')
+        self.client.force_authenticate(self.organizer)
+        with mock.patch('apps.core.sms.send_sms', return_value=True) as sms, self.captureOnCommitCallbacks(execute=True):
+            r = self.client.post(f'/api/voting/contests/{poll.id}/announce/', {'announcement': 'Congratulations to all!'}, format='json')
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual(len(r.data['winners']), 2)
+        self.assertTrue(any('Results announced' in m.subject for m in mail.outbox))
+        self.assertTrue(sms.called)
+        poll.refresh_from_db()
+        self.assertEqual(poll.results_visibility, 'top_n')  # the public can now see who won
+        self.client.force_authenticate(None)
+        stages = self.client.get(f'/api/events/public/{self.event.slug}/').data['event']['stages']
+        self.assertEqual(stages[-2]['kind'], 'results')  # results stage before the event itself
+        Poll.objects.filter(pk=poll.pk).update(contestant_notify='off')
+        mail.outbox.clear()
+        self.client.force_authenticate(self.organizer)
+        with self.captureOnCommitCallbacks(execute=True):
+            from apps.voting import notify
+            notify.added(Candidate.objects.get(pk=a.pk))
+        self.assertEqual(len(mail.outbox), 0)  # notifications are optional
