@@ -4,6 +4,7 @@ import '../../attendee/data/attendee_api.dart' show friendlyError;
 import '../../attendee/widgets/attendee_widgets.dart' show AsyncErrorView;
 import '../../core/api_client.dart';
 import '../../providers/event_provider.dart';
+import '../../providers/modules_provider.dart';
 import '../../ui/ui.dart';
 
 /// Organizer: the newer settings of the current event (stages, registration, guests), PATCHed to /api/events/<id>/.
@@ -124,6 +125,8 @@ class _EventSettingsScreenState extends ConsumerState<EventSettingsScreen> {
                     ]),
                   GroupedSection(header: 'Guests', separatorInset: 16, children: [
                     _toggle(e, 'reminders_enabled', 'Reminders', 'Email guests before the event starts'),
+                    if ((_changes['reminders_enabled'] ?? e['reminders_enabled']) == true && ref.watch(moduleEnabledProvider(AppModule.sms)))
+                      _toggle(e, 'reminders_sms', 'Also remind by SMS', 'Uses your SMS credits, one per guest each time'),
                     _toggle(e, 'arrival_alerts', 'Arrival alerts', 'Tell you when tagged guests (VIP, Press…) arrive'),
                   ]),
                 ]),

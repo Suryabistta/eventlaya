@@ -31,6 +31,7 @@ export interface Event {
   phone_required?: boolean
   arrival_alerts?: 'tagged' | 'all' | 'off'
   reminders_enabled?: boolean
+  reminders_sms?: boolean
   /** Race bibs: each registration gets the next number from bib_start */
   bib_numbers?: boolean
   bib_start?: number

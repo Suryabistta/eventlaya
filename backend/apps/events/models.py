@@ -128,6 +128,8 @@ class Event(models.Model):
     arrival_alerts = models.CharField(max_length=10, choices=ArrivalAlerts.choices, default=ArrivalAlerts.TAGGED)
     # Reminder emails the day before and ~2 hours before the start (send_event_reminders, every 10 minutes)
     reminders_enabled = models.BooleanField(default=True)
+    # Reminders also as SMS, paid from the organizer's SMS credits (module sms)
+    reminders_sms = models.BooleanField(default=False)
     reminder_day_sent_at = models.DateTimeField(null=True, blank=True)
     reminder_soon_sent_at = models.DateTimeField(null=True, blank=True)
     # Bib numbers (runs, races): every registration gets the next number from bib_start, shown on the pass
@@ -784,6 +786,8 @@ class GuestMessage(models.Model):
     # all | not_arrived | inside | tag:<tag> | type:<ticket type id>
     audience = models.CharField(max_length=80, default='all')
     recipients = models.PositiveIntegerField(default=0)
+    # Guests texted as well (SMS credits, module sms); 0 when it went by email only
+    sms_recipients = models.PositiveIntegerField(default=0)
     sent_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name='+')
     created_at = models.DateTimeField(auto_now_add=True)
 

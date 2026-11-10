@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { DoorOpen, Send } from 'lucide-react'
 import { request, type Ticket } from '@/services/api'
 import { Badge, Button, Card, CardHeader, EmptyState, Input, Modal, Select, Skeleton, Textarea, useToast } from '@/components/ui'
+import { useModuleEnabled } from '@/lib/modules'
 import { cn } from '@/lib/utils'
 
 /** Guest management on the dashboard (module `guest_management`, backend apps/events/guests.py). */
@@ -95,6 +96,7 @@ interface SentMessage {
   body: string
   audience: string
   recipients: number
+  sms_recipients?: number
   sent_by: string
   created_at: string
 }
@@ -110,25 +112,43 @@ export const MessageGuestsModal: React.FC<{ eventId: string; tags: string[]; tic
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
   const [count, setCount] = useState<number | null>(null)
+  // "Also send as SMS": paid from the organizer's SMS credits (module sms)
+  const smsOn = useModuleEnabled('sms')
+  const [sms, setSms] = useState(false)
+  const [smsQuote, setSmsQuote] = useState<{ phones: number; credits: number; balance: number; ready: boolean } | null>(null)
   const { data: sent = [], isLoading } = useQuery({ queryKey: ['guest-messages', eventId], queryFn: () => request<SentMessage[]>(`/events/${eventId}/guest-messages/`) })
 
   // How many people the chosen audience reaches (one per email)
   useEffect(() => {
     let live = true
     setCount(null)
-    request<{ recipients: number }>(`/events/${eventId}/guest-messages/`, { method: 'POST', body: JSON.stringify({ subject: 'x', body: 'x', audience, dry_run: true }) })
-      .then((r) => live && setCount(r.recipients))
-      .catch(() => live && setCount(0))
+    setSmsQuote(null)
+    // The SMS cost depends on the text length, so wait for typing to pause
+    const timer = setTimeout(() => {
+      request<{ recipients: number; sms_recipients?: number; sms_credits?: number; sms_balance?: number; sms_ready?: boolean }>(`/events/${eventId}/guest-messages/`, {
+        method: 'POST',
+        body: JSON.stringify({ subject: subject.trim() || 'x', body: body.trim() || 'x', audience, dry_run: true, sms }),
+      })
+        .then((r) => {
+          if (!live) return
+          setCount(r.recipients)
+          if (sms) setSmsQuote({ phones: r.sms_recipients ?? 0, credits: r.sms_credits ?? 0, balance: r.sms_balance ?? 0, ready: r.sms_ready !== false })
+        })
+        .catch(() => live && setCount(0))
+    }, 400)
     return () => {
       live = false
+      clearTimeout(timer)
     }
-  }, [eventId, audience])
+  }, [eventId, audience, sms, subject, body])
+  const smsShort = sms && !!smsQuote && (!smsQuote.ready || smsQuote.credits > smsQuote.balance)
 
   const send = useMutation({
-    mutationFn: () => request<{ recipients: number }>(`/events/${eventId}/guest-messages/`, { method: 'POST', body: JSON.stringify({ subject: subject.trim(), body: body.trim(), audience }) }),
-    onSuccess: (r) => {
+    mutationFn: () => request<{ recipients: number }>(`/events/${eventId}/guest-messages/`, { method: 'POST', body: JSON.stringify({ subject: subject.trim(), body: body.trim(), audience, sms }) }),
+    onSuccess: (r: { recipients: number; sms_recipients?: number }) => {
       void qc.invalidateQueries({ queryKey: ['guest-messages', eventId] })
-      toast.success(`Sent to ${r.recipients} ${r.recipients === 1 ? 'guest' : 'guests'}`)
+      void qc.invalidateQueries({ queryKey: ['mySms'] })
+      toast.success(`Sent to ${r.recipients} ${r.recipients === 1 ? 'guest' : 'guests'}`, r.sms_recipients ? `Texting ${r.sms_recipients} phones too.` : undefined)
       setSubject('')
       setBody('')
     },
@@ -147,7 +167,7 @@ export const MessageGuestsModal: React.FC<{ eventId: string; tags: string[]; tic
           <Button variant="secondary" onClick={onClose}>
             Close
           </Button>
-          <Button icon={<Send className="h-4 w-4" />} loading={send.isPending} disabled={!subject.trim() || !body.trim() || !count} onClick={() => send.mutate()}>
+          <Button icon={<Send className="h-4 w-4" />} loading={send.isPending} disabled={!subject.trim() || !body.trim() || !count || smsShort} onClick={() => send.mutate()}>
             {count ? `Send to ${count}` : 'Send'}
           </Button>
         </>
@@ -189,6 +209,24 @@ export const MessageGuestsModal: React.FC<{ eventId: string; tags: string[]; tic
         </div>
         <Input label="Subject" required maxLength={150} value={subject} onChange={(e) => setSubject(e.target.value)} />
         <Textarea label="Message" required rows={5} maxLength={3000} value={body} onChange={(e) => setBody(e.target.value)} hint="Guests see “Namaste <name>,” above it and the event link below." />
+        {smsOn && (
+          <Checkbox
+            label="Also send as SMS"
+            hint={
+              !sms
+                ? 'The subject and message as one text to each guest’s phone, using your SMS credits.'
+                : !smsQuote
+                  ? 'Counting…'
+                  : !smsQuote.ready
+                    ? 'SMS sending isn’t connected yet. Send by email for now.'
+                    : smsShort
+                      ? `Needs ${smsQuote.credits.toLocaleString('en-IN')} credits for ${smsQuote.phones} phones, but you have ${smsQuote.balance.toLocaleString('en-IN')}. Request more in Plan & billing.`
+                      : `${smsQuote.phones} ${smsQuote.phones === 1 ? 'phone' : 'phones'} · uses ${smsQuote.credits.toLocaleString('en-IN')} of your ${smsQuote.balance.toLocaleString('en-IN')} credits`
+            }
+            checked={sms}
+            onChange={setSms}
+          />
+        )}
         <div className="border-t border-ink-100 pt-4">
           <p className="text-sm font-semibold text-ink-900">Sent messages</p>
           {isLoading ? (
@@ -201,7 +239,7 @@ export const MessageGuestsModal: React.FC<{ eventId: string; tags: string[]; tic
                 <li key={m.id} className="py-2">
                   <p className="font-medium text-ink-900">{m.subject}</p>
                   <p className="text-xs text-ink-500">
-                    {audienceLabel(m.audience)} · {m.recipients} people · {new Date(m.created_at).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
+                    {audienceLabel(m.audience)} · {m.recipients} people{m.sms_recipients ? ` · ${m.sms_recipients} SMS` : ''} · {new Date(m.created_at).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
                     {m.sent_by && ` · ${m.sent_by}`}
                   </p>
                 </li>
@@ -267,3 +305,18 @@ export const ArrivalsCard: React.FC<{ eventId: string }> = ({ eventId }) => {
     </Card>
   )
 }
+
+const Checkbox: React.FC<{ label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }> = ({ label, hint, checked, onChange }) => (
+  <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-ink-200 p-3 hover:bg-ink-50">
+    <input
+      type="checkbox"
+      checked={checked}
+      onChange={(e) => onChange(e.target.checked)}
+      className="mt-0.5 h-4 w-4 shrink-0 rounded border-ink-300 text-brand-600 focus:ring-brand-500/30"
+    />
+    <span>
+      <span className="block text-sm font-medium text-ink-900">{label}</span>
+      {hint && <span className="mt-0.5 block text-xs text-ink-500">{hint}</span>}
+    </span>
+  </label>
+)

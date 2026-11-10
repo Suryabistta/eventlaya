@@ -14,6 +14,7 @@ class AppModule {
   static const chat = 'chat';
   static const guestManagement = 'guest_management';
   static const applications = 'applications';
+  static const sms = 'sms';
 
   /// Contests / pageants (needs [voting]).
   static const contests = 'contests';

@@ -5,6 +5,7 @@ import '../../attendee/widgets/attendee_widgets.dart' show AsyncErrorView;
 import '../../core/api_client.dart';
 import '../../core/bs_date.dart';
 import '../../providers/event_provider.dart';
+import '../../providers/modules_provider.dart';
 import '../../ui/ui.dart';
 
 /// Organizer: email guests of the current event (module guest_management, server apps.events.guests).
@@ -31,6 +32,7 @@ class _GuestMessagesScreenState extends ConsumerState<GuestMessagesScreen> {
   final _subject = TextEditingController();
   final _body = TextEditingController();
   String _audience = 'all';
+  bool _sms = false;
   bool _sending = false;
 
   @override
@@ -46,17 +48,28 @@ class _GuestMessagesScreenState extends ConsumerState<GuestMessagesScreen> {
     final eventId = ref.read(eventProvider).currentEvent?.id;
     if (eventId == null) return;
     final api = ref.read(_api);
-    final data = {'subject': _subject.text.trim(), 'body': _body.text.trim(), 'audience': _audience};
+    final data = {'subject': _subject.text.trim(), 'body': _body.text.trim(), 'audience': _audience, 'sms': _sms};
     setState(() => _sending = true);
     try {
       final preview = await api.post('/api/events/$eventId/guest-messages/', data: {...data, 'dry_run': true});
       if (!mounted) return;
       final n = preview.data['recipients'];
+      final p = preview.data;
+      if (_sms && p['sms_ready'] == false) {
+        AppToast.error(context, "SMS sending isn't connected yet. Send by email for now.");
+        return;
+      }
+      if (_sms && (p['sms_credits'] as int) > (p['sms_balance'] as int)) {
+        AppToast.error(context, 'Needs ${p['sms_credits']} SMS credits, you have ${p['sms_balance']}. Request more on the website (Plan & billing).');
+        return;
+      }
       final ok = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: Text('Send to $n ${n == 1 ? 'guest' : 'guests'}?'),
-          content: Text(_subject.text.trim()),
+          content: Text(_sms
+              ? '${_subject.text.trim()}\n\nAlso as SMS to ${p['sms_recipients']} phones: uses ${p['sms_credits']} of your ${p['sms_balance']} credits.'
+              : _subject.text.trim()),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
             TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Send')),
@@ -109,6 +122,13 @@ class _GuestMessagesScreenState extends ConsumerState<GuestMessagesScreen> {
                   keyboardType: TextInputType.multiline,
                   validator: (s) => (s ?? '').trim().isEmpty ? 'Write a message' : null,
                 ),
+                if (ref.watch(moduleEnabledProvider(AppModule.sms)))
+                  ListRow(
+                    title: 'Also send as SMS',
+                    subtitle: 'Uses your SMS credits, one text per phone',
+                    trailing: Switch.adaptive(value: _sms, onChanged: (v) => setState(() => _sms = v)),
+                    onTap: () => setState(() => _sms = !_sms),
+                  ),
               ]),
             ]),
           ),
@@ -125,6 +145,7 @@ class _GuestMessagesScreenState extends ConsumerState<GuestMessagesScreen> {
                       title: m['subject'].toString(),
                       subtitle: [
                         _audiences[m['audience']] ?? m['audience'],
+                        if ((m['sms_recipients'] ?? 0) > 0) '${m['sms_recipients']} SMS',
                         if (m['created_at'] != null) BsDate.format('d MMM, h:mm a', DateTime.parse('${m['created_at']}').toLocal()),
                       ].join(' · '),
                       value: '${m['recipients']}',

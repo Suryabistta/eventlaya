@@ -168,6 +168,7 @@ class GuestMessagesView(APIView):
             return err
         return Response([
             {'id': str(m.id), 'subject': m.subject, 'body': m.body, 'audience': m.audience, 'recipients': m.recipients,
+             'sms_recipients': m.sms_recipients,
              'sent_by': m.sent_by.get_full_name() or m.sent_by.email if m.sent_by_id else '', 'created_at': m.created_at}
             for m in event.guest_messages.select_related('sent_by')[:50]
         ])
@@ -184,15 +185,68 @@ class GuestMessagesView(APIView):
         if event.guest_messages.filter(created_at__gte=timezone.now() - timedelta(hours=1)).count() >= MESSAGES_PER_HOUR:
             return Response({'error': f'You can send {MESSAGES_PER_HOUR} messages an hour. Try again a little later.'},
                             status=status.HTTP_429_TOO_MANY_REQUESTS)
-        recipients = _recipients(audience_tickets(event, audience))
+        tickets = audience_tickets(event, audience)
+        recipients = _recipients(tickets)
         if not recipients:
             return Response({'error': 'No guests match who you chose.'}, status=status.HTTP_400_BAD_REQUEST)
+        # Also by SMS: the subject and message as one text, paid from the organizer's SMS credits
+        sms, phones, need = bool(request.data.get('sms')), [], 0
+        if sms:
+            from apps.accounts.modules import module_enabled
+            from apps.core.sms import sms_enabled
+            from apps.platform.sms_credits import balance
+            if not module_enabled('sms', event.organizer):
+                return Response({'error': 'SMS isn’t available on your account.'}, status=status.HTTP_403_FORBIDDEN)
+            phones = guest_phones(tickets)
+            need, have = sms_cost(event, phones, f'{subject}. {body}'), balance(event.organizer)
+            if request.data.get('dry_run'):
+                return Response({'recipients': len(recipients), 'sms_recipients': len(phones), 'sms_credits': need, 'sms_balance': have,
+                                 'sms_ready': sms_enabled()})
+            if not sms_enabled():
+                return Response({'error': 'SMS sending isn’t connected yet. Send by email for now.'}, status=status.HTTP_400_BAD_REQUEST)
+            if need > have:
+                return Response({'error': f'This needs {need:,} SMS credits and you have {have:,}. Request more in Plan & billing, or send by email only.'},
+                                status=status.HTTP_400_BAD_REQUEST)
         if request.data.get('dry_run'):
             return Response({'recipients': len(recipients)})
         send_to_guests(event, subject, body, recipients)
+        if phones:
+            send_sms_to_guests(event, phones, f'{subject}. {body}')
         msg = GuestMessage.objects.create(event=event, subject=subject, body=body, audience=audience,
-                                          recipients=len(recipients), sent_by=request.user)
-        return Response({'id': str(msg.id), 'recipients': msg.recipients}, status=status.HTTP_201_CREATED)
+                                          recipients=len(recipients), sms_recipients=len(phones), sent_by=request.user)
+        return Response({'id': str(msg.id), 'recipients': msg.recipients, 'sms_recipients': msg.sms_recipients}, status=status.HTTP_201_CREATED)
+
+
+def guest_phones(tickets):
+    """One per Nepali mobile number among the guests."""
+    from apps.core.sms import normalize
+    return sorted({p for p in (normalize(t.attendee_phone) for t in tickets) if p})
+
+
+def sms_text(event, text):
+    """Guest SMS: the event name first, kept to 3 SMS at most."""
+    return f'{event.title}: {text}'.replace('\n', ' ')[:450]
+
+
+def sms_cost(event, phones, text):
+    from apps.platform.sms_credits import segments
+    return len(phones) * segments(sms_text(event, text))
+
+
+def send_sms_to_guests(event, phones, text):
+    """Text each phone on the organizer's credits, after the request (one provider call per number). Stops quietly
+    when credits run out."""
+    import threading
+    from django.db import transaction
+    from apps.platform.sms_credits import send_paid_sms
+    body = sms_text(event, text)
+
+    def run():
+        for p in phones:
+            send_paid_sms(event.organizer, p, body, f'{event.title}: guest SMS')
+
+    from django.conf import settings
+    transaction.on_commit(run if getattr(settings, 'SMS_SYNC', False) else lambda: threading.Thread(target=run, daemon=True).start())
 
 
 def send_due_reminders(now=None):
@@ -223,7 +277,10 @@ def send_due_reminders(now=None):
             body = (f'{event.title} is on {when} at {event.location}.\n\n'
                     + ('Your registration is confirmed; no ticket is needed.' if event.registration_only
                        else 'Have your QR pass ready at the gate (it is in your email and on the Eventlaya app).'))
-            sent += send_to_guests(event, f'{label}: {event.title}', body, _recipients(audience_tickets(event, 'all')))
+            tickets = audience_tickets(event, 'all')
+            sent += send_to_guests(event, f'{label}: {event.title}', body, _recipients(tickets))
+            if event.reminders_sms:
+                send_sms_to_guests(event, guest_phones(tickets), f'{label.lower()} {when}, {event.location}.')
             setattr(event, field, now)
             event.save(update_fields=[field])
     return sent

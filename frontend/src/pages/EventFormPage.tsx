@@ -68,6 +68,7 @@ interface EventDraft {
   form_template: string
   arrival_alerts: 'tagged' | 'all' | 'off'
   reminders_enabled: boolean
+  reminders_sms: boolean
   parent: string
   managed_by: string
   managed_by_label: string
@@ -151,6 +152,7 @@ const emptyDraft: EventDraft = {
   form_template: '',
   arrival_alerts: 'tagged',
   reminders_enabled: true,
+  reminders_sms: false,
   parent: '',
   managed_by: '',
   managed_by_label: '',
@@ -227,6 +229,7 @@ function fromEvent(ev: Event, page?: EventPageContent): EventDraft {
     form_template: '',
     arrival_alerts: ev.arrival_alerts ?? 'tagged',
     reminders_enabled: ev.reminders_enabled ?? true,
+    reminders_sms: ev.reminders_sms ?? false,
     parent: ev.parent ?? '',
     managed_by: ev.managed_by ?? '',
     managed_by_label: ev.managed_by_label ?? '',
@@ -294,7 +297,7 @@ const localToday = () => {
 const FIELD_STEP: Record<string, StepId> = {
   title: 'basics', tagline: 'basics', parent: 'basics', category: 'basics', description: 'basics', banner: 'basics', banner_url: 'basics',
   start_date: 'when', start_time: 'when', end_date: 'when', end_time: 'when', location: 'when', map_query: 'when',
-  capacity: 'registration', limit_spots: 'registration', show_spots_left: 'registration', status: 'registration', registration_deadline: 'registration', ticket_price: 'registration', is_paid: 'registration', allow_registration: 'registration', ticket_layout: 'registration', show_seat_number: 'registration', registration_mode: 'registration', cta_label: 'registration', tickets_enabled: 'stages', applications_enabled: 'stages', applications_close: 'stages', application_cta: 'stages', date_tba: 'when', phone_required: 'registration', bib_numbers: 'registration', bib_start: 'registration', form_template: 'registration', arrival_alerts: 'registration', reminders_enabled: 'registration',
+  capacity: 'registration', limit_spots: 'registration', show_spots_left: 'registration', status: 'registration', registration_deadline: 'registration', ticket_price: 'registration', is_paid: 'registration', allow_registration: 'registration', ticket_layout: 'registration', show_seat_number: 'registration', registration_mode: 'registration', cta_label: 'registration', tickets_enabled: 'stages', applications_enabled: 'stages', applications_close: 'stages', application_cta: 'stages', date_tba: 'when', phone_required: 'registration', bib_numbers: 'registration', bib_start: 'registration', form_template: 'registration', arrival_alerts: 'registration', reminders_enabled: 'registration', reminders_sms: 'registration',
   managed_by: 'page', managed_by_label: 'page', managed_by_logo: 'page', show_managed_by: 'page',
 }
 
@@ -461,6 +464,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
   const subEventsOn = useModuleEnabled('sub_events')
   const applicationsOn = useModuleEnabled('applications')
   const guestsOn = useModuleEnabled('guest_management')
+  const smsOn = useModuleEnabled('sms')
   const { events: myEvents } = useCurrentEvent()
   // Main events this one can sit under: the organizer's own top-level events, not itself
   const parentChoices = myEvents.filter((e) => !e.parent && e.id !== event?.id)
@@ -590,7 +594,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
         phone_required: draft.phone_required,
         bib_numbers: draft.bib_numbers,
         bib_start: Math.max(1, Number(draft.bib_start) || 1),
-        ...(guestsOn ? { arrival_alerts: draft.arrival_alerts, reminders_enabled: draft.reminders_enabled } : {}),
+        ...(guestsOn ? { arrival_alerts: draft.arrival_alerts, reminders_enabled: draft.reminders_enabled, ...(smsOn ? { reminders_sms: draft.reminders_sms } : {}) } : {}),
         ...(subEventsOn ? { parent: draft.parent || null } : {}),
         managed_by: draft.managed_by.trim(),
         managed_by_label: draft.managed_by_label.trim(),
@@ -1019,6 +1023,14 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                           checked={draft.reminders_enabled}
                           onChange={(v) => set('reminders_enabled', v)}
                         />
+                        {smsOn && draft.reminders_enabled && (
+                          <Checkbox
+                            label="Also remind by SMS"
+                            hint="A short text with the time and venue to each guest’s phone, using your SMS credits (one per guest each time)."
+                            checked={draft.reminders_sms}
+                            onChange={(v) => set('reminders_sms', v)}
+                          />
+                        )}
                       </div>
                     )}
                     <Checkbox

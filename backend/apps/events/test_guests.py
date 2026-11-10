@@ -3,6 +3,7 @@ from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core import mail
+from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
@@ -76,3 +77,67 @@ class GuestManagementTests(APITestCase):
         PlatformModule.objects.filter(slug='guest_management').update(is_globally_enabled=False)
         clear_cache()
         self.assertEqual(self.client.get(f'{self.base}/arrivals/').status_code, 403)
+
+
+@override_settings(SMS_SYNC=True)
+class GuestSmsTests(APITestCase):
+    """"Also send as SMS" on guest messages and reminders, paid from the organizer's SMS credits."""
+
+    def setUp(self):
+        clear_cache()
+        self.addCleanup(clear_cache)
+        self.org = User.objects.create_user(username='org', email='org@x.com', password='x', role=User.Role.ORGANIZER)
+        self.event = Event.objects.create(organizer=self.org, title='Gala', slug='gala', location='Dharan',
+                                          start_date=timezone.localdate(), start_time=time(23, 59), status='published')
+        for n, e, p in [('Hari', 'hari@x.com', '9812345678'), ('Sita', 'sita@x.com', '+977 981-2345679'), ('Ram', 'ram@x.com', ''),
+                        ('Sita 2', 'sita2@x.com', '9812345679')]:  # same phone twice: texted once
+            EventTicket.generate_ticket(event=self.event, name=n, email=e, phone=p, price=0)
+        self.client.force_authenticate(self.org)
+        self.url = f'/api/events/{self.event.id}/guest-messages/'
+
+    def credit(self, n):
+        from apps.platform.models import SmsCreditEntry
+        SmsCreditEntry.objects.create(organization=self.org, kind='top_up', credits=n)
+
+    def test_preview_checks_credits_then_texts_each_phone_once(self):
+        from apps.platform.sms_credits import balance
+        msg = {'subject': 'Gates open', 'body': 'Come early', 'sms': True}
+        preview = self.client.post(self.url, {**msg, 'dry_run': True}, format='json').data
+        self.assertEqual((preview['recipients'], preview['sms_recipients'], preview['sms_credits'], preview['sms_balance']), (4, 2, 2, 0))
+        self.assertFalse(preview['sms_ready'])
+        self.assertIn('isn’t connected', self.client.post(self.url, msg, format='json').data['error'])
+        with mock.patch('apps.core.sms.sms_enabled', return_value=True):
+            self.assertEqual(self.client.post(self.url, msg, format='json').status_code, 400)  # not enough credits: nothing sent
+        self.assertEqual(len(mail.outbox), 0)
+        self.credit(5)
+        with mock.patch('apps.core.sms.sms_enabled', return_value=True), mock.patch('apps.core.sms.send_sms', return_value=True) as send, \
+                self.captureOnCommitCallbacks(execute=True):
+            r = self.client.post(self.url, msg, format='json')
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(r.data['sms_recipients'], 2)
+        self.assertEqual(send.call_count, 2)
+        self.assertTrue(send.call_args[0][1].startswith('Gala: Gates open. Come early'))
+        self.assertEqual(balance(self.org), 3)
+        self.assertEqual(self.client.get(self.url).data[0]['sms_recipients'], 2)
+
+    def test_sms_module_off(self):
+        from apps.accounts.models import PlatformModule
+        PlatformModule.objects.filter(slug='sms').update(is_globally_enabled=False)
+        clear_cache()
+        self.assertEqual(self.client.post(self.url, {'subject': 's', 'body': 'b', 'sms': True}, format='json').status_code, 403)
+        self.assertEqual(self.client.post(self.url, {'subject': 's', 'body': 'b'}, format='json').status_code, 201)  # email still works
+
+    def test_reminder_sms_when_turned_on(self):
+        self.credit(10)
+        start = timezone.make_aware(datetime.combine(timezone.localdate() + timedelta(days=1), time(18, 0)))
+        Event.objects.filter(pk=self.event.pk).update(start_date=start.date(), start_time=time(18, 0))
+        with mock.patch('apps.core.sms.sms_enabled', return_value=True), mock.patch('apps.core.sms.send_sms', return_value=True) as send, \
+                self.captureOnCommitCallbacks(execute=True):
+            send_due_reminders(now=start - timedelta(hours=20))
+        self.assertEqual(send.call_count, 0)  # off by default
+        Event.objects.filter(pk=self.event.pk).update(reminders_sms=True)
+        with mock.patch('apps.core.sms.sms_enabled', return_value=True), mock.patch('apps.core.sms.send_sms', return_value=True) as send, \
+                self.captureOnCommitCallbacks(execute=True):
+            send_due_reminders(now=start - timedelta(hours=1))
+        self.assertEqual(send.call_count, 2)
+        self.assertIn('Gala: starting soon', send.call_args[0][1])
