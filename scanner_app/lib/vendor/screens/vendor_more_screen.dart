@@ -1,3 +1,4 @@
+import 'bookings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -57,6 +58,13 @@ class _VendorMoreScreenState extends ConsumerState<VendorMoreScreen> {
             header: 'Business',
             separatorInset: 58,
             children: [
+              ListRow(
+                leading: const RowIcon(Icons.event_available_rounded, background: AppColors.success),
+                title: 'Bookings',
+                subtitle: 'Confirmed bookings, payments received and receipts',
+                chevron: true,
+                onTap: () => _push(const BookingsScreen()),
+              ),
               if (reviews)
                 ListRow(
                   leading: const RowIcon(Icons.star_rounded, background: AppColors.marigold),

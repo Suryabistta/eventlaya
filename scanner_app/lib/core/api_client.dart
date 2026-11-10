@@ -150,6 +150,12 @@ class ApiClient {
     return _dio.delete(path, data: data);
   }
 
+  /// A file from the API (e.g. a PDF receipt) as bytes.
+  Future<List<int>> getBytes(String path) async {
+    final resp = await _dio.get<List<int>>(path, options: Options(responseType: ResponseType.bytes));
+    return resp.data ?? const [];
+  }
+
   /// Multipart upload (e.g. `/api/uploads/`).
   Future<Response> upload(String path, FormData data, {ProgressCallback? onSendProgress}) async {
     return _dio.post(

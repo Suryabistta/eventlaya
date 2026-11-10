@@ -1,3 +1,4 @@
+import 'applications_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/legal.dart';
@@ -123,6 +124,13 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                 subtitle: events.length > 1 ? 'Tap to switch event' : null,
                 chevron: events.length > 1,
                 onTap: events.length > 1 ? () => _switchEvent(events, event) : null,
+              ),
+              ListRow(
+                leading: const RowIcon(Icons.assignment_turned_in_rounded, background: AppColors.brand),
+                title: 'Applications',
+                subtitle: 'Review applications for this event',
+                chevron: true,
+                onTap: () => _push(const ApplicationsScreen()),
               ),
               if (chat)
                 ListRow(
