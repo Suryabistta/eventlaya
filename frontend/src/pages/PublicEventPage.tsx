@@ -192,7 +192,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
           </div>
         </div>
 
-        {event.stages && event.stages.length > 1 && <StageTimeline event={event} />}
+        {timelineStages(event).length > 1 && <StageTimeline event={event} />}
 
         {/* Key facts */}
         <dl className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -383,7 +383,15 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-6">
           <div className="min-w-0 flex-1">
             <p className="font-display text-lg font-bold leading-tight text-ink-900">{price}</p>
-            <p className="truncate text-xs text-ink-500">{state.open ? spotsText(event) : state.reason}</p>
+            <p className="truncate text-xs text-ink-500">
+              {callOnly(event) && event.applications?.open
+                ? event.applications.closes_at
+                  ? `Applications open until ${formatDate(event.applications.closes_at, 'short')}`
+                  : 'Applications are open'
+                : state.open
+                  ? spotsText(event)
+                  : state.reason}
+            </p>
           </div>
           {callOnly(event) && event.applications?.open ? (
             <ButtonLink to={`/e/${event.slug}/apply`} className="px-6">
@@ -1001,8 +1009,16 @@ const RegistrationCard: React.FC<{ event: PublicEvent; state: ReturnType<typeof 
 
 
 /** Applications → Voting → Grand finale: where the event is now, with the open stage's button. */
+/** Stages worth a timeline card. The event itself only counts once tickets are on: before that its date and venue are
+ *  already on the page, so a one-step "timeline" for a plain open call is left out. */
+const timelineStages = (event: PublicEvent) => {
+  const all = event.stages ?? []
+  const others = all.filter((s) => s.kind !== 'tickets' || event.tickets_enabled !== false)
+  return others.length > 1 ? all : others // a pageant keeps its finale card; a plain open call shows none
+}
+
 const StageTimeline: React.FC<{ event: PublicEvent }> = ({ event }) => {
-  const stages = event.stages ?? []
+  const stages = timelineStages(event)
   const label = (s: EventStage) => {
     const when = s.closes_at ? new Date(s.closes_at) : s.opens_at ? new Date(s.opens_at) : null
     if (s.kind === 'results') return s.opens_at ? `Announced ${formatDate(s.opens_at, 'short')}` : 'Announced'

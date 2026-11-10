@@ -17,6 +17,8 @@ import {
   MapPin,
   Plus,
   Ticket as TicketIcon,
+  ClipboardList,
+  Crown,
   Trash2,
   Users,
 } from 'lucide-react'
@@ -286,7 +288,36 @@ const STEPS: { id: StepId; label: string; description: string; required?: boolea
   { id: 'faqs', label: 'FAQs & terms', description: 'Common questions, and the terms & conditions attendees agree to. Optional.' },
   { id: 'review', label: 'Review & publish', description: 'Check everything, then save.' },
 ]
-const REQUIRED: StepId[] = ['basics', 'when', 'registration']
+type Step = (typeof STEPS)[number]
+const stepOf = (id: StepId, label?: string, description?: string): Step => {
+  const s = STEPS.find((x) => x.id === id)!
+  return { ...s, label: label ?? s.label, description: description ?? s.description }
+}
+
+/** The steps each kind of event needs. New events skip the page content (schedule, speakers, FAQs): it's added later. */
+function stepsFor(kind: EventKind, isEdit: boolean, ticketsOn: boolean): Step[] {
+  const page = isEdit ? (['page', 'schedule', 'speakers', 'faqs'] as StepId[]).map((id) => stepOf(id)) : []
+  const review = stepOf('review', isEdit ? 'Review & save' : 'Publish', isEdit ? 'Check everything, then save.' : 'Check the details, then create the event.')
+  if (kind === 'pageant') {
+    return [
+      stepOf('basics'),
+      { ...stepOf('stages', 'Applications', 'When applications close and what the button says. The application form is ready to edit after you create the event.'), required: true },
+      stepOf('when', 'Finale', 'The date and venue of the final show. Leave it “to be announced” for now if you like.'),
+      ...(ticketsOn ? [stepOf('registration', 'Finale tickets', 'Tickets for the audience of the final show.')] : []),
+      ...page,
+      review,
+    ]
+  }
+  return [
+    stepOf('basics'),
+    stepOf('when'),
+    kind === 'registration'
+      ? stepOf('registration', 'Sign-up', 'The sign-up form, how many people can register and until when.')
+      : stepOf('registration', 'Tickets', 'Ticket price, how many people can come and until when.'),
+    ...page,
+    review,
+  ]
+}
 
 const localToday = () => {
   const d = new Date()
@@ -385,6 +416,8 @@ function move<T>(arr: T[], i: number, dir: -1 | 1): T[] {
 
 export const EventFormPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
+  const [params] = useSearchParams()
+  const applicationsModuleOn = useModuleEnabled('applications')
   const { events, isLoading, isError, error, refetch } = useCurrentEvent()
   const isEdit = Boolean(id)
   const event = id ? events.find((e) => e.id === id) : undefined
@@ -396,6 +429,10 @@ export const EventFormPage: React.FC = () => {
   })
 
   const wrap = (children: React.ReactNode) => <div className="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 2xl:px-10">{children}</div>
+
+  // New event: pick the kind first, so the form only asks what that kind needs
+  const kindParam = params.get('kind')
+  if (!isEdit && !['ticketing', 'registration', 'pageant'].includes(kindParam ?? '')) return wrap(<KindPicker applicationsOn={applicationsModuleOn} />)
 
   if (isEdit) {
     if (isError) return wrap(<ErrorState message={error?.message} onRetry={refetch} />)
@@ -426,8 +463,38 @@ export const EventFormPage: React.FC = () => {
   }
 
   // Remount when switching between events so the form starts from the right values
-  return <EventBuilder key={event?.id ?? 'new'} event={event} page={pageQuery.data} />
+  return <EventBuilder key={event?.id ?? `new-${kindParam}`} event={event} page={pageQuery.data} />
 }
+
+const KIND_CARDS: { kind: EventKind; icon: React.ElementType; title: string; text: string; examples: string }[] = [
+  { kind: 'ticketing', icon: TicketIcon, title: 'Sell tickets', text: 'Paid or free tickets with a QR pass for the gate.', examples: 'Concerts, shows, festivals, sports' },
+  { kind: 'registration', icon: ClipboardList, title: 'Free registration', text: 'People sign up with a short form. No tickets or payments.', examples: 'Seminars, workshops, college events, meetups' },
+  { kind: 'pageant', icon: Crown, title: 'Pageant or applications', text: 'People apply, you pick contestants, the public votes, you announce winners.', examples: 'Beauty pageants, talent hunts, auditions, film submissions' },
+]
+
+/** First screen of "Create event": what kind of event it is. */
+const KindPicker: React.FC<{ applicationsOn: boolean }> = ({ applicationsOn }) => (
+  <>
+    <PageHeader title="Create event" description="What kind of event is it? You only see the settings it needs." />
+    <ul className="grid gap-4 md:grid-cols-3">
+      {KIND_CARDS.filter((c) => c.kind !== 'pageant' || applicationsOn).map((c) => (
+        <li key={c.kind}>
+          <Link
+            to={`/app/events/new?kind=${c.kind}`}
+            className="group flex h-full flex-col gap-3 rounded-2xl border border-ink-200 bg-white p-5 transition-colors hover:border-brand-400 hover:bg-brand-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+          >
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+              <c.icon className="h-5 w-5" aria-hidden />
+            </span>
+            <span className="text-lg font-bold text-ink-900">{c.title}</span>
+            <span className="text-sm text-ink-600">{c.text}</span>
+            <span className="mt-auto text-xs text-ink-500">{c.examples}</span>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  </>
+)
 
 /** The sample pieces each kind starts with: a VIP ticket, or a pageant application form and a draft contest. Best effort: the
  *  event is already saved, so a failure here only means the organizer adds that piece by hand. */
@@ -478,31 +545,43 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
   const kindParam = params.get('kind') as EventKind | null
   const preset = !event && kindParam ? KIND_PRESETS[kindParam] : undefined
   const initial = useMemo(() => (event ? fromEvent(event, page) : { ...emptyDraft, ...preset?.draft }), [event, page, preset])
+  // Applications without tickets (film submissions, auditions) use the applications form, like a pageant
+  const kind: EventKind = event ? (event.applications_enabled && !event.tickets_enabled ? 'pageant' : (event.event_kind ?? 'ticketing')) : (kindParam ?? 'ticketing')
   const initialPage = useMemo(() => pageFromContent(page), [page])
   const [draft, setDraft] = useState<EventDraft>(initial)
   const [content, setContent] = useState<PageDraft>(initialPage)
   const [attempted, setAttempted] = useState<Set<StepId>>(new Set())
-  const [maxReached, setMaxReached] = useState(isEdit ? STEPS.length - 1 : 0)
+  const [maxReached, setMaxReached] = useState(isEdit ? 99 : 0)
   const [initialSnapshot] = useState(() => JSON.stringify([initial, stripKeys(initialPage)]))
   const dirty = JSON.stringify([draft, stripKeys(content)]) !== initialSnapshot
 
+  const steps = stepsFor(kind, isEdit, draft.tickets_enabled)
+  // Ticketing and sign-up events edit "also take applications" inside their main step, so check it there
+  const check = (id: StepId) => ({
+    ...validateStep(id, draft, content, !isEdit),
+    ...(id === 'registration' && !steps.some((x) => x.id === 'stages') ? validateStep('stages', draft, content, !isEdit) : {}),
+  })
   const stepParam = params.get('step') as StepId | null
-  const requestedIdx = Math.max(0, STEPS.findIndex((s) => s.id === stepParam))
-  const requiredValid = REQUIRED.every((s) => Object.keys(validateStep(s, draft, content, !isEdit)).length === 0)
+  const requestedIdx = Math.max(0, steps.findIndex((s) => s.id === stepParam))
+  const requiredValid = steps.filter((x) => x.required).every((x) => Object.keys(check(x.id)).length === 0)
   const canReach = (i: number) => isEdit || i <= maxReached || (requiredValid && maxReached >= 2)
   const stepIdx = canReach(requestedIdx) ? requestedIdx : Math.min(requestedIdx, maxReached)
-  const step = STEPS[stepIdx]
+  const step = steps[stepIdx]
   // The Speakers step takes the section title the organizer picked (Performers, Line-up, ...)
   const peoplePlural = content.speakers_label.trim() || 'Speakers'
   const personSingular = singularOf(peoplePlural)
-  const stepLabel = (s: (typeof STEPS)[number]) => (s.id === 'speakers' ? peoplePlural : s.label)
+  const stepLabel = (s: Step) => (s.id === 'speakers' ? peoplePlural : s.label)
 
   useEffect(() => {
     if (stepParam !== step.id) setParams((p) => (p.set('step', step.id), p), { replace: true })
   }, [stepParam, step.id, setParams])
 
   const [serverErrors, setServerErrors] = useState<Errors>({})
-  const errors: Errors = { ...(attempted.has(step.id) ? validateStep(step.id, draft, content, !isEdit) : {}), ...serverErrors }
+  const [moreOpen, setMoreOpen] = useState(false)
+  const errors: Errors = { ...(attempted.has(step.id) ? check(step.id) : {}), ...serverErrors }
+  // Fields folded under "More settings": show them when one needs fixing
+  const moreFields = ['status', 'bib_start', 'cta_label', 'application_cta', ...(kind === 'pageant' ? [] : ['applications_close'])]
+  const moreShown = moreOpen || moreFields.some((f) => errors[f])
 
   // Focus the step heading after a step change
   const headingRef = useRef<HTMLHeadingElement>(null)
@@ -535,7 +614,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
     return () => window.removeEventListener('beforeunload', onBeforeUnload)
   }, [dirty])
 
-  const goTo = (i: number) => setParams((p) => (p.set('step', STEPS[i].id), p))
+  const goTo = (i: number) => setParams((p) => (p.set('step', steps[Math.max(0, i)].id), p))
 
   const focusFirstError = () =>
     requestAnimationFrame(() => {
@@ -550,14 +629,14 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
   }
 
   const onContinue = () => {
-    const found = validateStep(step.id, draft, content, !isEdit)
+    const found = check(step.id)
     setAttempted((a) => new Set(a).add(step.id))
     if (Object.keys(found).length) {
       reportErrors(found, 'to continue')
       focusFirstError()
       return
     }
-    const next = Math.min(stepIdx + 1, STEPS.length - 1)
+    const next = Math.min(stepIdx + 1, steps.length - 1)
     setMaxReached((m) => Math.max(m, next))
     goTo(next)
   }
@@ -673,7 +752,8 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
       if (m && FIELD_STEP[m[1]]) {
         const key = m[1] === 'banner_url' ? 'banner' : m[1]
         setServerErrors({ [key]: m[2] })
-        const idx = STEPS.findIndex((x) => x.id === FIELD_STEP[m[1]])
+        const target = FIELD_STEP[m[1]] === 'stages' && !steps.some((x) => x.id === 'stages') ? 'registration' : FIELD_STEP[m[1]]
+        const idx = steps.findIndex((x) => x.id === target)
         if (idx !== stepIdx) goTo(idx)
         toast.error(isEdit ? 'Couldn’t save your changes' : 'Couldn’t create the event', `${errorLabel(key)}: ${m[2]}`)
         return
@@ -685,13 +765,13 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
   const onSave = (e?: React.FormEvent) => {
     e?.preventDefault()
     // Validate every step; jump to the first one with problems
-    const all: [StepId, Errors][] = STEPS.map((s) => [s.id, validateStep(s.id, draft, content, !isEdit)])
+    const all: [StepId, Errors][] = steps.map((x) => [x.id, check(x.id)])
     const bad = all.filter(([, errs]) => Object.keys(errs).length)
     if (bad.length) {
       setAttempted((a) => new Set([...a, ...bad.map(([id]) => id)]))
       const [firstId, firstErrs] = bad[0]
       reportErrors(Object.assign({}, ...bad.map(([, er]) => er)), 'before saving')
-      const idx = STEPS.findIndex((s) => s.id === firstId)
+      const idx = steps.findIndex((x) => x.id === firstId)
       setMaxReached((m) => Math.max(m, idx))
       if (firstId !== step.id) goTo(idx)
       void firstErrs
@@ -714,11 +794,50 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
     navigate(to)
   }
 
+  const phoneAndGuestSettings = (
+    <>
+      <Checkbox
+        label="Phone number required"
+        hint="Guests and applicants must give a mobile number so you can call or message them."
+        checked={draft.phone_required}
+        onChange={(v) => set('phone_required', v)}
+      />
+      {guestsOn && (
+        <>
+          <Select
+            label="Arrival alerts"
+            hint="A notification to you and your staff when a guest is scanned in (tag guests VIP, Press… on the dashboard)."
+            value={draft.arrival_alerts}
+            onChange={(e) => set('arrival_alerts', e.target.value as EventDraft['arrival_alerts'])}
+          >
+            <option value="tagged">Tagged guests only</option>
+            <option value="all">Every guest</option>
+            <option value="off">Off</option>
+          </Select>
+          <Checkbox
+            label="Reminder emails"
+            hint="Guests get an email the day before and about two hours before the start."
+            checked={draft.reminders_enabled}
+            onChange={(v) => set('reminders_enabled', v)}
+          />
+          {smsOn && draft.reminders_enabled && (
+            <Checkbox
+              label="Also remind by SMS"
+              hint="A short text with the time and venue to each guest’s phone, using your SMS credits (one per guest each time)."
+              checked={draft.reminders_sms}
+              onChange={(v) => set('reminders_sms', v)}
+            />
+          )}
+        </>
+      )}
+    </>
+  )
+
   const submitLabel = isEdit ? 'Save changes' : 'Create event'
   const statuses = isEdit ? statusOptions : statusOptions.slice(0, 2)
   const days = eventDays(draft.start_date, draft.end_date)
-  const stepErrorCount = (id: StepId) => (attempted.has(id) ? Object.keys(validateStep(id, draft, content, !isEdit)).length : 0)
-  const isComplete = (id: StepId, i: number) => i < maxReached && Object.keys(validateStep(id, draft, content, !isEdit)).length === 0 && (STEPS[i].required || hasContent(id, draft, content))
+  const stepErrorCount = (id: StepId) => (attempted.has(id) ? Object.keys(check(id)).length : 0)
+  const isComplete = (id: StepId, i: number) => i < maxReached && Object.keys(check(id)).length === 0 && (steps[i].required || hasContent(id, draft, content))
 
   return (
     <div className="w-full space-y-6 px-4 pb-44 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pb-8 2xl:px-10">
@@ -768,7 +887,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
         <p className="flex items-baseline justify-between text-sm">
           <span className="font-semibold text-ink-900">{stepLabel(step)}</span>
           <span className="text-ink-500">
-            Step {stepIdx + 1} of {STEPS.length}
+            Step {stepIdx + 1} of {steps.length}
           </span>
         </p>
         <div
@@ -777,12 +896,12 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
           aria-label="Event setup progress"
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-valuenow={Math.round(((stepIdx + 1) / STEPS.length) * 100)}
+          aria-valuenow={Math.round(((stepIdx + 1) / steps.length) * 100)}
         >
-          <div className="h-full rounded-full bg-brand-600 transition-[width] duration-300" style={{ width: `${((stepIdx + 1) / STEPS.length) * 100}%` }} />
+          <div className="h-full rounded-full bg-brand-600 transition-[width] duration-300" style={{ width: `${((stepIdx + 1) / steps.length) * 100}%` }} />
         </div>
         <ol className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6" aria-label="Steps">
-          {STEPS.map((s, i) => (
+          {steps.map((s, i) => (
             <li key={s.id} className="shrink-0">
               <button
                 type="button"
@@ -813,7 +932,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
         <aside className="hidden space-y-4 lg:sticky lg:top-20 lg:block">
           <nav aria-label="Event setup steps">
             <ol className="space-y-1">
-              {STEPS.map((s, i) => {
+              {steps.map((s, i) => {
                 const errs = stepErrorCount(s.id)
                 const done = isComplete(s.id, i)
                 return (
@@ -913,35 +1032,29 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
 
                 {step.id === 'stages' && (
                   <div className="space-y-5">
-                    <Checkbox
-                      label="Tickets or registration for the audience"
-                      hint="People get tickets (paid or free) or register. Turn it off while you only take applications, and turn it on when tickets go on sale."
-                      checked={draft.tickets_enabled}
-                      onChange={(v) => setDraft((d) => ({ ...d, tickets_enabled: v, date_tba: v ? false : d.date_tba }))}
-                    />
-                    {errors.tickets_enabled && <p className="text-sm font-medium text-red-600">{errors.tickets_enabled}</p>}
-                    {applicationsOn ? (
+                    {!applicationsOn && <p className="text-sm text-ink-500">Applications aren’t available on your plan.</p>}
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Input label="Applications close" type="datetime-local" required hint="Applications are accepted until this time." {...bind('applications_close')} />
+                      <ApplyButtonText value={draft.application_cta} onChange={(v) => set('application_cta', v)} />
+                    </div>
+                    <p className="rounded-xl bg-ink-50 px-4 py-3 text-sm text-ink-600">
+                      {isEdit ? (
+                        <>
+                          Edit the application form in <span className="font-semibold">Forms → Applications</span>.
+                        </>
+                      ) : (
+                        'A ready-made application form (age, height, photos, bio) and a draft contest are created with the event. You can change both.'
+                      )}
+                    </p>
+                    <MoreSettings open={moreShown} onToggle={setMoreOpen}>
                       <Checkbox
-                        label="Applications from participants"
-                        hint="Filmmakers submit films, contestants apply, performers audition. They fill in your application form and you accept or decline each one. Applying is free and never uses a ticket."
-                        checked={draft.applications_enabled}
-                        onChange={(v) => set('applications_enabled', v)}
+                        label="Sell tickets for the finale now"
+                        hint="Turn on when the audience can get tickets. You can also do this later."
+                        checked={draft.tickets_enabled}
+                        onChange={(v) => setDraft((d) => ({ ...d, tickets_enabled: v, date_tba: v ? false : d.date_tba }))}
                       />
-                    ) : (
-                      <p className="text-sm text-ink-500">Applications aren’t available on your plan.</p>
-                    )}
-                    {draft.applications_enabled && (
-                      <div className="space-y-4 rounded-xl border border-ink-200 p-4">
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          <Input label="Applications close" type="datetime-local" required hint="Applications are accepted until this time." {...bind('applications_close')} />
-                          <ApplyButtonText value={draft.application_cta} onChange={(v) => set('application_cta', v)} />
-                        </div>
-                        <p className="text-sm text-ink-600">
-                          After saving, build the application form in <span className="font-semibold">Forms → Applications</span> (templates for film
-                          submissions and pageants are ready).
-                        </p>
-                      </div>
-                    )}
+                      {phoneAndGuestSettings}
+                    </MoreSettings>
                   </div>
                 )}
                 {step.id === 'when' && !draft.tickets_enabled && (
@@ -975,14 +1088,14 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
 
                 {step.id === 'registration' && (
                   <>
-                    {!isEdit && (
+                    {!isEdit && kind === 'registration' && (
                       <Select
-                        label="Registration form"
-                        hint="Start the questions from a ready-made form; you can edit them in Forms after saving."
+                        label="Sign-up form"
+                        hint="The questions people answer. Name, email and phone are always asked. Edit the questions in Forms after saving."
                         value={draft.form_template}
                         onChange={(e) => set('form_template', e.target.value)}
                       >
-                        <option value="">Name, email and phone only (add questions later)</option>
+                        <option value="">Name, email and phone only</option>
                         {FORM_TEMPLATES.map((t) => (
                           <option key={t.id} value={t.id}>
                             {t.name}
@@ -990,136 +1103,127 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                         ))}
                       </Select>
                     )}
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <Checkbox
-                        label="Bib numbers"
-                        hint="For runs and races: each registration gets the next number, shown on the pass."
-                        checked={draft.bib_numbers}
-                        onChange={(v) => set('bib_numbers', v)}
-                      />
-                      {draft.bib_numbers && <Input label="First bib number" type="number" min={1} {...bind('bib_start')} />}
-                    </div>
-                    <Checkbox
-                      label="Phone number required"
-                      hint="Guests and applicants must give a mobile number so you can call or message them."
-                      checked={draft.phone_required}
-                      onChange={(v) => set('phone_required', v)}
-                    />
-                    {guestsOn && (
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <Select
-                          label="Arrival alerts"
-                          hint="A push to you and your staff when a guest is scanned in (tag guests VIP, Press… on the dashboard)."
-                          value={draft.arrival_alerts}
-                          onChange={(e) => set('arrival_alerts', e.target.value as EventDraft['arrival_alerts'])}
-                        >
-                          <option value="tagged">Tagged guests only</option>
-                          <option value="all">Every guest</option>
-                          <option value="off">Off</option>
-                        </Select>
-                        <Checkbox
-                          label="Reminder emails"
-                          hint="Guests get an email the day before and about two hours before the start."
-                          checked={draft.reminders_enabled}
-                          onChange={(v) => set('reminders_enabled', v)}
-                        />
-                        {smsOn && draft.reminders_enabled && (
+                    {kind !== 'registration' &&
+                      (isEdit ? (
+                        <TicketsNote eventId={event!.id} />
+                      ) : (
+                        <>
                           <Checkbox
-                            label="Also remind by SMS"
-                            hint="A short text with the time and venue to each guest’s phone, using your SMS credits (one per guest each time)."
-                            checked={draft.reminders_sms}
-                            onChange={(v) => set('reminders_sms', v)}
+                            label="Paid tickets"
+                            hint="Turn off for free entry. Add student, VIP or early-bird prices on the Tickets page after you create the event."
+                            checked={draft.is_paid}
+                            onChange={(v) => set('is_paid', v)}
                           />
-                        )}
-                      </div>
-                    )}
+                          {draft.is_paid && (
+                            <Input label="Ticket price (Rs)" type="number" inputMode="decimal" min={1} step="any" required placeholder="500" containerClassName="sm:max-w-xs" {...bind('ticket_price')} />
+                          )}
+                        </>
+                      ))}
                     <Checkbox
                       label="Limit the number of spots"
-                      hint={draft.limit_spots ? 'Registration closes when this many people sign up.' : 'No limit: anyone can register until you close registration. No spot count is shown.'}
+                      hint={draft.limit_spots ? 'Sign-ups close when this many people have registered.' : 'No limit: anyone can register until you close it.'}
                       checked={draft.limit_spots}
                       onChange={(v) => set('limit_spots', v)}
                     />
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      {draft.limit_spots && (
-                        <Input label="Capacity" type="number" inputMode="numeric" min={1} required hint="Most people who can register" {...bind('capacity')} />
-                      )}
-                      <Select label="Status" hint="Only published events accept registrations" {...bind('status')}>
+                    {draft.limit_spots && (
+                      <Input label="How many people" type="number" inputMode="numeric" min={1} required containerClassName="sm:max-w-xs" {...bind('capacity')} />
+                    )}
+                    <Input
+                      label={kind === 'registration' ? 'Sign-up closes' : 'Ticket sales close'}
+                      type="datetime-local"
+                      hint="Optional. Leave empty to stay open until the event starts."
+                      containerClassName="sm:max-w-xs"
+                      {...bind('registration_deadline')}
+                    />
+                    <MoreSettings open={moreShown} onToggle={setMoreOpen}>
+                      <Select label="Status" hint="Only published events accept sign-ups" {...bind('status')}>
                         {statuses.map((s) => (
                           <option key={s.value} value={s.value}>
                             {s.label}
                           </option>
                         ))}
                       </Select>
-                    </div>
-                    <Select
-                      label="Registration type"
-                      hint={
-                        draft.registration_mode === 'form'
-                          ? 'People fill in your registration form and get a confirmation email. Free, one per person, no pass or gate check-in.'
-                          : 'Each registration gets a QR pass for check-in at the gate.'
-                      }
-                      value={draft.registration_mode}
-                      onChange={(e) => set('registration_mode', e.target.value as EventDraft['registration_mode'])}
-                    >
-                      <option value="pass">With pass (QR ticket)</option>
-                      <option value="form">Registration only (no pass)</option>
-                    </Select>
-                    <ButtonText
-                      value={draft.cta_label}
-                      auto={bookLabel({ ...(event ?? {}), registration_mode: draft.registration_mode, is_paid: draft.is_paid, ticket_price: draft.ticket_price, ticket_types: event?.ticket_types, cta_label: '', tickets_enabled: true } as Event)}
-                      onChange={(v) => set('cta_label', v)}
-                    />
-                    {draft.registration_mode === 'pass' && (
-                    <Select
-                      label="Ticket layout"
-                      hint="Shape of the pass people download, print and see in the app."
-                      value={draft.ticket_layout}
-                      onChange={(e) => set('ticket_layout', e.target.value as EventDraft['ticket_layout'])}
-                    >
-                      <option value="vertical">Vertical (phone screen)</option>
-                      <option value="landscape">Landscape (wide)</option>
-                    </Select>
-                    )}
-                    {seatsOn && (
                       <Checkbox
-                        label="Show seat numbers to attendees"
-                        hint="Assign seats from the attendee list on the dashboard. Gate staff always see them."
-                        checked={draft.show_seat_number}
-                        onChange={(v) => set('show_seat_number', v)}
+                        label="Accept sign-ups"
+                        hint="Turn off to close sign-ups without unpublishing the event."
+                        checked={draft.allow_registration}
+                        onChange={(v) => set('allow_registration', v)}
                       />
-                    )}
-                    {draft.limit_spots && (
-                    <Checkbox
-                      label="Show how many spots are left"
-                      hint="Attendees still see Fully booked / Sold out."
-                      checked={draft.show_spots_left}
-                      onChange={(v) => set('show_spots_left', v)}
-                    />
-                    )}
-                    <Checkbox
-                      label="Accept registrations"
-                      hint="Turn off to close sign-ups without unpublishing the event."
-                      checked={draft.allow_registration}
-                      onChange={(v) => set('allow_registration', v)}
-                    />
-                    {draft.allow_registration && (
-                      <Input label="Registration deadline" type="datetime-local" hint="Optional. Sign-ups close at this time." {...bind('registration_deadline')} />
-                    )}
-                    {isEdit ? (
-                      <TicketsNote eventId={event!.id} />
-                    ) : (
-                      <>
+                      <Checkbox
+                        label="Give each guest a QR pass"
+                        hint={draft.registration_mode === 'pass' ? 'Guests show the pass at the gate to check in.' : 'Off: guests just get a confirmation email (one per person, free, no gate check-in).'}
+                        checked={draft.registration_mode === 'pass'}
+                        onChange={(v) => set('registration_mode', v ? 'pass' : 'form')}
+                      />
+                      <ButtonText
+                        value={draft.cta_label}
+                        auto={bookLabel({ ...(event ?? {}), registration_mode: draft.registration_mode, is_paid: draft.is_paid, ticket_price: draft.ticket_price, ticket_types: event?.ticket_types, cta_label: '', tickets_enabled: true } as Event)}
+                        onChange={(v) => set('cta_label', v)}
+                      />
+                      {draft.limit_spots && (
                         <Checkbox
-                          label="Paid tickets"
-                          hint="Attendees pay at the venue. There’s no online payment yet. Add student, VIP or early-bird prices on the Tickets page after you create the event."
-                          checked={draft.is_paid}
-                          onChange={(v) => set('is_paid', v)}
+                          label="Show how many spots are left"
+                          hint="People still see Fully booked / Sold out."
+                          checked={draft.show_spots_left}
+                          onChange={(v) => set('show_spots_left', v)}
                         />
-                        {draft.is_paid && (
-                          <Input label="Ticket price (Rs)" type="number" inputMode="decimal" min={1} step="any" required placeholder="500" containerClassName="sm:max-w-xs" {...bind('ticket_price')} />
-                        )}
-                      </>
-                    )}
+                      )}
+                      {!isEdit && kind !== 'registration' && (
+                        <Select label="Questions for buyers" hint="Extra questions besides name, email and phone." value={draft.form_template} onChange={(e) => set('form_template', e.target.value)}>
+                          <option value="">None</option>
+                          {FORM_TEMPLATES.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name}
+                            </option>
+                          ))}
+                        </Select>
+                      )}
+                      {draft.registration_mode === 'pass' && (
+                        <Select
+                          label="Pass layout"
+                          hint="Shape of the pass people download, print and see in the app."
+                          value={draft.ticket_layout}
+                          onChange={(e) => set('ticket_layout', e.target.value as EventDraft['ticket_layout'])}
+                        >
+                          <option value="vertical">Vertical (phone screen)</option>
+                          <option value="landscape">Landscape (wide)</option>
+                        </Select>
+                      )}
+                      {seatsOn && draft.registration_mode === 'pass' && (
+                        <Checkbox
+                          label="Show seat numbers to attendees"
+                          hint="Assign seats from the attendee list on the dashboard. Gate staff always see them."
+                          checked={draft.show_seat_number}
+                          onChange={(v) => set('show_seat_number', v)}
+                        />
+                      )}
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <Checkbox
+                          label="Bib numbers"
+                          hint="For runs and races: each guest gets the next number, shown on the pass."
+                          checked={draft.bib_numbers}
+                          onChange={(v) => set('bib_numbers', v)}
+                        />
+                        {draft.bib_numbers && <Input label="First bib number" type="number" min={1} {...bind('bib_start')} />}
+                      </div>
+                      {phoneAndGuestSettings}
+                      {kind !== 'pageant' && applicationsOn && (
+                        <>
+                          <Checkbox
+                            label="Also take applications"
+                            hint="Performers, speakers or filmmakers apply with a form, and you accept or decline each one."
+                            checked={draft.applications_enabled}
+                            onChange={(v) => set('applications_enabled', v)}
+                          />
+                          {draft.applications_enabled && (
+                            <div className="grid gap-4 sm:grid-cols-2">
+                              <Input label="Applications close" type="datetime-local" required {...bind('applications_close')} />
+                              <ApplyButtonText value={draft.application_cta} onChange={(v) => set('application_cta', v)} />
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </MoreSettings>
                   </>
                 )}
 
@@ -1291,7 +1395,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                   />
                 )}
 
-                {step.id === 'review' && <Review draft={draft} content={content} event={event} onEdit={(id) => goTo(STEPS.findIndex((s) => s.id === id))} />}
+                {step.id === 'review' && <Review draft={draft} content={content} event={event} steps={steps} onEdit={(id) => goTo(steps.findIndex((x) => x.id === id))} />}
               </div>
 
               {/* Desktop step footer */}
@@ -1448,7 +1552,23 @@ const whenText = (d: EventDraft) =>
     ? `${fmtDate(d.start_date)}${d.start_time ? `, ${fmtClock(d.start_time)}` : ''}${d.end_date && d.end_date !== d.start_date ? ` to ${fmtDate(d.end_date)}` : ''}`
     : 'Date not set'
 
-const Review: React.FC<{ draft: EventDraft; content: PageDraft; event?: Event; onEdit: (id: StepId) => void }> = ({ draft, content, event, onEdit }) => {
+/** Rarely needed options, folded away so each step shows only the essentials. */
+const MoreSettings: React.FC<{ open: boolean; onToggle: (v: boolean) => void; children: React.ReactNode }> = ({ open, onToggle, children }) => (
+  <div className="rounded-xl border border-ink-200">
+    <button
+      type="button"
+      aria-expanded={open}
+      onClick={() => onToggle(!open)}
+      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold text-ink-800 hover:bg-ink-50"
+    >
+      More settings
+      <span className="text-xs font-medium text-ink-500">{open ? 'Hide' : 'Status, pass, reminders and more'}</span>
+    </button>
+    {open && <div className="space-y-5 border-t border-ink-100 px-4 py-4">{children}</div>}
+  </div>
+)
+
+const Review: React.FC<{ draft: EventDraft; content: PageDraft; event?: Event; steps: Step[]; onEdit: (id: StepId) => void }> = ({ draft, content, event, steps, onEdit }) => {
   const ticketSummary = useTicketSummary(event?.id)
   const categoryName = useEventCategories().find((c) => c.slug === draft.category)?.name ?? event?.category_name
   const groups: { id: StepId; rows: [string, string][] }[] = [
@@ -1462,9 +1582,16 @@ const Review: React.FC<{ draft: EventDraft; content: PageDraft; event?: Event; o
       ],
     },
     {
+      id: 'stages',
+      rows: [
+        ['Applications close', draft.applications_close ? new Date(draft.applications_close).toLocaleString() : 'Not set'],
+        ['Button', draft.application_cta.trim() || 'Apply'],
+      ],
+    },
+    {
       id: 'when',
       rows: [
-        ['When', whenText(draft)],
+        ['When', draft.date_tba && !draft.tickets_enabled ? 'To be announced' : whenText(draft)],
         ['Venue', draft.location.trim() || 'Not set'],
         ['Map search', draft.map_query.trim() || 'Same as venue'],
       ],
@@ -1491,12 +1618,12 @@ const Review: React.FC<{ draft: EventDraft; content: PageDraft; event?: Event; o
   ]
   return (
     <div className="space-y-4">
-      {groups.map((g) => (
+      {groups.filter((g) => steps.some((x) => x.id === g.id)).map((g) => (
         <section key={g.id} className="rounded-xl border border-ink-200">
           <div className="flex items-center justify-between gap-3 border-b border-ink-100 px-4 py-2.5">
-            <h3 className="text-sm font-semibold text-ink-900">{STEPS.find((s) => s.id === g.id)!.label}</h3>
+            <h3 className="text-sm font-semibold text-ink-900">{steps.find((x) => x.id === g.id)!.label}</h3>
             <button type="button" onClick={() => onEdit(g.id)} className="text-sm font-medium text-brand-700 hover:underline">
-              Edit<span className="sr-only"> {STEPS.find((s) => s.id === g.id)!.label}</span>
+              Edit<span className="sr-only"> {steps.find((x) => x.id === g.id)!.label}</span>
             </button>
           </div>
           <dl className="divide-y divide-ink-100">
