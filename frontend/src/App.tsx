@@ -26,6 +26,7 @@ const ForgotPasswordPage = lazyPage(() => import('./pages/auth/PasswordResetPage
 const ResetPasswordPage = lazyPage(() => import('./pages/auth/PasswordResetPages'), 'ResetPasswordPage')
 const DashboardPage = lazyPage(() => import('./pages/DashboardPage'), 'DashboardPage')
 const EventsPage = lazyPage(() => import('./pages/EventsPage'), 'EventsPage')
+const ApplicationsPage = lazyPage(() => import('./pages/ApplicationsPage'), 'ApplicationsPage')
 const TicketingEventsPage = lazyPage(() => import('./pages/EventsPage'), 'TicketingEventsPage')
 const RegistrationEventsPage = lazyPage(() => import('./pages/EventsPage'), 'RegistrationEventsPage')
 const PageantEventsPage = lazyPage(() => import('./pages/EventsPage'), 'PageantEventsPage')
@@ -236,6 +237,7 @@ export const App: React.FC = () => {
                 <Route path="voting/:id" element={organizer(<PollResultsPage />)} />
                 <Route path="voting/:id/edit" element={organizer(<PollBuilderPage />)} />
                 <Route path="analytics" element={organizer(<EventAnalyticsPage />)} />
+                <Route path="applications" element={organizer(<ApplicationsPage />)} />
                 <Route path="events/new" element={organizer(<EventFormPage />)} />
                 <Route path="events/:id/edit" element={organizer(<EventFormPage />)} />
                 <Route path="events/:id/analytics" element={organizer(<EventAnalyticsPage />)} />

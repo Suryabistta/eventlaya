@@ -85,14 +85,27 @@ interface NavExtras {
   payments: boolean
   printedTickets: boolean
   contests: boolean
+  /** Applications page: current event takes applications; badge = waiting for review */
+  applications: boolean
+  applicationsPending: number
 }
-const noExtras: NavExtras = { chat: false, chatUnread: 0, reviews: false, marketplace: true, whiteLabel: true, payments: true, printedTickets: false, contests: false }
+const noExtras: NavExtras = { chat: false, chatUnread: 0, reviews: false, marketplace: true, whiteLabel: true, payments: true, printedTickets: false, contests: false, applications: false, applicationsPending: 0 }
 
 /** Modules on for this user + chat unread count, for the sidebar, More sheet and tab bar. */
 function useNavExtras(): NavExtras {
   const modules = useModules()
   const chat = useChat()
+  const { currentEvent } = useCurrentEvent()
+  const appsOn = Boolean(currentEvent?.applications_enabled) && modules.enabled('applications')
+  // Same query as the Applications page, so the badge updates when one is reviewed
+  const { data: applications } = useQuery({
+    queryKey: ['applications', currentEvent?.id],
+    queryFn: () => request<{ review_status: string }[]>(`/forms/events/${currentEvent!.id}/applications/`),
+    enabled: appsOn,
+  })
   return {
+    applications: appsOn,
+    applicationsPending: appsOn ? (applications ?? []).filter((a) => a.review_status === 'pending').length : 0,
     chat: chat.available,
     chatUnread: chat.unread,
     reviews: modules.enabled('reviews'),
@@ -131,6 +144,9 @@ const eventTools = (x: NavExtras): NavGroup => ({
     },
     { label: 'Tickets', to: '/app/tickets', icon: Ticket, roles: ORGANIZER },
     ...(x.printedTickets ? [{ label: 'Printed tickets', to: '/app/printed-tickets', icon: Printer, roles: ORGANIZER }] : []),
+    ...(x.applications
+      ? [{ label: 'Applications', to: '/app/applications', icon: Inbox, roles: ORGANIZER, badge: x.applicationsPending }]
+      : []),
     { label: 'Payments', to: '/app/payments', icon: Wallet, roles: ORGANIZER },
     { label: 'Registration forms', to: '/app/forms', icon: FileText, roles: ORGANIZER },
     { label: 'Gate scanner', to: '/app/scanner', icon: ScanLine },
