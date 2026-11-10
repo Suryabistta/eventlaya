@@ -231,6 +231,30 @@ class SmsCreditRequest(models.Model):
         return f'{self.organization.email} asks {self.credits} SMS [{self.status}]'
 
 
+class ContactMessage(models.Model):
+    """"Send us a message" on the home page. Read by the superadmin under Contact messages."""
+    class Role(models.TextChoices):
+        USER = 'user', 'Attendee'
+        BUSINESS = 'business', 'Event organizer'
+        VENDOR = 'vendor', 'Vendor or venue'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=120)
+    email = models.EmailField()
+    phone = models.CharField(max_length=30, blank=True)
+    role = models.CharField(max_length=10, choices=Role.choices, default=Role.USER)
+    message = models.TextField(max_length=3000)
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    handled = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.name} <{self.email}>'
+
+
 class City(models.Model):
     """A city offered in pickers and filters (events, vendors, venues, sign-up). Managed by the superadmin."""
 

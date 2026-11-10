@@ -2,6 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 from . import billing_views as billing
 from . import sms_views as sms
+from . import contact_views as contact
 from . import segments
 from . import featured_events, org_admin, views
 from .catalog import BannerViewSet, CityViewSet, EventCategoryViewSet, SiteBrandingView
@@ -51,6 +52,9 @@ urlpatterns = [
     path('billing/upgrade-requests/<uuid:pk>/approve/', billing.UpgradeRequestReviewView.as_view(decision='approve'), name='platform_billing_upgrade_approve'),
     path('billing/upgrade-requests/<uuid:pk>/decline/', billing.UpgradeRequestReviewView.as_view(decision='decline'), name='platform_billing_upgrade_decline'),
     path('billing/mine/', billing.MyBillingView.as_view(), name='platform_billing_mine'),
+    path('contact/', contact.ContactView.as_view(), name='platform_contact'),
+    path('contact/messages/', contact.ContactMessageListView.as_view(), name='platform_contact_messages'),
+    path('contact/messages/<uuid:pk>/', contact.ContactMessageDetailView.as_view(), name='platform_contact_message'),
     path('sms/mine/', sms.MySmsView.as_view(), name='platform_sms_mine'),
     path('sms/requests/', sms.SmsRequestListView.as_view(), name='platform_sms_requests'),
     path('sms/requests/<uuid:pk>/approve/', sms.SmsRequestReviewView.as_view(decision='approve'), name='platform_sms_approve'),

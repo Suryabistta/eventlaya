@@ -73,6 +73,7 @@ const OrganizationDetailPage = lazyPage(() => import('./pages/admin/Organization
 const ApprovalsQueuePage = lazyPage(() => import('./pages/admin/approvals/QueuePage'), 'ApprovalsQueuePage')
 const WhiteLabelApprovalsPage = lazyPage(() => import('./pages/admin/approvals/WhiteLabelApprovalsPage'), 'WhiteLabelApprovalsPage')
 const MarketplaceApprovalsPage = lazyPage(() => import('./pages/admin/approvals/MarketplaceApprovalsPage'), 'MarketplaceApprovalsPage')
+const ContactMessagesPage = lazyPage(() => import('./pages/admin/ContactMessagesPage'), 'ContactMessagesPage')
 const SmsApprovalsPage = lazyPage(() => import('./pages/admin/approvals/SmsApprovalsPage'), 'SmsApprovalsPage')
 const ListingsApprovalsPage = lazyPage(() => import('./pages/admin/approvals/ListingsApprovalsPage'), 'ListingsApprovalsPage')
 const AdminBillingPage = lazyPage(() => import('./pages/admin/billing/BillingPage'), 'BillingPage')
@@ -287,6 +288,7 @@ export const App: React.FC = () => {
                 <Route path="approvals/marketplace" element={<MarketplaceApprovalsPage />} />
                 <Route path="approvals/listings" element={<ListingsApprovalsPage />} />
                 <Route path="approvals/sms" element={<SmsApprovalsPage />} />
+                <Route path="contact-messages" element={<ContactMessagesPage />} />
                 <Route path="billing" element={<AdminBillingPage />} />
                 <Route path="segments" element={<SegmentsPage />} />
                 <Route path="modules" element={<ModulesPage />} />

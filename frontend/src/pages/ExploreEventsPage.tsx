@@ -32,7 +32,7 @@ export const ExploreEventsPage: React.FC = () => {
     }, { replace: true })
   const setCity = (v: string) => setParam('city', v)
   const eventTypes = useEventCategories()
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(() => params.get('q') ?? '')
   const deferredSearch = useDeferredValue(search.trim())
   useTrackSearch(deferredSearch, 'events')
 

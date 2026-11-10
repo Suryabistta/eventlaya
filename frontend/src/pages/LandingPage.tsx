@@ -2,23 +2,24 @@ import React from 'react'
 import { MotionConfig } from 'framer-motion'
 import { Hero } from './landing/Hero'
 import { ProductTour } from './landing/ProductTour'
-import { EventKindsStrip, HowItWorks, FeatureGrid, NumbersBand, MarketplaceBand, PricingTeaser, Faq, FinalCta } from './landing/Sections'
+import { Faq } from './landing/Sections'
+import { ContactSection, EventsShowcase, FeaturesEight, PoweredBy, SearchHero, StepsTabs, VendorsShowcase } from './landing/Discover'
 
 export { GatePassDemo } from './landing/GatePass'
 
 export const LandingPage: React.FC = () => (
   // Respect the visitor's reduced-motion setting for every animation on the page
   <MotionConfig reducedMotion="user">
+    <SearchHero />
     <Hero />
-    <EventKindsStrip />
+    <EventsShowcase />
+    <VendorsShowcase />
+    <FeaturesEight />
     <ProductTour />
-    <HowItWorks />
-    <NumbersBand />
-    <FeatureGrid />
-    <MarketplaceBand />
-    <PricingTeaser />
+    <PoweredBy />
+    <StepsTabs />
     <Faq />
-    <FinalCta />
+    <ContactSection />
   </MotionConfig>
 )
 

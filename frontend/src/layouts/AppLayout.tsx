@@ -234,6 +234,7 @@ function buildNav(user: ShellUser | null, pending: PendingApprovals = noPending,
               { label: 'SMS credits', to: '/admin/approvals/sms', icon: MessageCircle, badge: pending.sms },
             ],
           },
+          { label: 'Contact messages', to: '/admin/contact-messages', icon: Inbox, badge: pending.contact },
           { label: 'Billing & recharges', to: '/admin/billing', icon: CreditCard },
           ...(x.payments ? [{ label: 'Online payments', to: '/admin/payments', icon: Wallet }] : []),
           { label: 'Segments', to: '/admin/segments', icon: PieChart },
@@ -272,11 +273,12 @@ function usePendingApprovals(enabled: boolean) {
     marketplace: n('marketplace_access'),
     listings: n('listings'),
     sms: n('sms_credits'),
+    contact: n('contact_messages'),
   }
 }
 
 type PendingApprovals = ReturnType<typeof usePendingApprovals>
-const noPending: PendingApprovals = { total: 0, whiteLabel: 0, marketplace: 0, listings: 0, sms: 0 }
+const noPending: PendingApprovals = { total: 0, whiteLabel: 0, marketplace: 0, listings: 0, sms: 0, contact: 0 }
 
 /** A sub-item is active on its own page and anything below it. */
 const subItemActive = (item: NavItem, pathname: string) => pathname === item.to || pathname.startsWith(`${item.to}/`)

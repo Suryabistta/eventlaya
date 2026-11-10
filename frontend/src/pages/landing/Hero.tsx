@@ -1,13 +1,12 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { UserPlus, ArrowRight, ScanLine } from 'lucide-react'
+import { UserPlus, ArrowRight, ScanLine, Ticket, Vote } from 'lucide-react'
 import { buttonClass } from '@/components/ui/Button'
 import { GatePassDemo } from './GatePass'
-import { usePublicNumbers } from './data'
 
 const ease = [0.22, 1, 0.36, 1] as const
-const headline = ['From', 'sign-up', 'form', 'to', 'front', 'gate.']
+const headline = ['Registration,', 'ticketing', '&', 'check-in,', 'all', 'in', 'one', 'flow.']
 
 const signups = [
   { name: 'Sita Rai', from: 'Dharan', ticket: 'TKT-0313' },
@@ -18,10 +17,9 @@ const signups = [
 
 export const Hero: React.FC = () => {
   const reduce = useReducedMotion()
-  const numbers = usePublicNumbers()
 
   return (
-    <section className="relative overflow-hidden border-b border-ink-100">
+    <section className="relative overflow-hidden bg-gradient-to-br from-brand-50/60 via-white to-white">
       {/* Dot grid, faded towards the edges */}
       <div
         aria-hidden
@@ -33,13 +31,13 @@ export const Hero: React.FC = () => {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease }}
-            className="inline-flex items-center gap-2 rounded-full border border-brand-100 bg-brand-50 py-1 pl-1.5 pr-3 text-sm font-medium text-brand-800"
+            className="flex items-center gap-3 text-xs font-bold uppercase tracking-[0.2em] text-brand-600"
           >
-            <span className="rounded-full bg-brand-600 px-2 py-0.5 text-xs font-semibold text-white">New</span>
-            Gates, staff and offline scanning
+            <span className="h-px w-6 bg-brand-600" aria-hidden />
+            One platform. Every event.
           </motion.p>
 
-          <h1 className="mt-6 font-display text-[44px] font-extrabold leading-[1.02] tracking-[-0.035em] text-ink-900 sm:text-6xl lg:text-[70px]">
+          <h2 className="mt-5 font-display text-[38px] font-extrabold leading-[1.05] tracking-[-0.03em] text-ink-900 sm:text-5xl lg:text-[56px]">
             {headline.map((word, i) => (
               <motion.span
                 key={word}
@@ -52,7 +50,7 @@ export const Hero: React.FC = () => {
                 {i < headline.length - 1 && ' '}
               </motion.span>
             ))}
-          </h1>
+          </h2>
 
           <motion.p
             initial={{ opacity: 0, y: 12 }}
@@ -60,8 +58,8 @@ export const Hero: React.FC = () => {
             transition={{ duration: 0.6, delay: 0.55, ease }}
             className="mt-6 max-w-lg text-lg leading-relaxed text-ink-600"
           >
-            One place for clubs, colleges and venues to take registrations, send every attendee a QR pass the moment they sign
-            up, and check people in and out at every gate.
+            Let attendees register online, get a secure QR pass, scan in at the gate (even offline) and vote live from their
+            phones.
           </motion.p>
 
           <motion.div
@@ -70,25 +68,30 @@ export const Hero: React.FC = () => {
             transition={{ duration: 0.6, delay: 0.7, ease }}
             className="mt-8 flex flex-wrap gap-3"
           >
-            <Link to="/signup" className={buttonClass('primary', 'lg', 'group')}>
-              Start free
+            <Link to="/signup" className={buttonClass('primary', 'lg', 'group rounded-full')}>
+              Start your event
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
             </Link>
-            <Link to="/events" className={buttonClass('secondary', 'lg')}>
-              Browse upcoming events
-            </Link>
+            <a href="#dashboard" className={buttonClass('secondary', 'lg', 'rounded-full')}>
+              See how it works
+            </a>
           </motion.div>
 
-          <motion.dl
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.9 }}
-            className="mt-10 flex flex-wrap gap-x-8 gap-y-3 border-t border-ink-200 pt-6"
-          >
-            <HeroStat label="Upcoming events" value={numbers.upcomingEvents} />
-            <HeroStat label="People registered" value={numbers.registrations} />
-            <HeroStat label="Vendors and venues" value={numbers.listings} />
-          </motion.dl>
+          <ul className="mt-10 grid grid-cols-2 gap-4 border-t border-ink-200 pt-6 text-sm font-medium text-ink-700 sm:grid-cols-4">
+            {[
+              [UserPlus, 'Online registration'],
+              [Ticket, 'Digital QR passes'],
+              [ScanLine, 'Online / offline check-in'],
+              [Vote, 'Live voting'],
+            ].map(([Icon, label]) => (
+              <li key={label as string} className="flex items-center gap-2">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+                  {React.createElement(Icon as React.ElementType, { className: 'h-4 w-4', 'aria-hidden': true })}
+                </span>
+                {label as string}
+              </li>
+            ))}
+          </ul>
         </div>
 
         <div className="relative mx-auto w-full max-w-md lg:mr-0">
@@ -100,13 +103,6 @@ export const Hero: React.FC = () => {
     </section>
   )
 }
-
-const HeroStat: React.FC<{ label: string; value: number | null }> = ({ label, value }) => (
-  <div>
-    <dd className="font-display text-2xl font-bold tabular text-ink-900">{value === null ? '–' : value.toLocaleString()}</dd>
-    <dt className="text-sm text-ink-500">{label}</dt>
-  </div>
-)
 
 /** "Someone just registered" notifications, cycling. */
 const SignupFeed: React.FC = () => {

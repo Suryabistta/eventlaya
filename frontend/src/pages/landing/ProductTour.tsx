@@ -38,11 +38,15 @@ export const ProductTour: React.FC = () => {
   const tab = tabs.find((t) => t.id === active)!
 
   return (
-    <section id="features" className="scroll-mt-20 bg-ink-50 py-20 sm:py-28">
+    <section id="dashboard" className="scroll-mt-20 bg-[#241a22] bg-[radial-gradient(ellipse_at_85%_60%,rgba(194,33,90,0.35),transparent_55%)] py-20 sm:py-28">
       <div ref={ref} className="mx-auto max-w-6xl px-4 sm:px-6" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
-        <Reveal className="max-w-2xl">
-          <h2 className="font-display text-3xl font-bold text-ink-900 sm:text-[44px] sm:leading-[1.05]">See the whole event in one tool</h2>
-          <p className="mt-4 text-lg text-ink-600">Four screens your team actually uses on event day.</p>
+        <Reveal className="mx-auto max-w-2xl text-center">
+          <p className="flex items-center justify-center gap-3 text-xs font-bold uppercase tracking-[0.2em] text-brand-300">
+            <span className="h-px w-6 bg-brand-300" aria-hidden />
+            Organizer dashboard
+          </p>
+          <h2 className="mt-3 font-display text-3xl font-extrabold text-white sm:text-[44px] sm:leading-[1.08]">Run the whole event from one dashboard</h2>
+          <p className="mt-4 text-lg text-white/70">Four screens your team actually uses on event day.</p>
         </Reveal>
 
         <div role="tablist" aria-label="Product tour" className="mt-10 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -61,11 +65,11 @@ export const ProductTour: React.FC = () => {
                 }}
                 className={cn(
                   'relative overflow-hidden rounded-xl border p-3 text-left transition-colors sm:p-4',
-                  selected ? 'border-brand-200 bg-white shadow-xs' : 'border-transparent hover:bg-white/70',
+                  selected ? 'border-brand-200 bg-white shadow-xs' : 'border-white/15 bg-white/5 hover:bg-white/10',
                 )}
               >
-                <span className="flex items-center gap-2 text-sm font-semibold text-ink-900">
-                  <t.icon className={cn('h-4 w-4', selected ? 'text-brand-600' : 'text-ink-400')} aria-hidden />
+                <span className={cn('flex items-center gap-2 text-sm font-semibold', selected ? 'text-ink-900' : 'text-white')}>
+                  <t.icon className={cn('h-4 w-4', selected ? 'text-brand-600' : 'text-white/60')} aria-hidden />
                   {t.label}
                 </span>
                 {selected && (

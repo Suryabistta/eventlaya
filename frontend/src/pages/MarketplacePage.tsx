@@ -46,7 +46,7 @@ export const MarketplacePage: React.FC = () => {
   }
   const cityOptions = [{ value: '', label: 'All cities' }, ...useCities().map((c) => ({ value: c, label: c }))]
   const [venueType, setVenueType] = useState('')
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(() => params.get('q') ?? '')
   const deferredSearch = useDeferredValue(search.trim())
   useTrackSearch(deferredSearch, 'marketplace')
 

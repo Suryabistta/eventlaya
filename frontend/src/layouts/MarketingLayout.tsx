@@ -9,10 +9,11 @@ import { LEGAL_PATHS } from '@/lib/legal'
 import { useBlogEnabled } from '@/lib/seo'
 
 const links = [
+  { label: 'Explore events', to: '/events' },
+  { label: 'Find vendors', to: '/marketplace' },
   { label: 'Features', to: '/#features' },
-  { label: 'Events', to: '/events' },
-  { label: 'Vendors & venues', to: '/marketplace' },
   { label: 'Pricing', to: '/pricing' },
+  { label: 'Contact', to: '/#contact' },
 ]
 
 export const MarketingLayout: React.FC = () => {
@@ -140,23 +141,24 @@ export const MarketingLayout: React.FC = () => {
           <div className="col-span-2 max-w-xs md:col-span-4 lg:col-span-1">
             <Logo tagline />
             <p className="mt-4 text-sm leading-relaxed text-ink-600">
-              Registration, QR passes and gate check-in for clubs, colleges and venues. Built in Dharan for Eastern Nepal.
+              One platform for event registration, digital tickets, QR entry, live voting and vendor discovery across Nepal. Built in Dharan.
             </p>
           </div>
           <FooterCol
-            title="Product"
+            title="Quick links"
             links={[
+              ['Explore events', '/events'],
+              ['Find vendors', '/marketplace'],
               ['Features', '/#features'],
-              ['Pricing', '/pricing'],
-              ['Upcoming events', '/events'],
               ...(blog ? ([['Blog', '/blog']] as [string, string][]) : []),
             ]}
           />
           <FooterCol
-            title="Marketplace"
+            title="Organizers & vendors"
             links={[
-              ['Find vendors', '/marketplace'],
-              ['List your venue', '/signup?type=vendor'],
+              ['Create an event', '/signup'],
+              ['Pricing', '/pricing'],
+              ['List your business', '/signup?type=vendor'],
             ]}
           />
           <FooterCol

@@ -26,7 +26,7 @@ export interface PlatformStats {
   events_upcoming: number
   registrations_total: number
   checkins_total: number
-  pending: { white_label: number; marketplace_access: number; listings: number; sms_credits?: number }
+  pending: { white_label: number; marketplace_access: number; listings: number; sms_credits?: number; contact_messages?: number }
   signups_by_day: { date: string; organizers: number; vendors: number }[]
   registrations_by_day: { date: string; count: number }[]
   top_organizations: { id: string; name: string; events: number; registrations: number }[]
