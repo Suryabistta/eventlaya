@@ -146,6 +146,12 @@ class PublicEvent {
   final bool applicationsOpen;
   final String applyLabel;
 
+  /// The application form (only while applications are open).
+  final FormSchema? applicationForm;
+
+  /// Timeline when the event has several stages: applications → voting → event.
+  final List<EventStage> stages;
+
   /// Main button text chosen by the organizer (Apply, Submit entry...); null = automatic.
   final String? ctaLabel;
 
@@ -213,6 +219,8 @@ class PublicEvent {
     this.isOpenCall = false,
     this.applicationsOpen = false,
     this.applyLabel = 'Apply',
+    this.applicationForm,
+    this.stages = const [],
     this.ctaLabel,
     this.isFeatured = false,
     this.bannerUrl,
@@ -252,6 +260,10 @@ class PublicEvent {
       phoneRequired: j['phone_required'] != false,
       isOpenCall: j['applications_enabled'] == true && j['tickets_enabled'] == false,
       applicationsOpen: j['applications'] is Map ? (j['applications'] as Map)['open'] == true : false,
+      applicationForm: j['applications'] is Map && (j['applications'] as Map)['form'] is Map
+          ? FormSchema.fromJson(Map<String, dynamic>.from((j['applications'] as Map)['form'] as Map))
+          : null,
+      stages: [for (final s in _maps(j['stages'])) EventStage.fromJson(s)],
       applyLabel: j['applications'] is Map ? _str((j['applications'] as Map)['cta']) ?? 'Apply' : (_str(j['application_cta']) ?? 'Apply'),
       ctaLabel: _str(j['cta_label']),
       isFeatured: j['is_featured'] == true,
@@ -439,5 +451,30 @@ class SubEventSummary {
         startDate: _str(j['start_date']),
         location: _str(j['location']) ?? '',
         registrationOpen: j['registration_open'] == true,
+      );
+}
+
+
+/// One stage of the event's timeline (server: apps.events.views.event_stages).
+class EventStage {
+  final String kind; // applications | voting | tickets
+  final String title;
+  final String state; // upcoming | open | closed
+  final DateTime? opensAt;
+  final DateTime? closesAt;
+  final DateTime? date;
+  final String href;
+  const EventStage({required this.kind, required this.title, required this.state, this.opensAt, this.closesAt, this.date, this.href = ''});
+
+  bool get isOpen => state == 'open';
+
+  factory EventStage.fromJson(Map<String, dynamic> j) => EventStage(
+        kind: _str(j['kind']) ?? 'tickets',
+        title: _str(j['title']) ?? '',
+        state: _str(j['state']) ?? 'upcoming',
+        opensAt: DateTime.tryParse(_str(j['opens_at']) ?? '')?.toLocal(),
+        closesAt: DateTime.tryParse(_str(j['closes_at']) ?? '')?.toLocal(),
+        date: DateTime.tryParse(_str(j['date']) ?? ''),
+        href: _str(j['href']) ?? '',
       );
 }

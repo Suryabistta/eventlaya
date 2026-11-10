@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/bs_date.dart';
 import '../../core/legal.dart';
 import '../../models/event_model.dart';
 import '../../providers/modules_provider.dart';
@@ -19,6 +20,7 @@ import '../providers/explore_providers.dart';
 import '../providers/pass_providers.dart';
 import '../widgets/attendee_widgets.dart';
 import '../widgets/contest_widgets.dart';
+import 'apply_screen.dart';
 import 'contest_screen.dart';
 import 'pass_view_screen.dart';
 import 'poll_screen.dart';
@@ -129,6 +131,31 @@ class EventDetailScreen extends ConsumerWidget {
                               onTap: () => Navigator.of(context).push(
                                 MaterialPageRoute(builder: (_) => EventDetailScreen(slug: s.slug)),
                               ),
+                            ),
+                        ],
+                      ),
+                    if (event.stages.length > 1)
+                      GroupedSection(
+                        header: 'Stages',
+                        children: [
+                          for (final st in event.stages)
+                            ListRow(
+                              leading: Icon(
+                                st.kind == 'applications'
+                                    ? Icons.assignment_outlined
+                                    : st.kind == 'voting'
+                                        ? Icons.how_to_vote_outlined
+                                        : Icons.event_outlined,
+                                color: st.isOpen ? AppColors.brand : AppColors.ink400,
+                              ),
+                              title: st.title,
+                              subtitle: switch (st.state) {
+                                'open' => st.closesAt != null ? 'Open until ${BsDate.format('d MMM', st.closesAt!)}' : 'Open now',
+                                'closed' => 'Closed',
+                                _ => st.kind == 'tickets'
+                                    ? (st.date != null ? BsDate.format('d MMM y', st.date!) : 'Date to be announced')
+                                    : (st.opensAt != null ? 'Opens ${BsDate.format('d MMM', st.opensAt!)}' : 'Coming up'),
+                              },
                             ),
                         ],
                       ),
@@ -642,7 +669,14 @@ class _RegisterBar extends StatelessWidget {
         PrimaryButton(
           label: event.applyLabel,
           expand: false,
-          onPressed: () => openLegal(context, '/e/${event.slug}/apply'),
+          onPressed: () {
+            final full = detail?.event ?? event;
+            if (full.applicationForm == null || ApplyScreen.needsWebsite(full)) {
+              openLegal(context, '/e/${event.slug}/apply'); // PDF questions need the website
+            } else {
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) => ApplyScreen(event: full)));
+            }
+          },
         ),
       ]);
     } else if (!event.registrationOpen) {

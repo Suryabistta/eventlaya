@@ -129,6 +129,19 @@ class AttendeeApi {
     ];
   }
 
+  /// `POST /api/forms/events/<slug>/upload/`: a photo for a form answer (guests too). Returns the stored URL.
+  Future<String> formUpload(String slug, String path) async {
+    final resp = await _api.upload('/api/forms/events/$slug/upload/', FormData.fromMap({'file': await MultipartFile.fromFile(path)}));
+    return _map(resp.data)['url']?.toString() ?? '';
+  }
+
+  /// `POST /api/forms/events/<slug>/apply/` (applications stage). Returns (application number, already applied).
+  Future<(String, bool)> apply(String slug, {required String name, required String email, String phone = '', Map<String, dynamic> answers = const {}}) async {
+    final resp = await _api.post('/api/forms/events/$slug/apply/', data: {'name': name, 'email': email, 'phone': phone, 'answers': answers});
+    final data = _map(resp.data);
+    return (_map(data['application'])['number']?.toString() ?? '', data['already_applied'] == true);
+  }
+
   /// `GET /api/events/public/<slug>/` → `{event, form}`.
   Future<EventDetail> event(String slug) async {
     final resp = await _api.get('/api/events/public/$slug/');
