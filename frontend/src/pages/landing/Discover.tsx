@@ -26,16 +26,22 @@ import {
   Users,
   Wifi,
   Wrench,
+  Phone,
+  Clock,
+  Star,
+  Vote,
 } from 'lucide-react'
 import { api, request, type Event as PublicEvent } from '@/services/api'
 import { buttonClass } from '@/components/ui/Button'
 import { Input, Select, Textarea, useToast } from '@/components/ui'
 import { useEventCategories } from '@/lib/event-page'
+import { safeHref, useHomeContent, type StepsTab } from '@/lib/home-content'
 import { useCities } from '@/lib/cities'
 import { cn } from '@/lib/utils'
 import { EventCard } from '../ExploreEventsPage'
 import { VendorCard } from '../marketplace/Cards'
 import { Reveal } from './ProductTour'
+import { SocialLinks } from '@/components/SocialLinks'
 
 /** Home page sections from the November 2026 design: search-first hero, live events and vendors, features, steps, contact. */
 
@@ -71,6 +77,7 @@ const useVendorCategories = () => useQuery({ queryKey: ['marketplaceCategories']
 /* Hero: search events or vendors                                       */
 
 export const SearchHero: React.FC = () => {
+  const { hero } = useHomeContent()
   const navigate = useNavigate()
   const [mode, setMode] = useState<'events' | 'vendors'>('events')
   const [q, setQ] = useState('')
@@ -104,14 +111,14 @@ export const SearchHero: React.FC = () => {
       <div className="relative mx-auto max-w-6xl px-4 pb-14 pt-14 text-center sm:px-6 sm:pt-20">
         <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-sm backdrop-blur">
           <MapPin className="h-4 w-4 text-brand-300" aria-hidden />
-          Nepal’s event &amp; vendor discovery platform
+          {hero.badge}
         </p>
         <h1 className="mx-auto mt-6 max-w-4xl font-display text-[40px] font-extrabold leading-[1.05] tracking-[-0.03em] sm:text-6xl lg:text-7xl">
-          Find your next <span className="text-brand-400">event</span>
-          <br className="hidden sm:block" /> &amp; the vendors behind it
+          {hero.title_before} <span className="text-brand-400">{hero.title_highlight}</span>
+          <br className="hidden sm:block" /> {hero.title_after}
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-lg text-white/75">
-          Discover concerts, conferences, hackathons and festivals near you, and book photographers, venues, hosts and decorators for your own.
+          {hero.subtitle}
         </p>
 
         <div role="radiogroup" aria-label="Search for" className="mt-8 inline-flex gap-2">
@@ -178,7 +185,7 @@ export const SearchHero: React.FC = () => {
           </button>
         </form>
 
-        {eventTypes.length > 0 && (
+        {hero.show_categories && eventTypes.length > 0 && (
           <>
             <p className="mt-10 text-base font-medium text-white/80">Or browse popular categories</p>
             <ul className="mx-auto mt-4 grid max-w-5xl grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-8 lg:gap-3">
@@ -202,7 +209,7 @@ export const SearchHero: React.FC = () => {
             </ul>
           </>
         )}
-        {vendorTypes.length > 0 && (
+        {hero.show_vendor_links && vendorTypes.length > 0 && (
           <p className="mt-6 flex flex-wrap items-center justify-center gap-2 text-sm text-white/70">
             <span>Popular vendors:</span>
             {vendorTypes.slice(0, 5).map((t) => (
@@ -221,6 +228,7 @@ export const SearchHero: React.FC = () => {
 /* Featured & upcoming events (live data)                               */
 
 export const EventsShowcase: React.FC = () => {
+  const { events: sec } = useHomeContent()
   const { data = [], isLoading } = useUpcoming()
   const eventTypes = useEventCategories()
   const [tab, setTab] = useState<'featured' | 'upcoming'>('featured')
@@ -235,15 +243,15 @@ export const EventsShowcase: React.FC = () => {
     return l.slice(0, 4)
   }, [data, tab, type])
   const usedTypes = eventTypes.filter((t) => data.some((e) => e.category === t.slug))
-  if (!isLoading && data.length === 0) return null
+  if (!sec.show || (!isLoading && data.length === 0)) return null
 
   return (
     <section className="bg-white py-20 sm:py-24">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <Eyebrow>Event marketplace</Eyebrow>
-            <H2>Featured &amp; upcoming events</H2>
+            <Eyebrow>{sec.eyebrow}</Eyebrow>
+            <H2>{sec.title}</H2>
           </div>
           <div className="flex items-center gap-2">
             {(['featured', 'upcoming'] as const).map((t) => (
@@ -294,20 +302,21 @@ export const EventsShowcase: React.FC = () => {
 /* Featured vendors (live data)                                         */
 
 export const VendorsShowcase: React.FC = () => {
+  const { vendors: sec } = useHomeContent()
   const { data = [], isLoading } = useVendors()
   const categories = useVendorCategories().data ?? []
   const [cat, setCat] = useState('')
   const used = categories.filter((c) => data.some((v) => v.category_slug === c.slug))
   const list = (cat ? data.filter((v) => v.category_slug === cat) : data).slice(0, 4)
-  if (!isLoading && data.length === 0) return null
+  if (!sec.show || (!isLoading && data.length === 0)) return null
 
   return (
     <section className="bg-brand-50/60 py-20 sm:py-24">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <Eyebrow>Vendor marketplace</Eyebrow>
-            <H2>Featured vendors</H2>
+            <Eyebrow>{sec.eyebrow}</Eyebrow>
+            <H2>{sec.title}</H2>
           </div>
           <Link to="/marketplace" className={buttonClass('primary', 'lg', 'rounded-full')}>
             Explore all vendors <ArrowRight className="h-4 w-4" aria-hidden />
@@ -341,58 +350,72 @@ export const VendorsShowcase: React.FC = () => {
 /* ------------------------------------------------------------------ */
 /* Everything Eventlaya does                                            */
 
-const FEATURES: { icon: React.ElementType; title: string; body: string; accent?: boolean }[] = [
-  { icon: LayoutGrid, title: 'Management system', body: 'One dashboard for events, teams, tickets and money.', accent: true },
-  { icon: UserRound, title: 'Registration', body: 'Custom forms, approvals and instant confirmations.' },
-  { icon: Ticket, title: 'Ticketing', body: 'Free or paid QR tickets with tiers and promo codes.' },
-  { icon: CheckSquare, title: 'Voting', body: 'Live public voting and judges’ scores for contests and pageants.' },
-  { icon: Users, title: 'Vendor marketplace', body: 'Find and book verified photographers, venues and hosts.' },
-  { icon: Wifi, title: 'Online / offline check-in', body: 'QR scanning that keeps working without internet.', accent: true },
-  { icon: CalendarDays, title: 'Event management', body: 'Schedules, speakers, staff, gates and attendance.' },
-  { icon: ClipboardCheck, title: 'Event planning', body: 'Crew tasks and checklists for the whole team.' },
-]
+export const FEATURE_ICON: Record<string, React.ElementType> = {
+  grid: LayoutGrid,
+  user: UserRound,
+  ticket: Ticket,
+  vote: Vote,
+  users: Users,
+  wifi: Wifi,
+  calendar: CalendarDays,
+  checklist: ClipboardCheck,
+  qr: QrCode,
+  chart: BarChart3,
+  store: Store,
+  mail: Mail,
+  globe: Globe,
+  sparkles: Sparkles,
+}
 
-export const FeaturesEight: React.FC = () => (
+export const FeaturesEight: React.FC = () => {
+  const { features: sec } = useHomeContent()
+  if (!sec.show || !sec.items.length) return null
+  return (
   <section id="features" className="scroll-mt-20 bg-white py-20 sm:py-24">
     <div className="mx-auto max-w-6xl px-4 sm:px-6">
       <Reveal className="text-center">
-        <Eyebrow center>Features</Eyebrow>
-        <H2>Everything Eventlaya does for your event</H2>
+        <Eyebrow center>{sec.eyebrow}</Eyebrow>
+        <H2>{sec.title}</H2>
       </Reveal>
       <ul className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {FEATURES.map((f) => (
+        {sec.items.map((f, i) => {
+          const Icon = FEATURE_ICON[f.icon] ?? Sparkles
+          return (
           <li
-            key={f.title}
+            key={i}
             className={cn(
               'rounded-3xl border p-6 shadow-sm',
               f.accent ? 'border-transparent bg-gradient-to-br from-brand-600 to-brand-800 text-white' : 'border-ink-100 bg-white',
             )}
           >
             <span className={cn('flex h-11 w-11 items-center justify-center rounded-xl', f.accent ? 'bg-white/15' : 'bg-brand-50 text-brand-700')}>
-              <f.icon className="h-5 w-5" aria-hidden />
+              <Icon className="h-5 w-5" aria-hidden />
             </span>
             <h3 className={cn('mt-5 text-lg font-bold', f.accent ? 'text-white' : 'text-ink-900')}>{f.title}</h3>
             <p className={cn('mt-1.5 text-sm leading-relaxed', f.accent ? 'text-white/80' : 'text-ink-600')}>{f.body}</p>
           </li>
-        ))}
+          )
+        })}
       </ul>
     </div>
   </section>
-)
+  )
+}
 
 /* ------------------------------------------------------------------ */
 /* Events powered by Eventlaya (real past events with a banner)         */
 
 export const PoweredBy: React.FC = () => {
+  const { portfolio: sec } = useHomeContent()
   const { data = [] } = useQuery({ queryKey: ['landing', 'past'], queryFn: () => api.getPublicEvents({ when: 'past' }), staleTime: 5 * 60_000 })
   const shown = data.filter((e: PublicEvent) => e.banner).slice(0, 5)
-  if (shown.length < 3) return null
+  if (!sec.show || shown.length < 3) return null
   return (
     <section className="bg-white py-20 sm:py-24">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <Reveal className="text-center">
-          <Eyebrow center>Portfolio</Eyebrow>
-          <H2>Events powered by Eventlaya</H2>
+          <Eyebrow center>{sec.eyebrow}</Eyebrow>
+          <H2>{sec.title}</H2>
         </Reveal>
         <ul className="mt-12 grid auto-rows-[200px] gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {shown.map((e, i) => (
@@ -416,55 +439,28 @@ export const PoweredBy: React.FC = () => {
 /* ------------------------------------------------------------------ */
 /* Get started in four steps (attendee / organizer / vendor)            */
 
-const STEPS: Record<'user' | 'business' | 'vendor', { label: string; icon: React.ElementType; steps: { icon: React.ElementType; title: string; body: string }[]; cta: { label: string; to: string } }> = {
-  user: {
-    label: 'Attendee',
-    icon: UserRound,
-    cta: { label: 'Browse events', to: '/events' },
-    steps: [
-      { icon: UserRound, title: 'Create an account', body: 'Sign up with Google or email in under a minute.' },
-      { icon: Search, title: 'Find an event', body: 'Search or browse by category and city.' },
-      { icon: Ticket, title: 'Register or buy', body: 'Fill in the form, pay if it’s paid, get your QR pass.' },
-      { icon: QrCode, title: 'Scan and enjoy', body: 'Show the QR at the gate and join live voting.' },
-    ],
-  },
-  business: {
-    label: 'Organizer',
-    icon: CalendarDays,
-    cta: { label: 'Create your event', to: '/signup' },
-    steps: [
-      { icon: UserRound, title: 'Sign up as an organizer', body: 'Free for club-sized events.' },
-      { icon: CalendarDays, title: 'Create your event', body: 'Pick tickets, free registration or a pageant: four short steps.' },
-      { icon: Send, title: 'Share the link', body: 'On Facebook, WhatsApp or your college group.' },
-      { icon: BarChart3, title: 'Check in and track', body: 'Scan at the gate and watch sales and check-ins live.' },
-    ],
-  },
-  vendor: {
-    label: 'Vendor',
-    icon: Store,
-    cta: { label: 'List your business', to: '/signup' },
-    steps: [
-      { icon: Store, title: 'Create a vendor profile', body: 'Photographer, venue, sound, decor or host.' },
-      { icon: Camera, title: 'Build your portfolio', body: 'Photos, packages and prices.' },
-      { icon: CheckSquare, title: 'Get verified', body: 'Our team checks your business for the blue tick.' },
-      { icon: Mail, title: 'Receive inquiries', body: 'Customers ask for dates; you reply and take bookings.' },
-    ],
-  },
+// Step icons by audience and position; the texts come from the home page content
+const STEP_ICONS: Record<'attendee' | 'organizer' | 'vendor', { tab: React.ElementType; steps: React.ElementType[] }> = {
+  attendee: { tab: UserRound, steps: [UserRound, Search, Ticket, QrCode] },
+  organizer: { tab: CalendarDays, steps: [UserRound, CalendarDays, Send, BarChart3] },
+  vendor: { tab: Store, steps: [Store, Camera, CheckSquare, Mail] },
 }
 
 export const StepsTabs: React.FC = () => {
-  const [who, setWho] = useState<keyof typeof STEPS>('user')
-  const s = STEPS[who]
+  const { steps: sec } = useHomeContent()
+  const [who, setWho] = useState<keyof typeof STEP_ICONS>('attendee')
+  const s: StepsTab = sec[who]
+  if (!sec.show) return null
   return (
     <section className="bg-gradient-to-b from-brand-50/70 to-white py-20 sm:py-24">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <Reveal className="text-center">
-          <Eyebrow center>How it works</Eyebrow>
-          <H2>Get started in four simple steps</H2>
+          <Eyebrow center>{sec.eyebrow}</Eyebrow>
+          <H2>{sec.title}</H2>
         </Reveal>
         <div role="tablist" aria-label="I am" className="mx-auto mt-8 flex w-fit gap-1 rounded-full border border-ink-200 bg-white p-1">
-          {(Object.keys(STEPS) as (keyof typeof STEPS)[]).map((k) => {
-            const T = STEPS[k]
+          {(Object.keys(STEP_ICONS) as (keyof typeof STEP_ICONS)[]).map((k) => {
+            const T = { ...sec[k], icon: STEP_ICONS[k].tab }
             return (
               <button
                 key={k}
@@ -480,22 +476,27 @@ export const StepsTabs: React.FC = () => {
           })}
         </div>
         <ol role="tabpanel" className="mt-8 grid gap-8 rounded-3xl border border-ink-100 bg-white p-6 shadow-sm sm:grid-cols-2 sm:p-10 lg:grid-cols-4">
-          {s.steps.map((st, i) => (
-            <li key={st.title}>
+          {s.steps.map((st, i) => {
+            const Icon = STEP_ICONS[who].steps[i] ?? Sparkles
+            return (
+            <li key={i}>
               <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-md">
-                <st.icon className="h-6 w-6" aria-hidden />
+                <Icon className="h-6 w-6" aria-hidden />
               </span>
               <p className="mt-4 text-xs font-bold uppercase tracking-wider text-brand-600">Step {i + 1}</p>
               <h3 className="mt-1 text-lg font-bold text-ink-900">{st.title}</h3>
               <p className="mt-1 text-sm text-ink-600">{st.body}</p>
             </li>
-          ))}
+            )
+          })}
         </ol>
-        <p className="mt-8 text-center">
-          <Link to={s.cta.to} className={buttonClass('primary', 'lg', 'rounded-full')}>
-            {s.cta.label} <ArrowRight className="h-4 w-4" aria-hidden />
-          </Link>
-        </p>
+        {s.cta_label && safeHref(s.cta_to) && (
+          <p className="mt-8 text-center">
+            <a href={safeHref(s.cta_to)} className={buttonClass('primary', 'lg', 'rounded-full')}>
+              {s.cta_label} <ArrowRight className="h-4 w-4" aria-hidden />
+            </a>
+          </p>
+        )}
       </div>
     </section>
   )
@@ -505,6 +506,7 @@ export const StepsTabs: React.FC = () => {
 /* Contact                                                              */
 
 export const ContactSection: React.FC = () => {
+  const { contact: c } = useHomeContent()
   const toast = useToast()
   const [form, setForm] = useState({ name: '', email: '', phone: '', role: 'user', message: '' })
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setForm((f) => ({ ...f, [k]: e.target.value }))
@@ -516,35 +518,40 @@ export const ContactSection: React.FC = () => {
     },
     onError: (e: Error) => toast.error('Couldn’t send your message', e.message),
   })
+  if (!c.show) return null
+  const info: { icon: React.ElementType; label: string; value: string; href?: string }[] = [
+    ...(c.email ? [{ icon: Mail, label: 'Email', value: c.email, href: `mailto:${c.email}` }] : []),
+    ...(c.phone ? [{ icon: Phone, label: 'Phone', value: c.phone, href: `tel:${c.phone.replace(/\s/g, '')}` }] : []),
+    ...(c.location ? [{ icon: MapPin, label: 'Location', value: c.location }] : []),
+    ...(c.hours ? [{ icon: Clock, label: 'Support hours', value: c.hours }] : []),
+  ]
   return (
     <section id="contact" className="scroll-mt-20 bg-white py-20 sm:py-24">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-[1fr_1.1fr]">
         <div>
-          <Eyebrow>Contact</Eyebrow>
-          <H2>Let’s plan your next event together</H2>
-          <p className="mt-4 max-w-md text-lg text-ink-600">Questions about tickets, check-in or vendors? Send us a message and the Eventlaya team will reply by email.</p>
+          <Eyebrow>{c.eyebrow}</Eyebrow>
+          <H2>{c.title}</H2>
+          <p className="mt-4 max-w-md text-lg text-ink-600">{c.body}</p>
           <ul className="mt-8 space-y-5">
-            <li className="flex items-center gap-4">
-              <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
-                <Mail className="h-5 w-5" aria-hidden />
-              </span>
-              <span>
-                <span className="block font-semibold text-ink-900">Email</span>
-                <a href="mailto:support@eventlaya.com" className="text-ink-600 hover:text-brand-700">
-                  support@eventlaya.com
-                </a>
-              </span>
-            </li>
-            <li className="flex items-center gap-4">
-              <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
-                <MapPin className="h-5 w-5" aria-hidden />
-              </span>
-              <span>
-                <span className="block font-semibold text-ink-900">Location</span>
-                <span className="text-ink-600">Dharan · Itahari · Biratnagar, Nepal</span>
-              </span>
-            </li>
+            {info.map((x) => (
+              <li key={x.label} className="flex items-center gap-4">
+                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+                  <x.icon className="h-5 w-5" aria-hidden />
+                </span>
+                <span>
+                  <span className="block font-semibold text-ink-900">{x.label}</span>
+                  {x.href ? (
+                    <a href={x.href} className="text-ink-600 hover:text-brand-700">
+                      {x.value}
+                    </a>
+                  ) : (
+                    <span className="text-ink-600">{x.value}</span>
+                  )}
+                </span>
+              </li>
+            ))}
           </ul>
+          <SocialLinks className="mt-6" />
         </div>
         <form
           onSubmit={(e) => {
@@ -570,6 +577,87 @@ export const ContactSection: React.FC = () => {
             {send.isPending ? 'Sending…' : 'Send message'}
           </button>
         </form>
+      </div>
+    </section>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* Social links, testimonials and partners (filled in by the superadmin) */
+
+export const Testimonials: React.FC = () => {
+  const { testimonials: sec } = useHomeContent()
+  const items = sec.items.filter((t) => t.quote.trim() && t.name.trim())
+  if (!sec.show || !items.length) return null
+  return (
+    <section className="bg-ink-50 py-20 sm:py-24">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <Reveal className="text-center">
+          <Eyebrow center>{sec.eyebrow}</Eyebrow>
+          <H2>{sec.title}</H2>
+        </Reveal>
+        <ul className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {items.map((t, i) => (
+            <li key={i} className="flex flex-col rounded-3xl border border-ink-100 bg-white p-6 shadow-sm">
+              {t.rating > 0 && (
+                <p className="flex gap-0.5 text-marigold-500" aria-label={`${t.rating} out of 5`}>
+                  {Array.from({ length: Math.min(5, t.rating) }, (_, k) => (
+                    <Star key={k} className="h-4 w-4 fill-current" aria-hidden />
+                  ))}
+                </p>
+              )}
+              <blockquote className="mt-3 flex-1 text-ink-700">“{t.quote}”</blockquote>
+              <p className="mt-5 flex items-center gap-3">
+                {safeHref(t.photo) ? (
+                  <img src={t.photo} alt="" className="h-11 w-11 rounded-full object-cover" />
+                ) : (
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-50 font-semibold text-brand-700">{t.name.trim()[0]}</span>
+                )}
+                <span>
+                  <span className="block font-semibold text-ink-900">{t.name}</span>
+                  {t.org && <span className="text-sm text-ink-500">{t.org}</span>}
+                </span>
+              </p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  )
+}
+
+export const Partners: React.FC = () => {
+  const { partners: sec } = useHomeContent()
+  const items = sec.items.filter((p) => p.name.trim())
+  if (!sec.show || !items.length) return null
+  return (
+    <section className="bg-white pt-20 sm:pt-24">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <Reveal className="text-center">
+          <Eyebrow center>{sec.eyebrow}</Eyebrow>
+          <H2>{sec.title}</H2>
+        </Reveal>
+        <ul className="mt-10 flex flex-wrap justify-center gap-3">
+          {items.map((p, i) => {
+            const inner = (
+              <>
+                {safeHref(p.logo) && <img src={p.logo} alt="" className="h-8 w-8 rounded-lg object-contain" />}
+                <span className="font-semibold text-ink-800">{p.name}</span>
+              </>
+            )
+            return (
+              <li key={i}>
+                {safeHref(p.url) ? (
+                  <a href={safeHref(p.url)} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-2xl border border-ink-100 px-5 py-3 hover:border-ink-300">
+                    {inner}
+                  </a>
+                ) : (
+                  <span className="flex items-center gap-3 rounded-2xl border border-ink-100 px-5 py-3">{inner}</span>
+                )}
+              </li>
+            )
+          })}
+        </ul>
       </div>
     </section>
   )

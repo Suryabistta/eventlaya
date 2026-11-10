@@ -7,6 +7,8 @@ import { Logo } from '@/components/ui/Logo'
 import { buttonClass } from '@/components/ui/Button'
 import { LEGAL_PATHS } from '@/lib/legal'
 import { useBlogEnabled } from '@/lib/seo'
+import { useHomeContent } from '@/lib/home-content'
+import { SocialLinks } from '@/components/SocialLinks'
 
 const links = [
   { label: 'Explore events', to: '/events' },
@@ -34,6 +36,7 @@ export const MarketingLayout: React.FC = () => {
   const signedIn = status === 'authenticated'
   // Blog link only in the footer and the phone menu (module `blog`; hidden when the superadmin switches it off)
   const blog = useBlogEnabled()
+  const home = useHomeContent()
 
   return (
     // Bottom padding keeps the footer clear of the phone tab bar
@@ -140,9 +143,8 @@ export const MarketingLayout: React.FC = () => {
         <div className="mx-auto grid max-w-6xl grid-cols-2 gap-x-6 gap-y-10 px-4 py-14 sm:px-6 md:grid-cols-4 lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr]">
           <div className="col-span-2 max-w-xs md:col-span-4 lg:col-span-1">
             <Logo tagline />
-            <p className="mt-4 text-sm leading-relaxed text-ink-600">
-              One platform for event registration, digital tickets, QR entry, live voting and vendor discovery across Nepal. Built in Dharan.
-            </p>
+            <p className="mt-4 text-sm leading-relaxed text-ink-600">{home.footer.about}</p>
+            <SocialLinks className="mt-4" />
           </div>
           <FooterCol
             title="Quick links"

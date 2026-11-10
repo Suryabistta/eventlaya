@@ -73,6 +73,7 @@ const OrganizationDetailPage = lazyPage(() => import('./pages/admin/Organization
 const ApprovalsQueuePage = lazyPage(() => import('./pages/admin/approvals/QueuePage'), 'ApprovalsQueuePage')
 const WhiteLabelApprovalsPage = lazyPage(() => import('./pages/admin/approvals/WhiteLabelApprovalsPage'), 'WhiteLabelApprovalsPage')
 const MarketplaceApprovalsPage = lazyPage(() => import('./pages/admin/approvals/MarketplaceApprovalsPage'), 'MarketplaceApprovalsPage')
+const HomePageEditorPage = lazyPage(() => import('./pages/admin/HomePageEditorPage'), 'HomePageEditorPage')
 const ContactMessagesPage = lazyPage(() => import('./pages/admin/ContactMessagesPage'), 'ContactMessagesPage')
 const SmsApprovalsPage = lazyPage(() => import('./pages/admin/approvals/SmsApprovalsPage'), 'SmsApprovalsPage')
 const ListingsApprovalsPage = lazyPage(() => import('./pages/admin/approvals/ListingsApprovalsPage'), 'ListingsApprovalsPage')
@@ -295,6 +296,7 @@ export const App: React.FC = () => {
                 <Route path="catalog" element={<CatalogPage />} />
                 <Route path="banners" element={<BannersPage />} />
                 <Route path="site-logo" element={<SiteLogoPage />} />
+                <Route path="home-page" element={<HomePageEditorPage />} />
                 <Route path="featured-events" element={<FeaturedEventsPage />} />
                 <Route path="activity" element={<ActivityPage />} />
                 <Route path="blog" element={<BlogAdminPage />} />

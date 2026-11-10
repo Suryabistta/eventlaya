@@ -9,7 +9,7 @@ from django.db.models import Count, OuterRef, Subquery
 from django.utils.text import slugify
 from rest_framework import status
 
-from .models import Banner, City, EventCategory, SiteBranding
+from .models import Banner, City, EventCategory, HomePageContent, SiteBranding
 from .views import IsSuperadmin
 
 
@@ -124,6 +124,45 @@ class SiteBrandingView(APIView):
         s.is_valid(raise_exception=True)
         s.save()
         return Response(s.data)
+
+
+MAX_HOME_BYTES = 200_000
+
+
+def _unsafe_strings(value):
+    """Every string inside the home page content that could run script when used as a link."""
+    if isinstance(value, dict):
+        for v in value.values():
+            yield from _unsafe_strings(v)
+    elif isinstance(value, list):
+        for v in value:
+            yield from _unsafe_strings(v)
+    elif isinstance(value, str) and value.strip().lower().startswith(('javascript:', 'data:', 'vbscript:')):
+        yield value
+
+
+class HomePageContentView(APIView):
+    """GET (public) / PUT (superadmin) /api/platform/home-content/: the editable home page."""
+
+    permission_classes = [ReadPublicWriteSuperadmin]
+
+    def get(self, request):
+        c = HomePageContent.load()
+        return Response({'data': c.data, 'updated_at': c.updated_at})
+
+    def put(self, request):
+        import json
+        data = request.data.get('data')
+        if not isinstance(data, dict):
+            return Response({'error': 'Send the page content as an object.'}, status=400)
+        if len(json.dumps(data)) > MAX_HOME_BYTES:
+            return Response({'error': 'The page content is too large.'}, status=400)
+        if any(True for _ in _unsafe_strings(data)):
+            return Response({'error': 'Links must start with https://, / or mailto:.'}, status=400)
+        c = HomePageContent.load()
+        c.data = data
+        c.save()
+        return Response({'data': c.data, 'updated_at': c.updated_at})
 
 
 class EventCategorySerializer(serializers.ModelSerializer):

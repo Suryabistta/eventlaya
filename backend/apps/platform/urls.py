@@ -5,7 +5,7 @@ from . import sms_views as sms
 from . import contact_views as contact
 from . import segments
 from . import featured_events, org_admin, views
-from .catalog import BannerViewSet, CityViewSet, EventCategoryViewSet, SiteBrandingView
+from .catalog import BannerViewSet, CityViewSet, EventCategoryViewSet, HomePageContentView, SiteBrandingView
 
 router = DefaultRouter()
 router.register(r'cities', CityViewSet, basename='platform-cities')
@@ -34,6 +34,7 @@ urlpatterns = [
     path('organizations/<uuid:pk>/reset-password/', org_admin.OrganizationResetPasswordView.as_view(), name='platform_organization_reset_password'),
     path('organizations/<uuid:pk>/verify/', org_admin.OrganizationVerifyView.as_view(), name='platform_organization_verify'),
     path('site-branding/', SiteBrandingView.as_view(), name='platform_site_branding'),
+    path('home-content/', HomePageContentView.as_view(), name='platform_home_content'),
     path('events/', featured_events.FeaturedEventListView.as_view(), name='platform_events'),
     path('events/<uuid:pk>/feature/', featured_events.FeatureEventView.as_view(), name='platform_event_feature'),
     path('activity/', views.ActivityView.as_view(), name='platform_activity'),

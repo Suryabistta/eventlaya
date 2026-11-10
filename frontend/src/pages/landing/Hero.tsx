@@ -4,9 +4,10 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { UserPlus, ArrowRight, ScanLine, Ticket, Vote } from 'lucide-react'
 import { buttonClass } from '@/components/ui/Button'
 import { GatePassDemo } from './GatePass'
+import { useHomeContent } from '@/lib/home-content'
 
 const ease = [0.22, 1, 0.36, 1] as const
-const headline = ['Registration,', 'ticketing', '&', 'check-in,', 'all', 'in', 'one', 'flow.']
+const POINT_ICONS = [UserPlus, Ticket, ScanLine, Vote]
 
 const signups = [
   { name: 'Sita Rai', from: 'Dharan', ticket: 'TKT-0313' },
@@ -17,6 +18,9 @@ const signups = [
 
 export const Hero: React.FC = () => {
   const reduce = useReducedMotion()
+  const { flow } = useHomeContent()
+  const headline = flow.title.split(/\s+/).filter(Boolean)
+  if (!flow.show) return null
 
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-brand-50/60 via-white to-white">
@@ -34,13 +38,13 @@ export const Hero: React.FC = () => {
             className="flex items-center gap-3 text-xs font-bold uppercase tracking-[0.2em] text-brand-600"
           >
             <span className="h-px w-6 bg-brand-600" aria-hidden />
-            One platform. Every event.
+            {flow.eyebrow}
           </motion.p>
 
           <h2 className="mt-5 font-display text-[38px] font-extrabold leading-[1.05] tracking-[-0.03em] text-ink-900 sm:text-5xl lg:text-[56px]">
             {headline.map((word, i) => (
               <motion.span
-                key={word}
+                key={i}
                 className="inline-block"
                 initial={{ opacity: 0, y: reduce ? 0 : 28, filter: reduce ? 'none' : 'blur(8px)' }}
                 animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
@@ -58,8 +62,7 @@ export const Hero: React.FC = () => {
             transition={{ duration: 0.6, delay: 0.55, ease }}
             className="mt-6 max-w-lg text-lg leading-relaxed text-ink-600"
           >
-            Let attendees register online, get a secure QR pass, scan in at the gate (even offline) and vote live from their
-            phones.
+            {flow.body}
           </motion.p>
 
           <motion.div
@@ -69,7 +72,7 @@ export const Hero: React.FC = () => {
             className="mt-8 flex flex-wrap gap-3"
           >
             <Link to="/signup" className={buttonClass('primary', 'lg', 'group rounded-full')}>
-              Start your event
+              {flow.cta_label}
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
             </Link>
             <a href="#dashboard" className={buttonClass('secondary', 'lg', 'rounded-full')}>
@@ -78,19 +81,17 @@ export const Hero: React.FC = () => {
           </motion.div>
 
           <ul className="mt-10 grid grid-cols-2 gap-4 border-t border-ink-200 pt-6 text-sm font-medium text-ink-700 sm:grid-cols-4">
-            {[
-              [UserPlus, 'Online registration'],
-              [Ticket, 'Digital QR passes'],
-              [ScanLine, 'Online / offline check-in'],
-              [Vote, 'Live voting'],
-            ].map(([Icon, label]) => (
-              <li key={label as string} className="flex items-center gap-2">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
-                  {React.createElement(Icon as React.ElementType, { className: 'h-4 w-4', 'aria-hidden': true })}
-                </span>
-                {label as string}
-              </li>
-            ))}
+            {flow.points.filter(Boolean).slice(0, 4).map((label, i) => {
+              const Icon = POINT_ICONS[i]
+              return (
+                <li key={i} className="flex items-center gap-2">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+                    <Icon className="h-4 w-4" aria-hidden />
+                  </span>
+                  {label}
+                </li>
+              )
+            })}
           </ul>
         </div>
 

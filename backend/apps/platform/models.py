@@ -341,6 +341,21 @@ class SiteBranding(models.Model):
         return cls.objects.get_or_create(pk=1)[0]
 
 
+class HomePageContent(models.Model):
+    """Texts, lists and section switches of the home page (one row, superadmin edits it). Empty keys fall back to the
+    built-in defaults in the web app, so only what the superadmin changed is stored."""
+
+    data = models.JSONField(default=dict, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = 'Home page content'
+
+    @classmethod
+    def load(cls):
+        return cls.objects.get_or_create(pk=1)[0]
+
+
 class EventCategory(models.Model):
     """A type of event (concert, festival, ...) offered in the event form and the public filters. Managed by the
     superadmin. Events store the slug, so it never changes after creation; renaming only changes the label."""

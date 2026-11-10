@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useInView, useReducedMotion } from 'framer-mot
 import { FileText, QrCode, ScanLine, BarChart3, Check, CheckCircle2 } from 'lucide-react'
 import { ModernQr } from '@/components/ModernQr'
 import { cn } from '@/lib/utils'
+import { useHomeContent } from '@/lib/home-content'
 
 const ease = [0.22, 1, 0.36, 1] as const
 const DURATION = 6000
@@ -36,6 +37,8 @@ export const ProductTour: React.FC = () => {
   }, [active, auto, progressKey])
 
   const tab = tabs.find((t) => t.id === active)!
+  const { dashboard: sec } = useHomeContent()
+  if (!sec.show) return null
 
   return (
     <section id="dashboard" className="scroll-mt-20 bg-[#241a22] bg-[radial-gradient(ellipse_at_85%_60%,rgba(194,33,90,0.35),transparent_55%)] py-20 sm:py-28">
@@ -43,10 +46,10 @@ export const ProductTour: React.FC = () => {
         <Reveal className="mx-auto max-w-2xl text-center">
           <p className="flex items-center justify-center gap-3 text-xs font-bold uppercase tracking-[0.2em] text-brand-300">
             <span className="h-px w-6 bg-brand-300" aria-hidden />
-            Organizer dashboard
+            {sec.eyebrow}
           </p>
-          <h2 className="mt-3 font-display text-3xl font-extrabold text-white sm:text-[44px] sm:leading-[1.08]">Run the whole event from one dashboard</h2>
-          <p className="mt-4 text-lg text-white/70">Four screens your team actually uses on event day.</p>
+          <h2 className="mt-3 font-display text-3xl font-extrabold text-white sm:text-[44px] sm:leading-[1.08]">{sec.title}</h2>
+          <p className="mt-4 text-lg text-white/70">{sec.subtitle}</p>
         </Reveal>
 
         <div role="tablist" aria-label="Product tour" className="mt-10 grid grid-cols-2 gap-2 sm:grid-cols-4">

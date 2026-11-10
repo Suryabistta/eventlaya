@@ -3,7 +3,7 @@ import { MotionConfig } from 'framer-motion'
 import { Hero } from './landing/Hero'
 import { ProductTour } from './landing/ProductTour'
 import { Faq } from './landing/Sections'
-import { ContactSection, EventsShowcase, FeaturesEight, PoweredBy, SearchHero, StepsTabs, VendorsShowcase } from './landing/Discover'
+import { ContactSection, EventsShowcase, FeaturesEight, Partners, PoweredBy, SearchHero, StepsTabs, Testimonials, VendorsShowcase } from './landing/Discover'
 
 export { GatePassDemo } from './landing/GatePass'
 
@@ -16,6 +16,8 @@ export const LandingPage: React.FC = () => (
     <VendorsShowcase />
     <FeaturesEight />
     <ProductTour />
+    <Testimonials />
+    <Partners />
     <PoweredBy />
     <StepsTabs />
     <Faq />

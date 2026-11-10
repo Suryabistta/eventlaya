@@ -23,3 +23,16 @@ class ContactFormTests(APITestCase):
         self.assertEqual(self.client.get('/api/platform/stats/').data['pending']['contact_messages'], 5)
         m = ContactMessage.objects.get(name='Sita')
         self.assertTrue(self.client.patch(f'/api/platform/contact/messages/{m.id}/', {'handled': True}, format='json').data['handled'])
+
+
+class HomeContentTests(APITestCase):
+    def test_public_read_superadmin_write(self):
+        url = '/api/platform/home-content/'
+        self.assertEqual(self.client.get(url).data['data'], {})
+        self.assertIn(self.client.put(url, {'data': {'hero': {'badge': 'x'}}}, format='json').status_code, (401, 403))
+        admin = User.objects.create_user(username='a', email='a@x.com', password='x', role='superadmin')
+        self.client.force_authenticate(admin)
+        self.assertEqual(self.client.put(url, {'data': {'contact': {'socials': {'facebook': 'javascript:alert(1)'}}}}, format='json').status_code, 400)
+        self.assertEqual(self.client.put(url, {'data': {'hero': {'badge': 'Hello'}}}, format='json').status_code, 200)
+        self.client.force_authenticate(None)
+        self.assertEqual(self.client.get(url).data['data']['hero']['badge'], 'Hello')

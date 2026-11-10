@@ -1,33 +1,28 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Plus } from 'lucide-react'
-import { CONTACT_EMAIL } from '@/lib/legal'
+import { useHomeContent } from '@/lib/home-content'
 import { Reveal } from './ProductTour'
 
 const ease = [0.22, 1, 0.36, 1] as const
 
-const faqs = [
-  { q: 'Do attendees need to install an app?', a: 'No. They register on a web page and get their pass on screen and by email. Only your gate crew can optionally use the Android scanner app; any phone browser works too.' },
-  { q: 'What happens if the internet drops at the gate?', a: 'The Android scanner keeps scanning and queues check-ins on the phone, then syncs them when the signal returns.' },
-  { q: 'Can the same pass be used twice?', a: 'No. A second gate-in with the same pass is flagged as a duplicate straight away, on every gate.' },
-  { q: 'How do people pay for tickets?', a: 'Online with Khalti or eSewa when you turn it on, or at the venue. Your plan is paid by eSewa, Khalti, Fonepay or bank transfer.' },
-  { q: 'Can we use our own domain and logo?', a: 'Yes. Request white-label from Branding and domain; once approved, registration runs on your domain with your colours.' },
-]
-
 export const Faq: React.FC = () => {
+  const { faq } = useHomeContent()
   const [open, setOpen] = useState<number | null>(0)
+  const faqs = faq.items.filter((f) => f.q.trim() && f.a.trim())
+  if (!faq.show || !faqs.length) return null
   return (
     <section className="bg-ink-50 py-20 sm:py-28">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-[0.8fr_1.2fr]">
         <Reveal>
-          <h2 className="font-display text-3xl font-bold text-ink-900 sm:text-[44px] sm:leading-[1.05]">Questions organizers ask</h2>
-          <p className="mt-4 text-lg text-ink-600">Something else? Write to {CONTACT_EMAIL}.</p>
+          <h2 className="font-display text-3xl font-bold text-ink-900 sm:text-[44px] sm:leading-[1.05]">{faq.title}</h2>
+          {faq.subtitle && <p className="mt-4 text-lg text-ink-600">{faq.subtitle}</p>}
         </Reveal>
         <ul className="divide-y divide-ink-200 rounded-2xl border border-ink-200 bg-white">
           {faqs.map((f, i) => {
             const isOpen = open === i
             return (
-              <li key={f.q}>
+              <li key={i}>
                 <button
                   onClick={() => setOpen(isOpen ? null : i)}
                   aria-expanded={isOpen}
