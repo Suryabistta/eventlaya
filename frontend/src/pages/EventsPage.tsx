@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import { formatDate } from '@/lib/dates'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { CalendarDays, Check, ClipboardList, ExternalLink, Link2, MapPin, Pencil, Plus, LayoutTemplate, QrCode } from 'lucide-react'
@@ -11,7 +12,7 @@ import { taskApi } from './tasks/api'
 import { PhaseBadge } from '@/components/PhaseBadge'
 import { eventPhase, sortByPhase } from '@/lib/phase'
 
-const fmtDate = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+const fmtDate = (d: string) => formatDate(d, 'medium')
 
 function dateRange(ev: Event) {
   const start = fmtDate(ev.start_date)

@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { formatDate } from '@/lib/dates'
 import { useMutation, useQueryClient, type QueryKey } from '@tanstack/react-query'
 import { CheckCircle2, Clock, XCircle } from 'lucide-react'
 import { Badge, Button, Modal, Textarea, useToast } from '@/components/ui'
@@ -10,8 +11,7 @@ export const PAGE = 'w-full space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 2xl:px-1
 /* ------------------------------------------------------------------ */
 /* Formatting                                                           */
 
-export const fmtDate = (iso: string | null | undefined) =>
-  iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : 'Never'
+export const fmtDate = (iso: string | null | undefined) => (iso ? formatDate(iso, 'medium') : 'Never')
 
 export const fmtNum = (n: number) => n.toLocaleString()
 

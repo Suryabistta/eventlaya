@@ -1,4 +1,5 @@
 import React, { useId, useState } from 'react'
+import { formatDate } from '@/lib/dates'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Clock, Globe, Palette, Send, ShieldCheck, Sparkles, XCircle } from 'lucide-react'
 import { Button, Card, CardHeader, ImageUpload, Input, Textarea, useToast } from '@/components/ui'
@@ -9,7 +10,7 @@ export const MINE_KEY = ['whiteLabelRequests', 'mine'] as const
 
 const DOMAIN = /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/
 
-const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : '')
+const fmt = (iso: string | null) => formatDate(iso, 'long')
 
 /** What you get, shown above the request form. */
 export const WhatYouGet: React.FC = () => (

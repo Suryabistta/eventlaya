@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import { formatDate, formatDateTime } from '@/lib/dates'
 import { Link } from 'react-router-dom'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, CalendarPlus, CheckCircle2, Download, Info, Search, Undo2, Wallet } from 'lucide-react'
@@ -9,7 +10,7 @@ import { useModuleEnabled } from '@/lib/modules'
 import { downloadCsv, PAYMENT_STATUS_META, paymentsApi, rs, type OrderFilters, type OrderRow } from '@/lib/payments'
 import { cn } from '@/lib/utils'
 
-const fmtDateTime = (iso: string) => new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })
+const fmtDateTime = (iso: string) => formatDateTime(iso)
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Any (not released)' },
@@ -367,7 +368,7 @@ const OnlineSummary: React.FC = () => {
             {s.payouts.map((p) => (
               <li key={p.id} className="flex flex-wrap justify-between gap-2">
                 <span>
-                  {new Date(p.paid_on).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} · {p.method_label}
+                  {formatDate(new Date(p.paid_on), 'medium')} · {p.method_label}
                   {p.reference ? ` · ${p.reference}` : ''}
                   {p.event ? ` · ${p.event.title}` : ''}
                 </span>

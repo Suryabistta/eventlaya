@@ -1,4 +1,5 @@
 import { request } from '@/services/api'
+import { formatDate } from './dates'
 
 export type ReviewKind = 'event' | 'vendor' | 'venue'
 
@@ -75,4 +76,4 @@ export const kindLabel: Record<ReviewKind, string> = { event: 'Event', vendor: '
 export const targetHref = (r: Pick<Review, 'kind' | 'target'>) =>
   r.kind === 'event' ? `/e/${r.target.slug}` : r.kind === 'venue' ? `/marketplace/venues/${r.target.slug}` : `/marketplace/vendors/${r.target.id}`
 
-export const fmtReviewDate = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+export const fmtReviewDate = (iso: string) => formatDate(new Date(iso), 'medium')

@@ -17,6 +17,7 @@ import '../models/stored_pass.dart';
 import '../providers/explore_providers.dart';
 import '../providers/pass_providers.dart';
 import 'pass_view_screen.dart';
+import '../../core/bs_date.dart';
 
 final _emailRe = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
 
@@ -980,7 +981,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         return ListRow(
           title: label,
           subtitle: _choiceErrors[f.id] ?? (f.helpText.isNotEmpty ? f.helpText : null),
-          value: v == null ? 'Choose' : DateFormat('d MMM y').format(DateTime.parse(v)),
+          value: v == null ? 'Choose' : BsDate.format('d MMM y', DateTime.parse(v)),
           chevron: true,
           onTap: () async {
             final now = DateTime.now();

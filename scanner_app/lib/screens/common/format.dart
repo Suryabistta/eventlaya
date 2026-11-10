@@ -1,5 +1,6 @@
 import 'package:clock/clock.dart';
 import 'package:intl/intl.dart';
+import '../../core/bs_date.dart';
 
 /// Formatting helpers shared by screens.
 class Fmt {
@@ -16,7 +17,7 @@ class Fmt {
     final local = t.toLocal();
     final now = clock.now();
     final sameDay = local.year == now.year && local.month == now.month && local.day == now.day;
-    return sameDay ? DateFormat('HH:mm').format(local) : DateFormat('d MMM, HH:mm').format(local);
+    return sameDay ? DateFormat('HH:mm').format(local) : BsDate.format('d MMM, HH:mm', local);
   }
 
   static String timeIso(String? iso) => time(parse(iso));
@@ -25,7 +26,7 @@ class Fmt {
   static String date(String? iso) {
     final d = parse(iso);
     if (d == null) return iso ?? '';
-    return DateFormat('EEE d MMM y').format(d);
+    return BsDate.format('EEE d MMM y', d);
   }
 
   static String number(int n) => NumberFormat.decimalPattern().format(n);

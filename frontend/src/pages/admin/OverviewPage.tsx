@@ -1,4 +1,5 @@
 import React from 'react'
+import { formatDate } from '@/lib/dates'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Bar, Line } from 'react-chartjs-2'
@@ -13,7 +14,7 @@ import { ActivityList, useActivity } from './ActivityPage'
 import { PendingQueue } from './approvals/PendingQueue'
 import { PAGE, fmtNum } from './shared'
 
-const dayLabel = (iso: string) => new Date(`${iso}T00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+const dayLabel = (iso: string) => formatDate(new Date(`${iso}T00:00`), 'short')
 
 const stackedBarOptions: ChartOptions<'bar'> = {
   responsive: true,

@@ -1,4 +1,5 @@
 import React from 'react'
+import { formatDate } from '@/lib/dates'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Bar } from 'react-chartjs-2'
@@ -17,7 +18,7 @@ type By = 'type' | 'city' | 'plan'
 /** Fixed categorical order (see analytics/charts.ts). */
 const SERIES = [chartColors.brand, chartColors.marigold, chartColors.emerald, chartColors.ink400]
 
-const weekLabel = (iso: string) => new Date(`${iso}T00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+const weekLabel = (iso: string) => formatDate(new Date(`${iso}T00:00`), 'short')
 
 const stacked: ChartOptions<'bar'> = {
   responsive: true,

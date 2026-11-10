@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import '../attendee/data/attendee_api.dart' show friendlyError;
 import '../providers/auth_provider.dart';
 import '../providers/modules_provider.dart';
 import '../ui/ui.dart';
 import 'review_models.dart';
 import 'reviews_api.dart';
+import '../core/bs_date.dart';
 
 /// Five stars, filled to [rating].
 class StarRow extends StatelessWidget {
@@ -39,7 +39,7 @@ class ReviewTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final r = review;
-    final date = r.createdAt == null ? '' : DateFormat('d MMM y').format(r.createdAt!);
+    final date = r.createdAt == null ? '' : BsDate.format('d MMM y', r.createdAt!);
     return InkWell(
       onTap: onTap,
       child: Padding(

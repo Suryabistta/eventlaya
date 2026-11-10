@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/modules_provider.dart';
 import '../../ui/ui.dart';
 import '../data/attendee_api.dart';
 import '../models/marketplace.dart';
 import '../providers/explore_providers.dart';
+import '../../core/bs_date.dart';
 
 /// "Send inquiry" to a venue or a vendor (public endpoints, work signed
 /// out; signed-in users see them later in My inquiries).
@@ -165,7 +165,7 @@ class _InquiryScreenState extends ConsumerState<InquiryScreen> {
                   ListRow(
                     title: 'Date',
                     value:
-                        _date == null ? (v == null ? 'Optional' : 'Choose') : DateFormat('EEE d MMM y').format(_date!),
+                        _date == null ? (v == null ? 'Optional' : 'Choose') : BsDate.format('EEE d MMM y', _date!),
                     chevron: true,
                     onTap: _pickDate,
                   ),

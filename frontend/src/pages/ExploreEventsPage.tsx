@@ -1,4 +1,5 @@
 import React, { useDeferredValue, useState } from 'react'
+import { formatDate } from '@/lib/dates'
 import { useTrackSearch } from '@/lib/analytics'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useCities } from '@/lib/cities'
@@ -251,7 +252,7 @@ export const EventCard: React.FC<{ event: PublicEvent; past: boolean }> = ({ eve
             {e.date_tba && <span className="shrink-0 font-medium text-ink-800">Applications close</span>}
             
             <time dateTime={e.start_date} className="truncate">
-              {start.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
+              {formatDate(start, 'weekday', false)}
               {e.start_time && `, ${start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
             </time>
           </p>

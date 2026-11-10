@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import '../../core/photo_picker.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/event_provider.dart';
@@ -16,6 +15,7 @@ import '../data/attendee_api.dart';
 import '../providers/explore_providers.dart';
 import 'vendor_detail_screen.dart';
 import 'venue_detail_screen.dart';
+import '../../core/bs_date.dart';
 
 /// Edit photo, name, phone and city (`PATCH /api/auth/me/`). Email can't
 /// change. The photo is uploaded first (`/api/uploads/`, kind=avatar) and
@@ -476,7 +476,7 @@ class _MyInquiriesScreenState extends ConsumerState<MyInquiriesScreen> {
                       title: target['name']?.toString() ?? 'Listing',
                       subtitle: [
                         if ((q['event_type']?.toString() ?? '').isNotEmpty) q['event_type'].toString(),
-                        if (created != null) 'Sent ${DateFormat('d MMM').format(created)}',
+                        if (created != null) 'Sent ${BsDate.format('d MMM', created)}',
                       ].join(' · '),
                       trailing: StatusBadge(label, tone: tone),
                       onTap: () => _open(q),

@@ -1,4 +1,5 @@
 import { request } from '@/services/api'
+import { formatDate } from '@/lib/dates'
 
 export type BlogStatus = 'draft' | 'published' | 'scheduled'
 
@@ -143,7 +144,7 @@ export function formatPostDate(iso: string | null | undefined, language = 'en') 
   const date = new Date(iso)
   // Written out by hand: not every browser ships Nepali locale data ("२८ अक्टोबर २०२६", AD date)
   if (language === 'ne') return `${neDigits(date.getDate())} ${NE_MONTHS[date.getMonth()]} ${neDigits(date.getFullYear())}`
-  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+  return formatDate(date, 'long')
 }
 
 /** Screen words of an article page in the article's language (the site itself stays English). */

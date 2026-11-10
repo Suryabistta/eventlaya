@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { formatDate } from '@/lib/dates'
 import { UsersRound } from 'lucide-react'
 import { mediaUrl } from '@/lib/account'
 import type { ChatMessage, ChatUser, Conversation } from '@/lib/chat/api'
@@ -48,7 +49,7 @@ export function listTime(iso: string | null) {
   if (sameDay(d, now)) return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
   const days = (now.getTime() - d.getTime()) / 86_400_000
   if (days < 6) return d.toLocaleDateString([], { weekday: 'short' })
-  return d.toLocaleDateString([], { day: 'numeric', month: 'short' })
+  return formatDate(d, 'short')
 }
 
 export const clockTime = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })

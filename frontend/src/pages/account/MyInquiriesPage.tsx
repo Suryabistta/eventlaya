@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Building2, CalendarDays, Inbox, MessageSquareText, Star, Store, Users, Wallet, XCircle } from 'lucide-react'
 import { isApiError, isModuleDisabled } from '@/services/api'
 import { accountApi, type MySentInquiry } from '@/lib/account'
-import { apiErrorText, slotsApi } from '@/lib/availability'
+import { apiErrorText, fmtPrice, slotsApi } from '@/lib/availability'
 import { useModuleEnabled } from '@/lib/modules'
 import { reviewsApi, type Review } from '@/lib/reviews'
 import { ReviewFormModal } from '@/components/reviews'
@@ -133,6 +133,17 @@ const SentInquiryCard: React.FC<{ inquiry: MySentInquiry }> = ({ inquiry: i }) =
             )}
           </dl>
           {i.message && <p className="line-clamp-3 whitespace-pre-line rounded-xl bg-ink-50 px-3.5 py-2.5 text-sm text-ink-700">{i.message}</p>}
+          {i.status === 'booked' && i.agreed_amount && (
+            <p className="rounded-xl bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-900">
+              Agreed <span className="font-semibold">{fmtPrice(i.agreed_amount)}</span> · Paid <span className="font-semibold">{fmtPrice(i.paid ?? 0)}</span>
+              {Number(i.agreed_amount) - Number(i.paid ?? 0) > 0 && (
+                <>
+                  {' '}
+                  · Due <span className="font-semibold">{fmtPrice(Number(i.agreed_amount) - Number(i.paid ?? 0))}</span>
+                </>
+              )}
+            </p>
+          )}
           {i.owner_note && (
             <div className="flex gap-2.5 rounded-xl border border-ink-200 px-3.5 py-2.5 text-sm">
               <MessageSquareText className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" aria-hidden />

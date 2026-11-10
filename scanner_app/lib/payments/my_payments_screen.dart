@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import '../attendee/screens/link_screens.dart';
 import '../core/api_client.dart';
 import '../models/ticket_type_model.dart';
@@ -10,6 +9,7 @@ import '../providers/modules_provider.dart';
 import '../ui/ui.dart';
 import 'payment_api.dart';
 import 'payment_widgets.dart';
+import '../core/bs_date.dart';
 
 /// Profile → My payments: tickets and vote packs paid online.
 ///
@@ -125,7 +125,7 @@ class _MyPaymentsScreenState extends ConsumerState<MyPaymentsScreen> {
   Widget _row(PaymentRecord r, bool signedIn) {
     final title = r.description.isEmpty ? (r.purpose == 'vote_pack' ? 'Vote pack' : 'Tickets') : r.description;
     final lines = [
-      '${DateFormat('d MMM y, h:mm a').format(r.createdAt.toLocal())} · ${formatRupees(r.amount)}',
+      '${BsDate.format('d MMM y, h:mm a', r.createdAt.toLocal())} · ${formatRupees(r.amount)}',
       if (r.summary != null && r.summary != title) r.summary!,
     ];
     return ListRow(

@@ -1,4 +1,5 @@
 import { request } from '@/services/api'
+import { formatDate, formatDateTime } from './dates'
 
 export type Availability = 'on_sale' | 'not_started' | 'ended' | 'sold_out' | 'inactive'
 
@@ -133,9 +134,8 @@ export const money = (v: string | number) => {
 /** "Free" or "Rs 500" */
 export const priceText = (v: string | number) => (Number(v) > 0 ? `Rs ${money(v)}` : 'Free')
 
-export const fmtShortDate = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-export const fmtDateTime = (iso: string) =>
-  new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true })
+export const fmtShortDate = (iso: string) => formatDate(iso, 'short')
+export const fmtDateTime = (iso: string) => formatDateTime(iso)
 
 /** Short reason a ticket type can't be bought right now (or null when it can). */
 export function availabilityText(t: Pick<PublicTicketType, 'availability' | 'sales_start' | 'sales_end'>): string | null {

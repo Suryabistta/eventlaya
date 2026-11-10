@@ -254,7 +254,7 @@ void main() {
 
   group('time', () {
     test('Nepal time is UTC+5:45 whatever the phone zone', () {
-      expect(nepalTime(DateTime.utc(2026, 10, 31, 7, 15)), 'Sat 31 Oct, 1:00 PM Nepal time');
+      expect(nepalTime(DateTime.utc(2026, 10, 31, 7, 15)), 'Sat 14 Kartik, 1:00 PM Nepal time');
     });
     test('countdown text', () {
       expect(countdownText(const Duration(days: 2, hours: 4, minutes: 3)), '2d 4h');

@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { formatDate as formatSiteDate } from '@/lib/dates'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
   CalendarDays,
+  CalendarCheck,
   FileText,
   ScanLine,
   Vote,
@@ -157,6 +159,7 @@ function buildNav(user: ShellUser | null, pending: PendingApprovals = noPending,
       { label: isVendor(user) ? 'Overview' : 'Business home', to: '/app/business', icon: Store, end: !isVendor(user) },
       { label: 'Listings', to: '/app/listings', icon: Building2 },
       { label: 'Inquiries', to: '/app/inquiries', icon: Inbox },
+      ...(x.marketplace ? [{ label: 'Bookings', to: '/app/bookings', icon: CalendarCheck }] : []),
       ...(x.marketplace ? [{ label: 'Availability', to: '/app/availability', icon: CalendarDays }] : []),
       ...(isVendor(user) && x.reviews ? [{ label: 'Reviews', to: '/app/reviews', icon: Star }] : []),
     ],
@@ -341,6 +344,7 @@ const vendorTabs: NavItem[] = [
   { label: 'Overview', to: '/app/business', icon: Store },
   { label: 'Listings', to: '/app/listings', icon: Building2 },
   { label: 'Inquiries', to: '/app/inquiries', icon: Inbox },
+  { label: 'Bookings', to: '/app/bookings', icon: CalendarCheck },
 ]
 
 const adminTabs: NavItem[] = [
@@ -874,7 +878,7 @@ function useDismiss(open: boolean, close: () => void) {
   return ref
 }
 
-const formatDate = (d: string) => new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+const formatDate = (d: string) => formatSiteDate(d, 'short')
 
 const EventSwitcher: React.FC = () => {
   const { events, currentEvent, setCurrentEventId, isLoading } = useCurrentEvent()

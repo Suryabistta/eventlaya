@@ -30,7 +30,7 @@ import { PAGE, useMyListings } from '../ListingsPage'
 import { InquiryStatusBadge } from '../status'
 import { timeAgo } from '../InquiriesPage'
 import { DecisionModal, type Decision, type DecisionTarget } from '../DecisionModal'
-import { BlockDatesModal, DeleteSlotModal, RepeatSlotsModal, SlotFormModal } from './SlotDialogs'
+import { BlockDatesModal, DeleteSlotModal, PresetsModal, RepeatSlotsModal, SlotFormModal } from './SlotDialogs'
 import { Legend, MonthNav, SpaceSelect, StatusDot, WeekdayHeader, bsDayOf, monthGrid, monthOf, type ListingRef } from './shared'
 import { CalendarToggle } from '@/components/CalendarToggle'
 import { useCalendarSystem } from '@/lib/calendar'
@@ -48,6 +48,7 @@ export const AvailabilityPage: React.FC = () => {
   const [slotForm, setSlotForm] = useState<{ slot?: Slot | null; date?: string } | null>(null)
   const [repeatOpen, setRepeatOpen] = useState(false)
   const [blockOpen, setBlockOpen] = useState(false)
+  const [presetsOpen, setPresetsOpen] = useState(false)
   const [deleting, setDeleting] = useState<Slot | null>(null)
   const [deciding, setDeciding] = useState<{ target: DecisionTarget; decision: Decision } | null>(null)
 
@@ -55,8 +56,8 @@ export const AvailabilityPage: React.FC = () => {
     const d = listingsQ.data
     if (!d) return []
     return [
-      ...d.venues.map((v) => ({ key: `venue:${v.id}`, kind: 'venue' as const, id: v.id, name: v.name, spaces: (v.spaces ?? []).filter((s) => s.is_active !== false), status: v.listing_status })),
-      ...d.vendor_profiles.map((p) => ({ key: `vendor:${p.id}`, kind: 'vendor' as const, id: p.id, name: p.business_name, spaces: [], status: p.listing_status })),
+      ...d.venues.map((v) => ({ key: `venue:${v.id}`, kind: 'venue' as const, id: v.id, name: v.name, spaces: (v.spaces ?? []).filter((s) => s.is_active !== false), status: v.listing_status, presets: v.slot_presets ?? [] })),
+      ...d.vendor_profiles.map((p) => ({ key: `vendor:${p.id}`, kind: 'vendor' as const, id: p.id, name: p.business_name, spaces: [], status: p.listing_status, presets: p.slot_presets ?? [] })),
     ]
   }, [listingsQ.data])
 
@@ -155,6 +156,9 @@ export const AvailabilityPage: React.FC = () => {
         description="Open dates and times customers can request. Requests hold a slot until you confirm or decline."
         actions={
           <>
+            <Button variant="secondary" size="sm" onClick={() => setPresetsOpen(true)} icon={<Clock className="h-4 w-4" aria-hidden />}>
+              Time slots
+            </Button>
             <Button variant="secondary" size="sm" onClick={() => setBlockOpen(true)} icon={<CalendarX className="h-4 w-4" aria-hidden />}>
               Block dates
             </Button>
@@ -281,6 +285,7 @@ export const AvailabilityPage: React.FC = () => {
       </div>
 
       <SlotFormModal open={Boolean(slotForm)} onClose={() => setSlotForm(null)} listing={listing} slot={slotForm?.slot} date={slotForm?.date} space={space} />
+      {presetsOpen && <PresetsModal listing={listing} onClose={() => setPresetsOpen(false)} />}
       <RepeatSlotsModal open={repeatOpen} onClose={() => setRepeatOpen(false)} listing={listing} date={day ?? (month > monthOf(today) ? `${month}-01` : undefined)} space={space} />
       <BlockDatesModal open={blockOpen} onClose={() => setBlockOpen(false)} listing={listing} date={day ?? undefined} space={space} month={month} />
       <DeleteSlotModal slot={deleting} onClose={() => setDeleting(null)} />

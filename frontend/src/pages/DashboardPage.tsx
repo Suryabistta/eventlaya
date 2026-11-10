@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import { formatDate } from '@/lib/dates'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Bar, Line } from 'react-chartjs-2'
@@ -214,7 +215,7 @@ export const DashboardPage: React.FC = () => {
           <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-600">
             <span className="inline-flex items-center gap-1.5">
               <CalendarDays className="h-4 w-4 text-ink-400" aria-hidden />
-              {new Date(currentEvent.start_date).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}
+              {formatDate(new Date(currentEvent.start_date), 'weekday')}
               {currentEvent.start_time && `, ${currentEvent.start_time.slice(0, 5)}`}
             </span>
             <span className="inline-flex min-w-0 items-center gap-1.5">
@@ -950,7 +951,7 @@ const AttendeesCard: React.FC<{
                     </td>
                     {!formOnly && <td className="hidden whitespace-nowrap px-4 py-3 tabular text-ink-600 sm:table-cell">{t.first_check_in ? fmtTime(t.first_check_in) : '–'}</td>}
                     <td className="hidden whitespace-nowrap px-4 py-3 tabular text-ink-600 md:table-cell">
-                      {new Date(t.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                      {formatDate(new Date(t.created_at), 'short')}
                     </td>
                     <td className="whitespace-nowrap px-2 py-3 text-right">
                       {guestsOn && (

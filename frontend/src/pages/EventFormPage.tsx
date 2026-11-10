@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { formatDate } from '@/lib/dates'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -342,7 +343,7 @@ function validateStep(id: StepId, d: EventDraft, p: PageDraft, isNew = false): E
 
 const errorLabel = (k: string) => fieldNames[k] ?? (k.startsWith('agenda') ? 'Schedule item' : k.startsWith('speaker') ? 'Speaker' : k.startsWith('faq') ? 'FAQ' : k.startsWith('highlight') ? 'Highlight' : k)
 
-const fmtDate = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+const fmtDate = (d: string) => formatDate(d, 'weekday')
 
 function eventDays(start: string, end: string) {
   if (!start) return []

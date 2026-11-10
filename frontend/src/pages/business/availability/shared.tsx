@@ -13,6 +13,14 @@ export interface ListingRef {
   name: string
   spaces: VenueSpace[]
   status?: string
+  /** Owner's saved time slots (Morning 7–11…); empty = whole day only */
+  presets: SlotPreset[]
+}
+
+export interface SlotPreset {
+  name: string
+  start: string
+  end: string
 }
 
 export const toTarget = (l: ListingRef, space?: string | null): SlotTarget =>

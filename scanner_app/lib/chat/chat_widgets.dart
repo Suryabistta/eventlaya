@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../ui/ui.dart';
 import 'chat_models.dart';
+import '../core/bs_date.dart';
 
 /// "14:05" today, "Yesterday", "Mon" this week, else "12 Mar".
 String chatTime(DateTime? t) {
@@ -14,7 +15,7 @@ String chatTime(DateTime? t) {
   if (diff == 0) return DateFormat('HH:mm').format(t);
   if (diff == 1) return 'Yesterday';
   if (diff < 7) return DateFormat('EEE').format(t);
-  return DateFormat('d MMM').format(t);
+  return BsDate.format('d MMM', t);
 }
 
 /// "Today", "Yesterday", "Monday 12 March".
@@ -23,7 +24,7 @@ String chatDay(DateTime t) {
   final diff = DateTime(now.year, now.month, now.day).difference(DateTime(t.year, t.month, t.day)).inDays;
   if (diff == 0) return 'Today';
   if (diff == 1) return 'Yesterday';
-  return DateFormat(t.year == now.year ? 'EEEE d MMMM' : 'd MMMM y').format(t);
+  return BsDate.format(t.year == now.year ? 'EEEE d MMMM' : 'd MMMM y', t);
 }
 
 /// Avatar for a person or a conversation (group / event crew icon).

@@ -8,6 +8,7 @@ import '../providers/vendor_providers.dart';
 import '../widgets/month_grid.dart';
 import '../widgets/slot_sheets.dart';
 import '../widgets/vendor_widgets.dart';
+import '../../core/bs_date.dart';
 
 const _statusOrder = [SlotStatus.booked, SlotStatus.held, SlotStatus.open, SlotStatus.blocked];
 
@@ -253,7 +254,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               children: [
                 for (final d in agendaDays)
                   ListRow(
-                    title: DateFormat('EEE d MMM').format(d),
+                    title: BsDate.format('EEE d MMM', d),
                     subtitleWidget: Padding(
                       padding: const EdgeInsets.only(top: 2),
                       child: Wrap(spacing: 6, runSpacing: 4, children: [

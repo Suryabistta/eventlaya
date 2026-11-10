@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../core/media_url.dart';
 import '../../models/ticket_type_model.dart';
 import '../../payments/payment_models.dart';
+import '../../core/bs_date.dart';
 
 /// Contests / pageants from the public voting API
 /// (`/api/voting/public/<event>/contests/<contest>/…`, see docs/voting.md).
@@ -29,7 +30,7 @@ const nepalOffset = Duration(hours: 5, minutes: 45);
 /// "Sat 1 Nov, 6:00 PM" in Nepal time, whatever the phone's time zone.
 String nepalTime(DateTime t, {bool withZone = true}) {
   final npt = t.toUtc().add(nepalOffset);
-  final s = DateFormat('EEE d MMM, h:mm a').format(npt);
+  final s = BsDate.format('EEE d MMM, h:mm a', npt);
   return withZone ? '$s Nepal time' : s;
 }
 

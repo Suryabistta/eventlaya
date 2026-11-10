@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../ui/ui.dart';
 import '../data/vendor_models.dart';
+import '../../core/bs_date.dart';
 
 /// First day shown on a Monday-first grid for [month] (may be in the previous month).
 DateTime gridStart(DateTime month) {
@@ -146,7 +147,7 @@ class _DayCell extends StatelessWidget {
     return Semantics(
       button: !disabled,
       selected: isSelected,
-      label: DateFormat('EEEE d MMMM').format(day),
+      label: BsDate.format('EEEE d MMMM', day),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: disabled ? null : () => onTap(day),

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import '../../core/notification_service.dart';
 import '../../ui/ui.dart';
 import '../data/vendor_api.dart';
 import '../data/vendor_models.dart';
 import '../providers/vendor_providers.dart';
 import 'vendor_widgets.dart';
+import '../../core/bs_date.dart';
 
 /// Opens a request's detail sheet: customer contact, the slot, Confirm /
 /// Decline (with an optional note) and Mark contacted.
@@ -159,7 +159,7 @@ class _RequestDetailState extends ConsumerState<_RequestDetail> {
             .firstOrNull ??
         _r;
     final api = ref.read(vendorApiProvider);
-    final created = r.createdAt == null ? null : DateFormat('d MMM y, HH:mm').format(r.createdAt!);
+    final created = r.createdAt == null ? null : BsDate.format('d MMM y, HH:mm', r.createdAt!);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,

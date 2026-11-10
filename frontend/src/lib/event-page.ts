@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { formatDate } from './dates'
 import { request, type DynamicForm, type Event, type Ticket } from '@/services/api'
 import { eventPriceLabel } from '@/lib/tickets'
 import { eventPhase, type EventPhase } from '@/lib/phase'
@@ -123,9 +124,9 @@ export const eventPageApi = {
 /* ---------- dates ---------- */
 
 export const toDate = (d: string, t?: string | null) => new Date(`${d}T${t || '00:00:00'}`)
-export const fmtDay = (d: Date, withYear = true) =>
-  d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', ...(withYear ? { year: 'numeric' } : {}) })
-export const fmtShortDay = (d: Date) => d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+// BS by default (lib/dates); AD when the viewer prefers it
+export const fmtDay = (d: Date, withYear = true) => formatDate(d, 'full', withYear)
+export const fmtShortDay = (d: Date) => formatDate(d, 'weekday', false)
 export const fmtClock = (t: string | Date) => {
   const d = typeof t === 'string' ? toDate('2000-01-01', t) : t
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
@@ -141,16 +142,12 @@ export function eventWhen(e: Pick<Event, 'start_date' | 'start_time' | 'end_date
   } else if (e.end_time) {
     endLabel = `Until ${fmtClock(e.end_time)}`
   }
-  const shortDate =
-    start.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' }) + (e.start_time ? `, ${fmtClock(start)}` : '')
-  // "27 to 28 October 2026" style range for compact headers
+  const shortDate = formatDate(start, 'weekday') + (e.start_time ? `, ${fmtClock(start)}` : '')
+  // "27 to 28 Kartik 2083" style range for compact headers
   let range = fmtDay(start)
   if (e.end_date && e.end_date !== e.start_date) {
     const end = toDate(e.end_date)
-    const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()
-    range = sameMonth
-      ? `${start.getDate()} to ${end.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`
-      : `${start.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })} to ${end.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`
+    range = `${formatDate(start, 'long', false)} to ${formatDate(end, 'long')}`
   }
   return { startLabel, endLabel, shortDate, range }
 }

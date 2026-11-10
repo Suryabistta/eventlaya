@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { formatDate } from '@/lib/dates'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { ChevronRight, Trash2 } from 'lucide-react'
@@ -364,7 +365,7 @@ const TaskForm: React.FC<{ task?: Task }> = ({ task }) => {
                 label="Due"
                 value={
                   draft.due_date
-                    ? `${new Date(`${draft.due_date}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}${draft.due_time ? `, ${draft.due_time}` : ''}`
+                    ? `${formatDate(new Date(`${draft.due_date}T00:00:00`), 'medium')}${draft.due_time ? `, ${draft.due_time}` : ''}`
                     : 'No deadline'
                 }
               />

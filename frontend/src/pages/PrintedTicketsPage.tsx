@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { formatDate } from '@/lib/dates'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ban, Download, FileSpreadsheet, Plus, Printer } from 'lucide-react'
 import { useCurrentEvent } from '@/lib/event-context'
@@ -90,7 +91,7 @@ const BatchRow: React.FC<{ eventId: string; batch: TicketBatch }> = ({ eventId, 
           </p>
           <p className="text-sm text-ink-500">
             {b.quantity.toLocaleString()} × {b.ticket_type_name || 'ticket'} · {rs(b.price)} · {b.layout === 'vertical' ? 'Vertical' : 'Landscape'} ·{' '}
-            {new Date(b.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+            {formatDate(new Date(b.created_at), 'short')}
           </p>
           <p className="mt-1 text-sm text-ink-700">
             <span className="font-semibold tabular">{b.used.toLocaleString()}</span> of {b.quantity.toLocaleString()} scanned in

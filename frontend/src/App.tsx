@@ -53,6 +53,7 @@ const EditVenuePage = lazyPage(() => import('./pages/marketplace/ListVenuePage')
 const BusinessHomePage = lazyPage(() => import('./pages/business/BusinessHomePage'), 'BusinessHomePage')
 const ListingsPage = lazyPage(() => import('./pages/business/ListingsPage'), 'ListingsPage')
 const InquiriesPage = lazyPage(() => import('./pages/business/InquiriesPage'), 'InquiriesPage')
+const BookingsPage = lazyPage(() => import('./pages/business/BookingsPage'), 'BookingsPage')
 const AvailabilityPage = lazyPage(() => import('./pages/business/availability/AvailabilityPage'), 'AvailabilityPage')
 const NewVendorProfilePage = lazyPage(() => import('./pages/business/VendorProfileFormPage'), 'NewVendorProfilePage')
 const EditVendorProfilePage = lazyPage(() => import('./pages/business/VendorProfileFormPage'), 'EditVendorProfilePage')
@@ -244,6 +245,7 @@ export const App: React.FC = () => {
                 <Route path="listings/vendor/:id/edit" element={business(<EditVendorProfilePage />)} />
                 <Route path="inquiries" element={business(<InquiriesPage />)} />
                 <Route path="availability" element={business(<AvailabilityPage />)} />
+                <Route path="bookings" element={business(<BookingsPage />)} />
                 <Route path="marketplace-access" element={<RequireAuth roles={['organizer', 'vendor']}><MarketplaceAccessPage /></RequireAuth>} />
                 <Route path="marketplace/*" element={<LegacyMarketplaceRedirect />} />
                 <Route path="branding" element={organizer(<WhiteLabelPage />)} />

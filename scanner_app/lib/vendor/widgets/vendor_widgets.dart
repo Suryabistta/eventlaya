@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 import '../../models/ticket_type_model.dart' show formatRupees;
 import '../../ui/ui.dart';
 import '../data/vendor_models.dart';
+import '../../core/bs_date.dart';
 
 Tone requestTone(String status) => switch (status) {
       RequestStatus.pending => Tone.warning,
@@ -32,7 +32,7 @@ Color slotColor(String status) => switch (status) {
 String shortDay(DateTime? d) {
   if (d == null) return 'No date';
   final sameYear = d.year == DateTime.now().year;
-  return DateFormat(sameYear ? 'EEE d MMM' : 'EEE d MMM y').format(d);
+  return BsDate.format(sameYear ? 'EEE d MMM' : 'EEE d MMM y', d);
 }
 
 /// "Sat 12 Apr · 09:00 – 13:00 · Main hall"
@@ -191,7 +191,7 @@ class Fmtx {
     if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
     if (diff.inHours < 24) return '${diff.inHours} h ago';
     if (diff.inDays < 7) return '${diff.inDays} d ago';
-    return DateFormat('d MMM').format(t);
+    return BsDate.format('d MMM', t);
   }
 }
 

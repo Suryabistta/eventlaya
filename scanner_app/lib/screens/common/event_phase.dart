@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/event_model.dart';
 import '../../ui/ui.dart';
+import '../../core/bs_date.dart';
 
 /// Plain-language lifecycle copy shared by the home hero, pickers and scanner.
 class PhaseCopy {
@@ -41,7 +42,7 @@ class PhaseCopy {
     if (days <= 0) return hasTime ? 'Today$time' : 'Today';
     if (days == 1) return short ? 'Tomorrow' : 'Tomorrow$time';
     if (days <= 30) return short ? 'In $days days' : 'Starts in $days days';
-    return '${short ? '' : 'Starts '}${DateFormat('d MMM').format(start)}'.trim();
+    return '${short ? '' : 'Starts '}${BsDate.format('d MMM', start)}'.trim();
   }
 
   /// Calm notice for the scanner when the server will refuse scans (or the

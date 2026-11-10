@@ -208,6 +208,8 @@ export interface Poll {
 }
 
 export interface Vendor {
+  /** Owner's saved time slots for opening dates (empty = whole day only) */
+  slot_presets?: { name: string; start: string; end: string }[]
   id: string
   business_name: string
   /** Business logo URL ('' when not set) */
@@ -289,6 +291,8 @@ export interface City {
 }
 
 export interface VenueListing {
+  /** Owner's saved time slots for opening dates (empty = whole day only) */
+  slot_presets?: { name: string; start: string; end: string }[]
   id: string
   owner_name?: string
   name: string

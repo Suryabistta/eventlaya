@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { formatDateTime } from '@/lib/dates'
 import { motion, useReducedMotion } from 'framer-motion'
 import { ModernQrCanvas } from '@/components/ModernQr'
 import { CalendarClock, Copy, Download, ExternalLink, Lock, Trophy } from 'lucide-react'
@@ -37,8 +38,7 @@ export const visibilityLabel: Record<ResultsVisibility, string> = {
 
 export const votesLabel = (n: number) => `${n.toLocaleString()} ${n === 1 ? 'vote' : 'votes'}`
 
-export const fmtDateTime = (iso: string) =>
-  new Date(iso).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+export const fmtDateTime = (iso: string) => formatDateTime(iso, 'weekday')
 
 /** "Opens Thu 12 Nov, 10:00" / "Closes in 2 h" style schedule line. */
 export function scheduleText(p: { status: PollStatus; opens_at: string | null; closes_at: string | null }) {

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { CalendarX, Repeat, X } from 'lucide-react'
-import { isApiError } from '@/services/api'
+import { isApiError, request } from '@/services/api'
 import {
   addDays,
   apiErrorText,
@@ -17,7 +17,7 @@ import {
 } from '@/lib/availability'
 import { Button, Input, Modal, Textarea, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
-import { MonthNav, SpaceSelect, WeekdayHeader, monthGrid, monthOf, toTarget, type ListingRef } from './shared'
+import { MonthNav, SpaceSelect, WeekdayHeader, monthGrid, monthOf, toTarget, type ListingRef, type SlotPreset } from './shared'
 
 const invalidateSlots = (qc: ReturnType<typeof useQueryClient>) => qc.invalidateQueries({ queryKey: ['my-slots'] })
 
@@ -29,9 +29,28 @@ interface TimesValue {
   end: string
 }
 
-const TimesFields: React.FC<{ value: TimesValue; onChange: (v: TimesValue) => void }> = ({ value, onChange }) => (
+const TimesFields: React.FC<{ value: TimesValue; onChange: (v: TimesValue) => void; presets?: SlotPreset[] }> = ({ value, onChange, presets = [] }) => (
   <fieldset className="space-y-3">
     <legend className="mb-1.5 block text-sm font-medium text-ink-800">Time</legend>
+    {presets.length > 0 && (
+      // The owner's saved slots: one tap fills the hours
+      <div className="flex flex-wrap gap-2">
+        {presets.map((p) => {
+          const on = !value.fullDay && value.start === p.start && value.end === p.end
+          return (
+            <button
+              key={p.name}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onChange({ fullDay: false, start: p.start, end: p.end })}
+              className={cn('h-8 rounded-full border px-3 text-sm font-semibold', on ? 'border-ink-900 bg-ink-900 text-white' : 'border-ink-200 text-ink-700 hover:border-ink-400')}
+            >
+              {p.name} · {p.start}–{p.end}
+            </button>
+          )
+        })}
+      </div>
+    )}
     <div className="inline-flex rounded-xl bg-ink-100 p-1" role="radiogroup" aria-label="Slot length">
       {(
         [
@@ -187,7 +206,7 @@ export const SlotFormModal: React.FC<{
             <SpaceSelect listing={listing} value={form.space} onChange={(v) => setForm((f) => ({ ...f, space: v }))} />
           )}
         </div>
-        <TimesFields value={times} onChange={setTimes} />
+        <TimesFields value={times} onChange={setTimes} presets={listing.presets} />
         {err && <p className="text-xs font-medium text-red-600">{err}</p>}
         <PriceNote
           price={form.price}
@@ -352,7 +371,7 @@ export const RepeatSlotsModal: React.FC<{ open: boolean; onClose: () => void; li
             <Input label="Until" type="date" required min={form.start} value={form.end} onChange={(e) => setForm((f) => ({ ...f, end: e.target.value }))} />
             <SpaceSelect listing={listing} value={form.space} onChange={(v) => setForm((f) => ({ ...f, space: v }))} />
           </div>
-          <TimesFields value={times} onChange={setTimes} />
+          <TimesFields value={times} onChange={setTimes} presets={listing.presets} />
           {err && <p className="text-xs font-medium text-red-600">{err}</p>}
           <div className="grid gap-3 sm:grid-cols-2">
             <PriceNote price={form.price} note={form.note} onPrice={(v) => setForm((f) => ({ ...f, price: v }))} onNote={(v) => setForm((f) => ({ ...f, note: v }))} />
@@ -562,6 +581,65 @@ export const DeleteSlotModal: React.FC<{ slot: Slot | null; onClose: () => void 
       }
     >
       <p className="text-sm text-ink-600">Customers won’t see it any more. To keep the day closed instead, block it.</p>
+    </Modal>
+  )
+}
+
+/** The listing's saved time slots (Morning 7–11, Evening 6–10…). Whole day stays the default when opening dates. */
+export const PresetsModal: React.FC<{ listing: ListingRef; onClose: () => void }> = ({ listing, onClose }) => {
+  const toast = useToast()
+  const qc = useQueryClient()
+  const [rows, setRows] = useState<SlotPreset[]>(listing.presets.length ? listing.presets : [{ name: 'Morning', start: '07:00', end: '11:00' }])
+  const bad = rows.find((r) => !r.name.trim() || !r.start || !r.end || r.end <= r.start)
+  const save = useMutation({
+    mutationFn: () =>
+      request(`/marketplace/${listing.kind === 'venue' ? 'venues' : 'vendors'}/${listing.id}/`, {
+        method: 'PATCH',
+        body: JSON.stringify({ slot_presets: rows.map((r) => ({ ...r, name: r.name.trim() })) }),
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries()
+      toast.success('Time slots saved', 'Pick them when you add or repeat slots.')
+      onClose()
+    },
+    onError: (e: Error) => toast.error('Couldn’t save', e.message),
+  })
+  const set = (i: number, patch: Partial<SlotPreset>) => setRows((r) => r.map((x, j) => (j === i ? { ...x, ...patch } : x)))
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Time slots"
+      description={`Saved slots for ${listing.name}. Whole day is always available; these are one-tap choices when you open dates.`}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button loading={save.isPending} disabled={Boolean(bad)} onClick={() => save.mutate()}>
+            Save
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        {rows.map((r, i) => (
+          <div key={i} className="grid grid-cols-[minmax(0,1fr)_110px_110px_auto] items-end gap-2">
+            <Input label={i === 0 ? 'Name' : ''} aria-label="Slot name" maxLength={40} value={r.name} onChange={(e) => set(i, { name: e.target.value })} />
+            <Input label={i === 0 ? 'Starts' : ''} aria-label="Starts" type="time" value={r.start} onChange={(e) => set(i, { start: e.target.value })} />
+            <Input label={i === 0 ? 'Ends' : ''} aria-label="Ends" type="time" value={r.end} onChange={(e) => set(i, { end: e.target.value })} />
+            <Button variant="ghost" size="sm" onClick={() => setRows(rows.filter((_, j) => j !== i))} aria-label={`Remove ${r.name}`}>
+              Remove
+            </Button>
+          </div>
+        ))}
+        {bad && <p className="text-sm text-red-600">Each slot needs a name and an end after its start.</p>}
+        {rows.length < 8 && (
+          <Button variant="secondary" size="sm" onClick={() => setRows([...rows, { name: '', start: '18:00', end: '22:00' }])}>
+            Add a time slot
+          </Button>
+        )}
+      </div>
     </Modal>
   )
 }

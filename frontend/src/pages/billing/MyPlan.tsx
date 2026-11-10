@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useState } from 'react'
+import { formatDate } from '@/lib/dates'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CalendarClock, Clock, CreditCard, Receipt, XCircle } from 'lucide-react'
 import { Badge, Button, Card, CardHeader, EmptyState, ErrorState, Modal, Select, Skeleton, Textarea, useToast } from '@/components/ui'
@@ -9,7 +10,7 @@ export const MY_BILLING_KEY = ['myBilling'] as const
 
 export const useMyBilling = (enabled = true) => useQuery({ queryKey: MY_BILLING_KEY, queryFn: billingApi.mine, enabled })
 
-const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : '')
+const fmt = (iso: string | null) => formatDate(iso, 'long')
 
 /** Current plan, renewal date, pending plan change and payment history for the signed-in organization. */
 export const MyPlanSection: React.FC<{ data: MyBilling | undefined; isLoading: boolean; error: Error | null; onRetry: () => void }> = ({

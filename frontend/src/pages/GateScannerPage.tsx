@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { formatDate } from '@/lib/dates'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import {
   Download,
@@ -50,7 +51,7 @@ const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2
 
 const passDate = (d: string, t?: string) => {
   const date = new Date(`${d}T${t || '00:00:00'}`)
-  const day = date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })
+  const day = formatDate(date, 'weekday')
   return t ? `${day}, ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : day
 }
 

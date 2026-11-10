@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { formatDate } from '@/lib/dates'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { DoorOpen, KeyRound, Pencil, Search, Trash2, UserCheck, UserPlus, UserX, UsersRound } from 'lucide-react'
@@ -25,7 +26,7 @@ const lastSignIn = (iso: string | null) => {
   if (days < 1) return `Signed in today, ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
   if (days === 1) return 'Signed in yesterday'
   if (days < 7) return `Signed in ${days} days ago`
-  return `Last signed in ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
+  return `Last signed in ${formatDate(d, 'medium')}`
 }
 
 export const TeamPage: React.FC = () => {

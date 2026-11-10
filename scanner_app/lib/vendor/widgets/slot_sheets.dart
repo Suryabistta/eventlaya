@@ -9,6 +9,7 @@ import '../providers/vendor_providers.dart';
 import 'month_grid.dart';
 import 'request_sheet.dart';
 import 'vendor_widgets.dart';
+import '../../core/bs_date.dart';
 
 String _hhmm(TimeOfDay t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
@@ -235,7 +236,7 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
       mainAxisSize: MainAxisSize.min,
       children: [
         SheetHeader(
-          title: DateFormat('EEEE d MMMM').format(day),
+          title: BsDate.format('EEEE d MMMM', day),
           message: [
             targetLabel(widget.target, widget.listings),
             if (past) 'Past day — read only',

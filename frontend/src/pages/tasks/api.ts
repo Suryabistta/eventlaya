@@ -1,4 +1,5 @@
 import { request } from '@/services/api'
+import { formatDate } from '@/lib/dates'
 
 export type TaskStatus = 'todo' | 'in_progress' | 'completed'
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent'
@@ -73,7 +74,7 @@ export function taskDue(task: Task): { date: Date; hasTime: boolean } | null {
 export function fmtDue(task: Task): string | null {
   const due = taskDue(task)
   if (!due) return null
-  const day = due.date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+  const day = formatDate(due.date, 'short')
   return due.hasTime ? `${day}, ${due.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : day
 }
 

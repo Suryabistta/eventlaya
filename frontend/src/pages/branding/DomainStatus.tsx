@@ -1,4 +1,5 @@
 import React from 'react'
+import { formatDate } from '@/lib/dates'
 import { AlertTriangle, CheckCircle2, Circle, Copy, ExternalLink, Globe, Loader2, Lock, RefreshCw } from 'lucide-react'
 import type { TenantDomainStatus } from '@/services/api'
 import { Badge, Button, IconButton, useToast } from '@/components/ui'
@@ -12,7 +13,7 @@ const ago = (iso: string | null) => {
   if (min < 1) return 'just now'
   if (min < 60) return `${min} min ago`
   const h = Math.round(min / 60)
-  return h < 24 ? `${h} h ago` : new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+  return h < 24 ? `${h} h ago` : formatDate(new Date(iso), 'short')
 }
 
 /** One-line badge for tables: Live / Waiting for DNS / SSL pending / No custom domain. */

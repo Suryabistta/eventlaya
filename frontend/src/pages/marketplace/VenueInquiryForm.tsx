@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { formatDate } from '@/lib/dates'
 import { track } from '@/lib/analytics'
 import { useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, Phone } from 'lucide-react'
@@ -187,7 +188,7 @@ export const VenueInquiryForm: React.FC<{
         <p className="mt-1 text-sm text-ink-600">
           {venue.name} has your request{space ? ` for ${space.name}` : ''} on{' '}
           <span className="font-medium text-ink-900">
-            {new Date(`${form.date}T00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}
+            {formatDate(new Date(`${form.date}T00:00`), 'long')}
           </span>{' '}
           for {form.guests.toLocaleString()} guests.
         </p>

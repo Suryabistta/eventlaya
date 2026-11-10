@@ -1,4 +1,5 @@
 import React from 'react'
+import { formatDate } from '@/lib/dates'
 import type { Event } from '@/services/api'
 import { Badge } from '@/components/ui'
 import { Ban, CalendarCheck2, CalendarClock } from 'lucide-react'
@@ -28,7 +29,7 @@ export const PhaseNotice: React.FC<{ event: Parameters<typeof eventPhase>[0] & P
   className,
 }) => {
   const phase = eventPhase(event)
-  const day = new Date(`${event.start_date}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+  const day = formatDate(new Date(`${event.start_date}T00:00:00`), 'full', false)
   let tone: 'danger' | 'neutral' | 'info' = 'neutral'
   let title = ''
   let body = ''

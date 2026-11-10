@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import { formatDate } from '@/lib/dates'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CalendarCheck, CalendarDays, CalendarX, Inbox, Mail, MessageSquareText, Phone, Users, Wallet, Package } from 'lucide-react'
@@ -16,12 +17,7 @@ type Filter = 'all' | InquiryStatus
 const FILTERS: Filter[] = ['all', 'pending', 'contacted', 'booked', 'rejected', 'cancelled']
 const filterLabel = (f: Filter) => (f === 'all' ? 'All' : INQUIRY_STATUS[f].label)
 
-export const fmtDate = (iso: string, withYear = true) =>
-  new Date(iso.length === 10 ? `${iso}T00:00` : iso).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    ...(withYear ? { year: 'numeric' } : {}),
-  })
+export const fmtDate = (iso: string, withYear = true) => formatDate(iso, 'medium', withYear)
 
 /** "2 hours ago", "3 days ago" */
 export const timeAgo = (iso: string) => {

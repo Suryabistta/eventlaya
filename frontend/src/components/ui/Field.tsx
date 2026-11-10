@@ -1,4 +1,6 @@
 import React, { useId } from 'react'
+import { calendarSystem } from '@/lib/calendar'
+import { formatDate } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 
 export const controlClass =
@@ -36,11 +38,16 @@ export const Field: React.FC<FieldProps> = ({ label, hint, error, required, clas
 type InputProps = React.InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: string; error?: string; containerClassName?: string }
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ label, hint, error, required, className, containerClassName, ...props }, ref) => (
-    <Field label={label} hint={hint} error={error} required={required} className={containerClassName}>
-      {(a11y) => <input ref={ref} required={required} className={cn(controlClass, className)} {...a11y} {...props} />}
-    </Field>
-  ),
+  ({ label, hint, error, required, className, containerClassName, ...props }, ref) => {
+    // Date pickers are AD (the browser's); show the picked day in BS too when the viewer reads BS
+    const bsHint = props.type === 'date' && typeof props.value === 'string' && props.value && calendarSystem() === 'bs' ? formatDate(props.value, 'full') : ''
+    const shownHint = bsHint ? (hint ? `${bsHint} · ${hint}` : bsHint) : hint
+    return (
+      <Field label={label} hint={shownHint} error={error} required={required} className={containerClassName}>
+        {(a11y) => <input ref={ref} required={required} className={cn(controlClass, className)} {...a11y} {...props} />}
+      </Field>
+    )
+  },
 )
 Input.displayName = 'Input'
 

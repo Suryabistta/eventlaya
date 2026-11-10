@@ -68,6 +68,9 @@ export interface MySentInquiry {
   slot: InquirySlot | null
   /** Note the owner added when confirming or declining. */
   owner_note: string
+  /** Confirmed bookings: agreed price and what the business recorded as paid */
+  agreed_amount?: string | null
+  paid?: string | null
   can_cancel: boolean
   created_at: string
   updated_at?: string

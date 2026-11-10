@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { formatDate } from '@/lib/dates'
 import { track } from '@/lib/analytics'
 import { useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, Phone } from 'lucide-react'
@@ -148,7 +149,7 @@ export const VendorQuoteForm: React.FC<{
             </>
           ) : (
             <>
-              {vendor.business_name} has your request{form.date ? ` for ${new Date(`${form.date}T00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}. They usually reply by phone or email with a price.
+              {vendor.business_name} has your request{form.date ? ` for ${formatDate(new Date(`${form.date}T00:00`), 'long')}` : ''}. They usually reply by phone or email with a price.
             </>
           )}
         </p>

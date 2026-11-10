@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import { formatDate } from '@/lib/dates'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, Download, FileText, Search, X } from 'lucide-react'
 import { request, tokenStore } from '@/services/api'
@@ -175,7 +176,7 @@ export const ApplicationsCard: React.FC<{ className?: string; eventId: string }>
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold text-ink-900">{a.submitter_name}</p>
                   <p className="truncate text-xs text-ink-500">
-                    {a.submitter_email} · {new Date(a.submitted_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                    {a.submitter_email} · {formatDate(new Date(a.submitted_at), 'short')}
                   </p>
                 </div>
                 <Badge tone={REVIEW[a.review_status].tone} dot>
