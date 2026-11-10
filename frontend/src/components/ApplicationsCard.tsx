@@ -1,14 +1,14 @@
 import React, { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, Download, FileText, Search, X } from 'lucide-react'
-import { request } from '@/services/api'
+import { request, tokenStore } from '@/services/api'
 import { Badge, Button, Card, CardHeader, EmptyState, ErrorState, Modal, Skeleton, Textarea, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
 
 /** Open calls (registration_mode apply): the organizer screens every application. Backend: apps.dynamic_forms. */
 type Review = 'pending' | 'accepted' | 'rejected'
 
-interface Answer {
+export interface Answer {
   id: string
   field_label: string
   field_type: string
@@ -17,6 +17,7 @@ interface Answer {
 
 interface Application {
   id: string
+  number: string
   ticket_number: string | null
   submitter_name: string
   submitter_email: string
@@ -41,7 +42,7 @@ const FILTERS: { key: 'all' | Review; label: string }[] = [
 ]
 
 /** Answer values: text, a list (checkboxes) or an uploaded file / link. */
-const AnswerValue: React.FC<{ value: unknown }> = ({ value }) => {
+export const AnswerValue: React.FC<{ value: unknown }> = ({ value }) => {
   const v = value && typeof value === 'object' && !Array.isArray(value) && 'value' in value ? (value as { value: unknown }).value : value
   if (Array.isArray(v)) return <>{v.join(', ') || '–'}</>
   const text = v == null ? '' : String(v)
@@ -56,22 +57,36 @@ const AnswerValue: React.FC<{ value: unknown }> = ({ value }) => {
   return <span className="whitespace-pre-line">{text || '–'}</span>
 }
 
-export const ApplicationsCard: React.FC<{ className?: string; eventId: string; onExport: () => void; exporting: boolean }> = ({
-  className,
-  eventId,
-  onExport,
-  exporting,
-}) => {
+export const ApplicationsCard: React.FC<{ className?: string; eventId: string }> = ({ className, eventId }) => {
   const toast = useToast()
   const qc = useQueryClient()
   const [filter, setFilter] = useState<'all' | Review>('all')
   const [search, setSearch] = useState('')
   const [open, setOpen] = useState<Application | null>(null)
   const [note, setNote] = useState('')
+  const [exporting, setExporting] = useState(false)
+  const onExport = async () => {
+    setExporting(true)
+    try {
+      const token = tokenStore.access
+      const res = await fetch(`/api/events/${eventId}/export-applications/`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      if (!res.ok) throw new Error(`Export failed (${res.status})`)
+      const href = URL.createObjectURL(await res.blob())
+      const a = document.createElement('a')
+      a.href = href
+      a.download = 'applications.csv'
+      a.click()
+      URL.revokeObjectURL(href)
+    } catch (e) {
+      toast.error('Couldn’t export applications', (e as Error).message)
+    } finally {
+      setExporting(false)
+    }
+  }
   const key = ['applications', eventId]
   const { data = [], isLoading, isError, refetch } = useQuery({
     queryKey: key,
-    queryFn: () => request<Application[]>(`/forms/events/${eventId}/submissions/`),
+    queryFn: () => request<Application[]>(`/forms/events/${eventId}/applications/`),
   })
 
   const review = useMutation({
@@ -178,7 +193,7 @@ export const ApplicationsCard: React.FC<{ className?: string; eventId: string; o
           onClose={() => setOpen(null)}
           size="lg"
           title={open.submitter_name}
-          description={`${open.submitter_email}${open.submitter_phone ? ` · ${open.submitter_phone}` : ''}${open.ticket_number ? ` · No. ${open.ticket_number}` : ''}`}
+          description={`${open.submitter_email}${open.submitter_phone ? ` · ${open.submitter_phone}` : ''}${open.number ? ` · ${open.number}` : ''}`}
           footer={
             <>
               {open.review_status !== 'pending' && (

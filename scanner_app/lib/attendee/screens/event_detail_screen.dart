@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/legal.dart';
 import '../../models/event_model.dart';
 import '../../providers/modules_provider.dart';
 import '../../reviews/review_models.dart';
@@ -633,6 +634,16 @@ class _RegisterBar extends StatelessWidget {
             )),
           ),
         ],
+      ]);
+    } else if (!event.registrationOpen && event.applicationsOpen) {
+      // Applications stage: the form (with photo and file uploads) is on the website for now
+      content = Row(children: [
+        Expanded(child: Text(event.isOpenCall ? 'Free to apply' : 'Applications are open', style: AppType.body(14, weight: FontWeight.w600))),
+        PrimaryButton(
+          label: event.applyLabel,
+          expand: false,
+          onPressed: () => openLegal(context, '/e/${event.slug}/apply'),
+        ),
       ]);
     } else if (!event.registrationOpen) {
       content = Row(children: [

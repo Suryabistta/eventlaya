@@ -10,7 +10,7 @@ import { api, type Event } from '@/services/api'
 import { buttonClass } from '@/components/ui/Button'
 import { Badge, EmptyState, ErrorState, Skeleton } from '@/components/ui'
 import { eventPhase } from '@/lib/phase'
-import { bookLabel, spotsInfo, useEventCategories } from '@/lib/event-page'
+import { applicationsOpen, bookLabel, callOnly, spotsInfo, useEventCategories } from '@/lib/event-page'
 import { cn } from '@/lib/utils'
 
 type PublicEvent = Event & { organizer_name?: string }
@@ -210,12 +210,12 @@ export const EventCard: React.FC<{ event: PublicEvent; past: boolean }> = ({ eve
               Featured
             </Badge>
           )}
-          {e.registration_mode === 'apply' && !over && (
+          {applicationsOpen(e) && !over && (
             <Badge tone="brand" className="shadow-2xs">
               Open call
             </Badge>
           )}
-          {phase === 'live' && e.registration_mode !== 'apply' && (
+          {phase === 'live' && !e.date_tba && (
             <Badge tone="success" dot>
               Happening now
             </Badge>
@@ -248,7 +248,7 @@ export const EventCard: React.FC<{ event: PublicEvent; past: boolean }> = ({ eve
         <div className="mt-3 space-y-1.5 text-sm text-ink-600">
           <p className="flex items-center gap-1.5">
             <Clock className="h-4 w-4 shrink-0 text-ink-400" aria-hidden />
-            {e.registration_mode === 'apply' && <span className="shrink-0 font-medium text-ink-800">Closes</span>}
+            {e.date_tba && <span className="shrink-0 font-medium text-ink-800">Applications close</span>}
             
             <time dateTime={e.start_date} className="truncate">
               {start.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
@@ -279,13 +279,18 @@ export const EventCard: React.FC<{ event: PublicEvent; past: boolean }> = ({ eve
         )}
 
         <div className="relative z-[1] mt-auto pt-5">
-          {open ? (
+          {/* Applications only (tickets later): the button goes straight to the application form */}
+          {callOnly(e) && applicationsOpen(e) ? (
+            <Link to={`/e/${e.slug}/apply`} className={buttonClass('primary', 'md', 'w-full')}>
+              {bookLabel(e)}
+            </Link>
+          ) : open ? (
             <Link to={`/e/${e.slug}`} className={buttonClass('primary', 'md', 'w-full')}>
               {bookLabel(e)}
             </Link>
           ) : (
             <span className="inline-flex h-10 w-full items-center justify-center rounded-[10px] bg-ink-100 px-4 text-sm font-semibold text-ink-600">
-              {phase === 'cancelled' ? 'Cancelled' : over ? 'Ended' : full ? 'Fully booked' : 'Bookings closed'}
+              {phase === 'cancelled' ? 'Cancelled' : over ? 'Ended' : full ? 'Fully booked' : e.tickets_enabled === false ? 'Tickets later' : 'Bookings closed'}
             </span>
           )}
         </div>

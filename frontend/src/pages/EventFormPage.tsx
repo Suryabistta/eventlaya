@@ -50,8 +50,14 @@ interface EventDraft {
   show_managed_by: boolean
   ticket_layout: 'vertical' | 'landscape'
   show_seat_number: boolean
-  registration_mode: 'pass' | 'form' | 'apply'
+  registration_mode: 'pass' | 'form'
   cta_label: string
+  // Stages (docs/plan-2026-11-event-journeys.md)
+  tickets_enabled: boolean
+  date_tba: boolean
+  applications_enabled: boolean
+  applications_close: string // datetime-local value
+  application_cta: string
   parent: string
   managed_by: string
   managed_by_label: string
@@ -124,6 +130,11 @@ const emptyDraft: EventDraft = {
   show_seat_number: false,
   registration_mode: 'pass',
   cta_label: '',
+  tickets_enabled: true,
+  date_tba: false,
+  applications_enabled: false,
+  applications_close: '',
+  application_cta: '',
   parent: '',
   managed_by: '',
   managed_by_label: '',
@@ -143,6 +154,7 @@ const fieldNames: Record<string, string> = {
   location: 'Venue',
   capacity: 'Capacity',
   registration_deadline: 'Registration deadline',
+  applications_close: 'Applications close',
   ticket_price: 'Ticket price',
   contact_email: 'Contact email',
 }
@@ -188,6 +200,11 @@ function fromEvent(ev: Event, page?: EventPageContent): EventDraft {
     show_seat_number: ev.show_seat_number ?? false,
     registration_mode: ev.registration_mode ?? 'pass',
     cta_label: ev.cta_label ?? '',
+    tickets_enabled: ev.tickets_enabled ?? true,
+    date_tba: ev.date_tba ?? false,
+    applications_enabled: ev.applications_enabled ?? false,
+    applications_close: toLocalInput(ev.applications_close ?? undefined),
+    application_cta: ev.application_cta ?? '',
     parent: ev.parent ?? '',
     managed_by: ev.managed_by ?? '',
     managed_by_label: ev.managed_by_label ?? '',
@@ -232,9 +249,10 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 /* ---------- steps ---------- */
 
-type StepId = 'basics' | 'when' | 'registration' | 'page' | 'schedule' | 'speakers' | 'faqs' | 'review'
+type StepId = 'basics' | 'stages' | 'when' | 'registration' | 'page' | 'schedule' | 'speakers' | 'faqs' | 'review'
 const STEPS: { id: StepId; label: string; description: string; required?: boolean }[] = [
   { id: 'basics', label: 'Basics', description: 'What people see first on the event page.', required: true },
+  { id: 'stages', label: 'Stages', description: 'What this event opens for: tickets or registration for the audience, applications from participants, or both.' },
   { id: 'when', label: 'Date & venue', description: 'Leave the end date empty for a one-day event.', required: true },
   { id: 'registration', label: 'Registration', description: 'Who can sign up, how many, and until when.', required: true },
   { id: 'page', label: 'Event page', description: 'Highlights and contact details for attendees. Optional.' },
@@ -254,7 +272,7 @@ const localToday = () => {
 const FIELD_STEP: Record<string, StepId> = {
   title: 'basics', tagline: 'basics', parent: 'basics', category: 'basics', description: 'basics', banner: 'basics', banner_url: 'basics',
   start_date: 'when', start_time: 'when', end_date: 'when', end_time: 'when', location: 'when', map_query: 'when',
-  capacity: 'registration', limit_spots: 'registration', show_spots_left: 'registration', status: 'registration', registration_deadline: 'registration', ticket_price: 'registration', is_paid: 'registration', allow_registration: 'registration', ticket_layout: 'registration', show_seat_number: 'registration', registration_mode: 'registration', cta_label: 'registration',
+  capacity: 'registration', limit_spots: 'registration', show_spots_left: 'registration', status: 'registration', registration_deadline: 'registration', ticket_price: 'registration', is_paid: 'registration', allow_registration: 'registration', ticket_layout: 'registration', show_seat_number: 'registration', registration_mode: 'registration', cta_label: 'registration', tickets_enabled: 'stages', applications_enabled: 'stages', applications_close: 'stages', application_cta: 'stages', date_tba: 'when',
   managed_by: 'page', managed_by_label: 'page', managed_by_logo: 'page', show_managed_by: 'page',
 }
 
@@ -264,10 +282,13 @@ function validateStep(id: StepId, d: EventDraft, p: PageDraft, isNew = false): E
     if (!d.title.trim()) e.title = 'Give the event a name.'
     if (d.tagline.length > 160) e.tagline = 'Keep the tagline to 160 characters or fewer.'
   }
-  if (id === 'when' && d.registration_mode === 'apply') {
-    // Open call: no event date or venue, just when applications close
-    if (!d.registration_deadline) e.registration_deadline = 'Pick when applications close.'
-    else if (isNew && new Date(d.registration_deadline) < new Date()) e.registration_deadline = 'The closing time can’t be in the past.'
+  if (id === 'stages') {
+    if (!d.tickets_enabled && !d.applications_enabled) e.tickets_enabled = 'Turn on tickets / registration, applications, or both.'
+    if (d.applications_enabled && !d.applications_close) e.applications_close = 'Pick when applications close.'
+    else if (d.applications_enabled && isNew && new Date(d.applications_close) < new Date()) e.applications_close = 'The closing time can’t be in the past.'
+  }
+  if (id === 'when' && d.date_tba) {
+    // Date and venue to be announced: nothing to check until tickets go on sale
   } else if (id === 'when') {
     if (!d.start_date) e.start_date = 'Pick the day the event starts.'
     else if (isNew && d.start_date < localToday()) e.start_date = 'The start date can’t be in the past.'
@@ -279,7 +300,7 @@ function validateStep(id: StepId, d: EventDraft, p: PageDraft, isNew = false): E
   if (id === 'registration') {
     const cap = Number(d.capacity)
     if (d.limit_spots && (!d.capacity || !Number.isInteger(cap) || cap <= 0)) e.capacity = 'Enter a whole number greater than 0.'
-    if (d.registration_deadline && d.registration_mode !== 'apply') {
+    if (d.registration_deadline) {
       const last = d.end_date || d.start_date
       if (last && d.registration_deadline.slice(0, 10) > last) e.registration_deadline = 'The deadline must be on or before the last day of the event.'
     }
@@ -387,6 +408,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
   const eventCategories = useEventCategories()
   const seatsOn = useModuleEnabled('seat_numbers')
   const subEventsOn = useModuleEnabled('sub_events')
+  const applicationsOn = useModuleEnabled('applications')
   const { events: myEvents } = useCurrentEvent()
   // Main events this one can sit under: the organizer's own top-level events, not itself
   const parentChoices = myEvents.filter((e) => !e.parent && e.id !== event?.id)
@@ -492,7 +514,8 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
         description: draft.description.trim(),
         location: draft.location.trim(),
         // Open calls: the server sets the date from the closing time
-        ...(draft.registration_mode === 'apply' ? {} : { start_date: draft.start_date }),
+        // Date to be announced: the server uses the applications deadline meanwhile
+        ...(draft.date_tba ? {} : { start_date: draft.start_date }),
         start_time: optional(draft.start_time),
         end_date: optional(draft.end_date),
         end_time: optional(draft.end_time),
@@ -505,6 +528,11 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
         show_seat_number: draft.show_seat_number,
         registration_mode: draft.registration_mode,
         cta_label: draft.cta_label.trim(),
+        tickets_enabled: draft.tickets_enabled,
+        date_tba: draft.date_tba && !draft.tickets_enabled,
+        applications_enabled: draft.applications_enabled,
+        applications_close: draft.applications_close ? new Date(draft.applications_close).toISOString() : null,
+        application_cta: draft.application_cta.trim(),
         ...(subEventsOn ? { parent: draft.parent || null } : {}),
         managed_by: draft.managed_by.trim(),
         managed_by_label: draft.managed_by_label.trim(),
@@ -811,21 +839,51 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                   </>
                 )}
 
-                {step.id === 'when' && (
+                {step.id === 'stages' && (
+                  <div className="space-y-5">
+                    <Checkbox
+                      label="Tickets or registration for the audience"
+                      hint="People get tickets (paid or free) or register. Turn it off while you only take applications, and turn it on when tickets go on sale."
+                      checked={draft.tickets_enabled}
+                      onChange={(v) => setDraft((d) => ({ ...d, tickets_enabled: v, date_tba: v ? false : d.date_tba }))}
+                    />
+                    {errors.tickets_enabled && <p className="text-sm font-medium text-red-600">{errors.tickets_enabled}</p>}
+                    {applicationsOn ? (
+                      <Checkbox
+                        label="Applications from participants"
+                        hint="Filmmakers submit films, contestants apply, performers audition. They fill in your application form and you accept or decline each one. Applying is free and never uses a ticket."
+                        checked={draft.applications_enabled}
+                        onChange={(v) => set('applications_enabled', v)}
+                      />
+                    ) : (
+                      <p className="text-sm text-ink-500">Applications aren’t available on your plan.</p>
+                    )}
+                    {draft.applications_enabled && (
+                      <div className="space-y-4 rounded-xl border border-ink-200 p-4">
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <Input label="Applications close" type="datetime-local" required hint="Applications are accepted until this time." {...bind('applications_close')} />
+                          <ApplyButtonText value={draft.application_cta} onChange={(v) => set('application_cta', v)} />
+                        </div>
+                        <p className="text-sm text-ink-600">
+                          After saving, build the application form in <span className="font-semibold">Forms → Applications</span> (templates for film
+                          submissions and pageants are ready).
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {step.id === 'when' && !draft.tickets_enabled && (
                   <Checkbox
-                    label="This is an open call (applications or submissions)"
-                    hint="For pageant applications, film submissions, auditions and the like: no event date or venue, just a closing date. You accept or reject each entry."
-                    checked={draft.registration_mode === 'apply'}
-                    onChange={(v) => set('registration_mode', v ? 'apply' : 'pass')}
+                    label="Date and venue to be announced"
+                    hint="While only applications are open. Set them before you turn on tickets."
+                    checked={draft.date_tba}
+                    onChange={(v) => set('date_tba', v)}
                   />
                 )}
-                {step.id === 'when' && draft.registration_mode === 'apply' && (
-                  <>
-                    <Input label="Applications close" type="datetime-local" required hint="Entries are accepted until this time." {...bind('registration_deadline')} />
-                    <Input label="Where" placeholder="Online" hint="Optional. Leave empty for Online, or name the city or venue of the final event." {...bind('location')} />
-                  </>
+                {step.id === 'when' && draft.date_tba && !draft.tickets_enabled && (
+                  <p className="rounded-xl bg-ink-50 px-4 py-3 text-sm text-ink-600">The event page shows when applications close instead of a date and venue.</p>
                 )}
-                {step.id === 'when' && draft.registration_mode !== 'apply' && (
+                {step.id === 'when' && !(draft.date_tba && !draft.tickets_enabled) && (
                   <>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <Input label="Start date" type="date" required min={isEdit ? undefined : localToday()} {...bind('start_date')} />
@@ -866,9 +924,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                     <Select
                       label="Registration type"
                       hint={
-                        draft.registration_mode === 'apply'
-                          ? 'Applicants fill in your form (link a film, upload photos...). Free, one per person, no pass. Accept or reject each entry from the dashboard.'
-                          : draft.registration_mode === 'form'
+                        draft.registration_mode === 'form'
                           ? 'People fill in your registration form and get a confirmation email. Free, one per person, no pass or gate check-in.'
                           : 'Each registration gets a QR pass for check-in at the gate.'
                       }
@@ -877,11 +933,10 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                     >
                       <option value="pass">With pass (QR ticket)</option>
                       <option value="form">Registration only (no pass)</option>
-                      <option value="apply">Applications / submissions (open call)</option>
                     </Select>
                     <ButtonText
                       value={draft.cta_label}
-                      auto={bookLabel({ ...(event ?? {}), registration_mode: draft.registration_mode, is_paid: draft.is_paid, ticket_price: draft.ticket_price, ticket_types: event?.ticket_types, cta_label: '' } as Event)}
+                      auto={bookLabel({ ...(event ?? {}), registration_mode: draft.registration_mode, is_paid: draft.is_paid, ticket_price: draft.ticket_price, ticket_types: event?.ticket_types, cta_label: '', tickets_enabled: true } as Event)}
                       onChange={(v) => set('cta_label', v)}
                     />
                     {draft.registration_mode === 'pass' && (
@@ -917,7 +972,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                       checked={draft.allow_registration}
                       onChange={(v) => set('allow_registration', v)}
                     />
-                    {draft.allow_registration && draft.registration_mode !== 'apply' && (
+                    {draft.allow_registration && (
                       <Input label="Registration deadline" type="datetime-local" hint="Optional. Sign-ups close at this time." {...bind('registration_deadline')} />
                     )}
                     {isEdit ? (
@@ -1608,6 +1663,28 @@ const ButtonText: React.FC<{ value: string; auto: string; onChange: (v: string) 
       </Select>
       {preset === 'custom' && (
         <Input label="Custom button text" required maxLength={30} placeholder="Send your film" value={value.trimStart()} onChange={(e) => onChange(e.target.value || ' ')} />
+      )}
+    </div>
+  )
+}
+
+const APPLY_TEXTS = ['Apply', 'Apply now', 'Submit', 'Submit entry', 'Submit your film', 'Nominate', 'Audition', 'Enroll']
+
+/** Text of the Apply button (applications stage). */
+const ApplyButtonText: React.FC<{ value: string; onChange: (v: string) => void }> = ({ value, onChange }) => {
+  const preset = value === '' ? 'Apply' : APPLY_TEXTS.includes(value) ? value : 'custom'
+  return (
+    <div className="space-y-4">
+      <Select label="Apply button text" value={preset} onChange={(e) => onChange(e.target.value === 'custom' ? ' ' : e.target.value === 'Apply' ? '' : e.target.value)}>
+        {APPLY_TEXTS.map((t) => (
+          <option key={t} value={t}>
+            {t}
+          </option>
+        ))}
+        <option value="custom">Custom…</option>
+      </Select>
+      {preset === 'custom' && (
+        <Input label="Custom button text" required maxLength={30} placeholder="Send your entry" value={value.trimStart()} onChange={(e) => onChange(e.target.value || ' ')} />
       )}
     </div>
   )

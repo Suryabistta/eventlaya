@@ -28,7 +28,7 @@ class FormResponseSerializer(serializers.ModelSerializer):
     class Meta:
         model = FormResponse
         fields = [
-            'id', 'form', 'event', 'ticket', 'ticket_number', 'qr_token',
+            'id', 'form', 'event', 'ticket', 'number', 'ticket_number', 'qr_token',
             'submitter_name', 'submitter_email', 'submitter_phone',
             'review_status', 'rejection_note', 'submitted_at', 'answers'
         ]

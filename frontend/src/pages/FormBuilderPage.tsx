@@ -22,6 +22,7 @@ import {
   useToast,
 } from '@/components/ui'
 import { cn } from '@/lib/utils'
+import { Segmented } from './admin/shared'
 
 // The shared API client only exposes create calls for forms; the backend viewsets also accept PATCH/DELETE.
 const formsApi = {
@@ -63,11 +64,18 @@ export const FormBuilderPage: React.FC = () => {
   const { currentEvent, isLoading: eventsLoading, isError: eventsError, error: eventsErr, refetch: refetchEvents } = useCurrentEvent()
   const { data: forms = [], isLoading, isError, error, refetch } = useQuery({ queryKey: ['forms'], queryFn: api.getForms })
 
-  // The event's registration form is the one linked on the event; fall back to a form created for this event.
+  // Two forms per event: the audience registration form and, with the applications stage on, the application form
+  const [which, setWhich] = useState<FormKind>('registration')
+  const kind: FormKind = which === 'application' && currentEvent?.applications_enabled ? 'application' : 'registration'
   const form = useMemo(() => {
     if (!currentEvent) return undefined
-    return forms.find((f) => f.id === currentEvent.registration_form) ?? forms.find((f) => f.event === currentEvent.id)
-  }, [forms, currentEvent])
+    if (kind === 'application') return forms.find((f) => f.id === currentEvent.application_form)
+    // The registration form is the one linked on the event; fall back to a form created for this event
+    return (
+      forms.find((f) => f.id === currentEvent.registration_form) ??
+      forms.find((f) => f.event === currentEvent.id && f.id !== currentEvent.application_form)
+    )
+  }, [forms, currentEvent, kind])
 
   const wrap = (children: React.ReactNode) => <div className="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 2xl:px-10">{children}</div>
 
@@ -87,11 +95,24 @@ export const FormBuilderPage: React.FC = () => {
 
   return wrap(
     <>
+      {currentEvent?.applications_enabled && (
+        <Segmented
+          label="Form"
+          value={kind}
+          onChange={(v) => setWhich(v as FormKind)}
+          options={[
+            { value: 'registration', label: 'Audience registration' },
+            { value: 'application', label: 'Applications' },
+          ]}
+        />
+      )}
       <PageHeader
-        title="Registration form"
+        title={kind === 'application' ? 'Application form' : 'Registration form'}
         description={
           currentEvent
-            ? `Questions attendees answer when they register for ${currentEvent.title}. Name, email and phone are always asked.`
+            ? kind === 'application'
+              ? `Questions participants answer when they apply to ${currentEvent.title} (film details, photos, bio…). Name, email and phone are always asked.`
+              : `Questions attendees answer when they register for ${currentEvent.title}. Name, email and phone are always asked.`
             : 'Questions attendees answer when they register.'
         }
       />
@@ -103,28 +124,32 @@ export const FormBuilderPage: React.FC = () => {
           <Skeleton className="h-96 rounded-2xl" />
         </div>
       ) : !form ? (
-        <NoForm event={currentEvent!} />
+        <NoForm key={kind} event={currentEvent!} kind={kind} />
       ) : (
-        <Builder key={form.id} form={form} event={currentEvent!} />
+        <Builder key={form.id} form={form} event={currentEvent!} kind={kind} />
       )}
     </>,
   )
 }
 
-const NoForm: React.FC<{ event: Event }> = ({ event }) => {
+type FormKind = 'registration' | 'application'
+/** The event field that links each kind of form */
+const LINK: Record<FormKind, 'registration_form' | 'application_form'> = { registration: 'registration_form', application: 'application_form' }
+
+const NoForm: React.FC<{ event: Event; kind: FormKind }> = ({ event, kind }) => {
   const toast = useToast()
   const queryClient = useQueryClient()
   const [picking, setPicking] = useState(false)
   const create = useMutation({
     mutationFn: async (template?: FormTemplate) => {
       const form = await api.createForm({
-        title: `${event.title} registration`,
-        slug: slugify(`${event.title}-registration`),
+        title: kind === 'application' ? `Apply to ${event.title}` : `${event.title} registration`,
+        slug: slugify(`${event.title}-${kind}`),
         event: event.id,
         status: 'published',
       })
       // Link it so the public registration page shows these questions
-      await api.updateEvent(event.id, { registration_form: form.id })
+      await api.updateEvent(event.id, { [LINK[kind]]: form.id })
       if (template) await addTemplateFields(form.id, 0, template)
       return form
     },
@@ -140,8 +165,12 @@ const NoForm: React.FC<{ event: Event }> = ({ event }) => {
     <Card>
       <EmptyState
         icon={<FileText className="h-6 w-6" />}
-        title="No registration form yet"
-        description="Right now attendees only give their name, email and phone. Add a form to ask for things like college, T-shirt size or meal choice."
+        title={kind === 'application' ? 'No application form yet' : 'No registration form yet'}
+        description={
+          kind === 'application'
+            ? 'Applications need a form: film details and a screener link, or age, photos and a bio. Start from a template.'
+            : 'Right now attendees only give their name, email and phone. Add a form to ask for things like college, T-shirt size or meal choice.'
+        }
         action={
           <div className="flex flex-wrap justify-center gap-2">
             <Button icon={<LayoutTemplate className="h-4 w-4" />} loading={create.isPending} onClick={() => setPicking(true)}>
@@ -214,7 +243,7 @@ const parseOptions = (s: string) =>
     .map((o) => o.trim())
     .filter(Boolean)
 
-const Builder: React.FC<{ form: DynamicForm; event: Event }> = ({ form, event }) => {
+const Builder: React.FC<{ form: DynamicForm; event: Event; kind: FormKind }> = ({ form, event, kind }) => {
   const toast = useToast()
   const queryClient = useQueryClient()
   const fields = useMemo(() => [...(form.fields ?? [])].sort((a, b) => a.order - b.order), [form.fields])
@@ -239,7 +268,7 @@ const Builder: React.FC<{ form: DynamicForm; event: Event }> = ({ form, event })
   }
 
   const editingField = fields.find((f) => f.id === editing)
-  const isLinked = event.registration_form === form.id
+  const isLinked = event[LINK[kind]] === form.id
 
   useEffect(() => {
     if (editing === 'new') setDraft(blankDraft)
@@ -277,7 +306,7 @@ const Builder: React.FC<{ form: DynamicForm; event: Event }> = ({ form, event })
   const updateFormStatus = useMutation({
     mutationFn: async (status: DynamicForm['status']) => {
       await formsApi.updateForm(form.id, { status })
-      if (status === 'published' && !isLinked) await api.updateEvent(event.id, { registration_form: form.id })
+      if (status === 'published' && !isLinked) await api.updateEvent(event.id, { [LINK[kind]]: form.id })
     },
     onSuccess: (_, status) => {
       refresh()
@@ -455,7 +484,7 @@ const Builder: React.FC<{ form: DynamicForm; event: Event }> = ({ form, event })
       </div>
 
       {picking && <TemplatePicker event={event} onClose={() => setPicking(false)} onPick={addTemplate} adding />}
-      <Preview event={event} fields={previewFields} highlightId={editing === 'new' ? '__new' : editing} />
+      <Preview event={event} kind={kind} fields={previewFields} highlightId={editing === 'new' ? '__new' : editing} />
     </div>
   )
 }
@@ -593,7 +622,7 @@ const FieldEditor: React.FC<{
 
 const choiceClass = 'h-4 w-4 border-ink-300 text-brand-600 focus:ring-brand-500/30'
 
-const Preview: React.FC<{ event: Event; fields: FormField[]; highlightId: string | null }> = ({ event, fields, highlightId }) => (
+const Preview: React.FC<{ event: Event; kind: FormKind; fields: FormField[]; highlightId: string | null }> = ({ event, kind, fields, highlightId }) => (
   <Card className="min-w-0 xl:sticky xl:top-20">
     <div className="flex items-center gap-2 border-b border-ink-100 px-5 py-3 text-sm font-medium text-ink-500">
       <Eye className="h-4 w-4" aria-hidden />
@@ -603,10 +632,10 @@ const Preview: React.FC<{ event: Event; fields: FormField[]; highlightId: string
       <div className="space-y-5 rounded-2xl border border-ink-200 bg-white p-5 sm:p-6">
         <div className="border-b border-ink-100 pb-4">
           <h3 className="text-lg font-bold text-ink-900">
-            {event.registration_mode === 'apply' ? 'Apply' : 'Register'} for {event.title}
+            {kind === 'application' ? 'Apply to' : 'Register for'} {event.title}
           </h3>
           <p className="mt-1 text-sm text-ink-500">
-            {event.registration_mode === 'apply'
+            {kind === 'application'
               ? 'You’ll get an email when your application is received, and again when it’s reviewed.'
               : event.registration_mode === 'form'
                 ? 'You’ll get a confirmation by email.'
@@ -629,7 +658,7 @@ const Preview: React.FC<{ event: Event; fields: FormField[]; highlightId: string
           ))}
         </fieldset>
         <Button className="w-full" size="lg" icon={<TicketIcon className="h-4 w-4" />} disabled>
-          Register
+          {kind === 'application' ? event.application_cta || 'Apply' : 'Register'}
         </Button>
         <p className="text-center text-xs text-ink-500">Preview only. Submitting is turned off here.</p>
       </div>

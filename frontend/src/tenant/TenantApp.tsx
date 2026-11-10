@@ -26,6 +26,7 @@ function lazyPage<M extends Record<string, unknown>>(load: () => Promise<M>, nam
 
 const PublicEventPage = lazyPage(() => import('@/pages/PublicEventPage'), 'PublicEventPage')
 const EventRegisterPage = lazyPage(() => import('@/pages/EventRegisterPage'), 'EventRegisterPage')
+const ApplyPage = lazyPage(() => import('@/pages/ApplyPage'), 'ApplyPage')
 const PublicPassPage = lazyPage(() => import('@/pages/PublicPassPage'), 'PublicPassPage')
 const PublicVotePage = lazyPage(() => import('@/pages/voting/PublicVotePage'), 'PublicVotePage')
 const MyTicketsPage = lazyPage(() => import('@/pages/account/MyTicketsPage'), 'MyTicketsPage')
@@ -65,6 +66,7 @@ export const TenantApp: React.FC = () => {
           <Route path="/events" element={<Navigate to="/" replace />} />
           <Route path="/e/:slug" element={<PublicEventPage />} />
           <Route path="/e/:slug/register" element={<EventRegisterPage />} />
+          <Route path="/e/:slug/apply" element={<ApplyPage />} />
           <Route path="/e/:slug/vote" element={<PublicVotePage />} />
           <Route path="/e/:slug/vote/:pollId" element={<PublicVotePage />} />
           <Route path="/e/:slug/vote/:pollId/c/:cref" element={<PublicVotePage />} />

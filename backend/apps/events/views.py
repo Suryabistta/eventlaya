@@ -141,7 +141,7 @@ class PublicEventListView(APIView):
 
         # ?kind=open_calls: applications / submissions (pageants, film festivals...)
         if request.query_params.get('kind') == 'open_calls':
-            events = events.filter(registration_mode=Event.RegistrationMode.APPLY)
+            events = events.filter(applications_enabled=True, applications_close__gt=timezone.now())
 
         # Sub-events are listed on their main event's page, not on their own here
         from apps.accounts.modules import module_enabled
@@ -198,6 +198,17 @@ class PublicEventDetailView(APIView):
         if event.registration_form and event.registration_form.status == 'published':
             from apps.dynamic_forms.serializers import FormDetailSerializer
             form_schema = FormDetailSerializer(event.registration_form).data
+
+        # Applications stage: whether it's open, and the application form for the Apply page
+        data['applications'] = None
+        if event.applications_enabled:
+            from apps.dynamic_forms.serializers import FormDetailSerializer
+            reason = event.applications_closed_reason()
+            data['applications'] = {
+                'open': reason is None, 'closed_reason': reason, 'closes_at': event.applications_close,
+                'cta': event.application_cta or 'Apply',
+                'form': FormDetailSerializer(event.application_form).data if reason is None else None,
+            }
 
         return Response({
             'event': data,
@@ -909,9 +920,7 @@ class ExportAttendeesCSVView(APIView):
         response['Content-Disposition'] = f'attachment; filename="eventlaya_registrations_{event.slug}.csv"'
         form = event.registration_form
         fields = list(form.fields.order_by('order')) if form else []
-        review = event.is_application
-        writer.writerow(['Application No.' if review else 'Registration No.', 'Name', 'Email', 'Phone', 'Status', 'Registered At',
-                         *(['Review', 'Review note'] if review else []), *[f.label for f in fields]])
+        writer.writerow(['Registration No.', 'Name', 'Email', 'Phone', 'Status', 'Registered At', *[f.label for f in fields]])
         for t in tickets.prefetch_related('form_response__answers'):
             response_obj = getattr(t, 'form_response', None)
             answers = {a.field_id: a.value for a in response_obj.answers.all()} if response_obj else {}
@@ -923,11 +932,39 @@ class ExportAttendeesCSVView(APIView):
                 t.ticket_number, t.attendee_name, t.attendee_email, t.attendee_phone,
                 'cancelled' if t.status == 'cancelled' else 'registered',
                 t.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-                *([response_obj.review_status if response_obj else '', response_obj.rejection_note if response_obj else ''] if review else []),
                 *[text(answers.get(f.id)) for f in fields],
             ])
         return response
 
+
+class ExportApplicationsCSVView(APIView):
+    """GET /api/events/<id>/export-applications/: every application with its review and answers (module `applications`)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, event_id):
+        import csv
+        from django.http import HttpResponse
+        from apps.dynamic_forms.models import FormResponse
+        event = get_object_or_404(Event, id=event_id)
+        if not can_manage_event(request.user, event):
+            return Response({'error': 'Only the event organizer can see this.'}, status=status.HTTP_403_FORBIDDEN)
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="eventlaya_applications_{event.slug}.csv"'
+        form = event.application_form
+        fields = list(form.fields.exclude(field_type='heading').order_by('order')) if form else []
+        writer = csv.writer(response)
+        writer.writerow(['Application No.', 'Name', 'Email', 'Phone', 'Review', 'Review note', 'Submitted At', *[f.label for f in fields]])
+
+        def text(v):
+            if isinstance(v, dict):
+                v = v.get('value', '')
+            return ', '.join(map(str, v)) if isinstance(v, list) else ('' if v is None else str(v))
+
+        for r in FormResponse.objects.filter(event=event, ticket__isnull=True).prefetch_related('answers').order_by('submitted_at'):
+            answers = {a.field_id: a.value for a in r.answers.all()}
+            writer.writerow([r.number, r.submitter_name, r.submitter_email, r.submitter_phone, r.review_status, r.rejection_note,
+                             r.submitted_at.strftime('%Y-%m-%d %H:%M:%S'), *[text(answers.get(f.id)) for f in fields]])
+        return response
 
 
 from django.db.models import Count

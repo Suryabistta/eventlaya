@@ -103,6 +103,8 @@ export type PublicEvent = Event &
     organizer_info: { name: string; logo: string | null; verified?: boolean }
     /** Only present when the organizer switched "Managed by" on */
     managed_by_info?: { name: string; logo: string | null; label?: string } | null
+    /** Applications stage (null when off) */
+    applications?: PublicApplications | null
     /** Published sub-events of a main event (module sub_events), soonest first */
     sub_events?: SubEventCard[]
     /** The main event, when this is a sub-event */
@@ -187,8 +189,8 @@ export function registrationState(e: PublicEvent): { open: boolean; reason?: str
 }
 
 /** "Free", "Rs 500", or "From Rs 250" when the event has several ticket prices. */
-export const priceLabel = (e: Pick<Event, 'is_paid' | 'ticket_price' | 'ticket_types' | 'registration_mode'>) =>
-  e.registration_mode === 'apply' ? 'Free · Open call' : e.registration_mode === 'form' ? 'Free · Registration' : eventPriceLabel(e.ticket_types, e)
+export const priceLabel = (e: Pick<Event, 'is_paid' | 'ticket_price' | 'ticket_types' | 'registration_mode' | 'tickets_enabled' | 'applications_enabled'>) =>
+  callOnly(e) ? 'Free · Open call' : e.registration_mode === 'form' ? 'Free · Registration' : eventPriceLabel(e.ticket_types, e)
 
 /** True when anyone has to pay at the venue for some ticket. */
 export const hasPaidTickets = (e: Pick<Event, 'is_paid' | 'ticket_price' | 'ticket_types'>) =>
@@ -322,5 +324,23 @@ export interface PublicPass {
 export const getPublicPass = (token: string) => request<PublicPass>(`/events/passes/${encodeURIComponent(token)}/`)
 
 /** Call to action on an event: "Register" for registration-only events, "Get tickets" when any ticket costs money, otherwise "Book a spot". */
-export const bookLabel = (e: Pick<Event, 'is_paid' | 'ticket_price' | 'ticket_types' | 'registration_mode' | 'cta_label'>) =>
-  e.cta_label?.trim() ? e.cta_label.trim() : e.registration_mode === 'apply' ? 'Apply' : e.registration_mode === 'form' ? 'Register' : hasPaidTickets(e) ? 'Get tickets' : 'Book a spot'
+export const bookLabel = (
+  e: Pick<Event, 'is_paid' | 'ticket_price' | 'ticket_types' | 'registration_mode' | 'cta_label' | 'tickets_enabled' | 'applications_enabled' | 'application_cta'>,
+) =>
+  callOnly(e) ? e.application_cta?.trim() || 'Apply' : e.cta_label?.trim() ? e.cta_label.trim() : e.registration_mode === 'form' ? 'Register' : hasPaidTickets(e) ? 'Get tickets' : 'Book a spot'
+
+/** Applications stage on, tickets / registration off: the event is (for now) only an open call. */
+export const callOnly = (e: Pick<Event, 'tickets_enabled' | 'applications_enabled'>) => Boolean(e.applications_enabled) && e.tickets_enabled === false
+
+/** Applications still open, from the list data (the detail page gets `applications.open` from the server). */
+export const applicationsOpen = (e: Pick<Event, 'applications_enabled' | 'applications_close'>) =>
+  Boolean(e.applications_enabled && e.applications_close && new Date(e.applications_close).getTime() > Date.now())
+
+/** The applications stage as the public event page sees it (apps.events PublicEventDetailView). */
+export interface PublicApplications {
+  open: boolean
+  closed_reason: string | null
+  closes_at: string | null
+  cta: string
+  form: import('@/services/api').DynamicForm | null
+}

@@ -136,8 +136,12 @@ class PublicEvent {
   /// Registration only (`registration_mode: form`): free, one per person, no pass or check-in.
   final bool registrationOnly;
 
-  /// Open call (`registration_mode: apply`): applications the organizer reviews; the date is the closing date.
+  /// Applications stage on and tickets off (for now only an open call: film submissions, pageant applications).
   final bool isOpenCall;
+
+  /// Applications are open right now (the Apply page is on the website).
+  final bool applicationsOpen;
+  final String applyLabel;
 
   /// Main button text chosen by the organizer (Apply, Submit entry...); null = automatic.
   final String? ctaLabel;
@@ -203,6 +207,8 @@ class PublicEvent {
     this.categoryName,
     this.registrationOnly = false,
     this.isOpenCall = false,
+    this.applicationsOpen = false,
+    this.applyLabel = 'Apply',
     this.ctaLabel,
     this.isFeatured = false,
     this.bannerUrl,
@@ -238,8 +244,10 @@ class PublicEvent {
       tagline: _str(j['tagline']),
       category: _str(j['category']),
       categoryName: _str(j['category_name']),
-      registrationOnly: j['registration_mode'] == 'form' || j['registration_mode'] == 'apply',
-      isOpenCall: j['registration_mode'] == 'apply',
+      registrationOnly: j['registration_mode'] == 'form',
+      isOpenCall: j['applications_enabled'] == true && j['tickets_enabled'] == false,
+      applicationsOpen: j['applications'] is Map ? (j['applications'] as Map)['open'] == true : false,
+      applyLabel: j['applications'] is Map ? _str((j['applications'] as Map)['cta']) ?? 'Apply' : (_str(j['application_cta']) ?? 'Apply'),
       ctaLabel: _str(j['cta_label']),
       isFeatured: j['is_featured'] == true,
       bannerUrl: mediaUrl(_str(j['banner']) ?? j['banner_absolute']),

@@ -59,6 +59,7 @@ const EditVendorProfilePage = lazyPage(() => import('./pages/business/VendorProf
 const MarketplaceAccessPage = lazyPage(() => import('./pages/business/MarketplaceAccessPage'), 'MarketplaceAccessPage')
 const PublicEventPage = lazyPage(() => import('./pages/PublicEventPage'), 'PublicEventPage')
 const EventRegisterPage = lazyPage(() => import('./pages/EventRegisterPage'), 'EventRegisterPage')
+const ApplyPage = lazyPage(() => import('./pages/ApplyPage'), 'ApplyPage')
 const PublicPassPage = lazyPage(() => import('./pages/PublicPassPage'), 'PublicPassPage')
 const ExploreEventsPage = lazyPage(() => import('./pages/ExploreEventsPage'), 'ExploreEventsPage')
 const AdminOverviewPage = lazyPage(() => import('./pages/admin/OverviewPage'), 'OverviewPage')
@@ -181,6 +182,7 @@ export const App: React.FC = () => {
               <Route element={<PublicLayout />}>
                 <Route path="/e/:slug" element={<PublicEventPage />} />
                 <Route path="/e/:slug/register" element={<EventRegisterPage />} />
+                <Route path="/e/:slug/apply" element={<ApplyPage />} />
                 <Route path="/e/:slug/vote" element={<PublicVotePage />} />
                 <Route path="/e/:slug/vote/:pollId" element={<PublicVotePage />} />
                 <Route path="/e/:slug/vote/:pollId/c/:cref" element={<PublicVotePage />} />

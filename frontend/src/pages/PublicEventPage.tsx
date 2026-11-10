@@ -42,6 +42,7 @@ import {
   type PublicEvent,
   type Speaker,
   bookLabel,
+  callOnly,
 } from '@/lib/event-page'
 import { paymentNote, type PaymentOptions } from '@/lib/payments'
 import { availabilityText, fmtShortDate, money, priceText, type PublicTicketType } from '@/lib/tickets'
@@ -126,7 +127,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
     if (event.registration_mode !== 'form' && (tt.length > 1 || tt.some((t) => Number(t.price) > 0 || t.remaining !== null || t.description))) s.push('tickets')
     if (event.agenda?.length) s.push('schedule')
     if (event.speakers?.length) s.push('speakers')
-    if (event.registration_mode !== 'apply' || event.location !== 'Online') s.push('venue')
+    if (!event.date_tba) s.push('venue')
     if (event.faqs?.length) s.push('faqs')
     return s
   }, [event])
@@ -160,10 +161,12 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               {event.category_name && <Badge tone="brand">{event.category_name}</Badge>}
-              {state.phase === 'upcoming' && <Badge tone="info">{startsInText(event)}</Badge>}
+              {/* Date to be announced: the date is only the applications deadline, so no countdown */}
+              {state.phase === 'upcoming' && !event.date_tba && <Badge tone="info">{startsInText(event)}</Badge>}
+              {event.applications?.open && <Badge tone="success" dot>Applications open</Badge>}
               {state.phase === 'ended' && <Badge tone="neutral">Ended</Badge>}
               {state.phase === 'cancelled' && <Badge tone="danger">Cancelled</Badge>}
-              {!state.open && !over && <Badge tone="warning">{state.label}</Badge>}
+              {!state.open && !over && event.tickets_enabled !== false && <Badge tone="warning">{state.label}</Badge>}
             </div>
             {event.parent && (
               <p className="mt-3 text-sm font-medium text-ink-600">
@@ -189,7 +192,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
 
         {/* Key facts */}
         <dl className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Fact icon={<CalendarDays className="h-5 w-5" aria-hidden />} label={event.registration_mode === 'apply' ? 'Applications close' : 'Date'}>
+          <Fact icon={<CalendarDays className="h-5 w-5" aria-hidden />} label={event.date_tba ? 'Applications close' : 'Date'}>
             <span className="font-semibold text-ink-900">{when.range}</span>
             {event.start_time && (
               <span className="block text-ink-500">
@@ -200,19 +203,19 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
           </Fact>
           {/* Only the facts that fit the registration type: open calls skip venue (when online), spots and price;
               registration-only events skip price and show spots only when limited */}
-          {(event.registration_mode !== 'apply' || event.location !== 'Online') && (
+          {!event.date_tba && (
             <Fact icon={<MapPin className="h-5 w-5" aria-hidden />} label="Venue">
               <a href="#venue" className="font-semibold text-ink-900 hover:text-brand-700 hover:underline">
                 {event.location}
               </a>
             </Fact>
           )}
-          {event.registration_mode !== 'apply' && (event.registration_mode !== 'form' || event.capacity > 0) && (
+          {event.tickets_enabled !== false && (event.registration_mode !== 'form' || event.capacity > 0) && (
             <Fact icon={<Users className="h-5 w-5" aria-hidden />} label="Spots">
               <SpotsMeter event={event} />
             </Fact>
           )}
-          {(event.registration_mode ?? 'pass') === 'pass' && (
+          {event.tickets_enabled !== false && (event.registration_mode ?? 'pass') === 'pass' && (
             <Fact icon={<TicketIcon className="h-5 w-5" aria-hidden />} label="Price">
               <span className="font-semibold text-ink-900">{price}</span>
               {hasPaidTickets(event) && <span className="block text-ink-500">{event.payment_options?.online ? paymentNote(event.payment_options).replace(/\.$/, '') : 'Pay at the venue'}</span>}
@@ -322,9 +325,11 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
             </Section>
           )}
 
-          <Section id="venue" title="Venue">
-            <Venue event={event} />
-          </Section>
+          {!event.date_tba && (
+            <Section id="venue" title="Venue">
+              <Venue event={event} />
+            </Section>
+          )}
 
           {sections.includes('faqs') && (
             <Section id="faqs" title="Frequently asked questions">
@@ -376,7 +381,13 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
             <p className="font-display text-lg font-bold leading-tight text-ink-900">{price}</p>
             <p className="truncate text-xs text-ink-500">{state.open ? spotsText(event) : state.reason}</p>
           </div>
-          <CtaButtons label={bookLabel(event)} state={state} hasPass={Boolean(storedPass)} registerHref={registerHref} slug={event.slug} compact />
+          {callOnly(event) && event.applications?.open ? (
+            <ButtonLink to={`/e/${event.slug}/apply`} className="px-6">
+              {event.applications.cta}
+            </ButtonLink>
+          ) : (
+            <CtaButtons label={bookLabel(event)} state={state} hasPass={Boolean(storedPass)} registerHref={registerHref} slug={event.slug} compact />
+          )}
         </div>
       </div>
       )}
@@ -520,7 +531,7 @@ const PhaseBanner: React.FC<{ event: PublicEvent; state: ReturnType<typeof regis
         <Radio className="mt-0.5 h-6 w-6 shrink-0 text-emerald-600" aria-hidden />
         <div>
           <p className="text-lg font-bold">Happening now</p>
-          <p className="mt-0.5 text-sm">{state.open ? (event.registration_mode === 'apply' ? 'Applications are open.' : event.registration_mode === 'form' ? 'You can still register.' : 'You can still register and get your pass, then head to the gate.') : state.reason}</p>
+          <p className="mt-0.5 text-sm">{state.open ? (event.registration_mode === 'form' ? 'You can still register.' : 'You can still register and get your pass, then head to the gate.') : state.reason}</p>
         </div>
       </div>
     )
@@ -903,7 +914,44 @@ const RegistrationCard: React.FC<{ event: PublicEvent; state: ReturnType<typeof 
       </Card>
     )
   }
+  const apps = event.applications
+  // Applications stage (participants): its own card, next to tickets or on its own while tickets are off
+  const appsCard = apps && (
+    <Card className="p-5">
+      <h2 className="text-base font-bold text-ink-900">Applications</h2>
+      {apps.open ? (
+        <>
+          {apps.closes_at && (
+            <p className="mt-2 text-sm text-ink-600">
+              Open until{' '}
+              <span className="font-semibold text-ink-900">
+                {new Date(apps.closes_at).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
+              </span>
+            </p>
+          )}
+          <ButtonLink to={`/e/${event.slug}/apply`} variant={event.tickets_enabled === false ? 'primary' : 'secondary'} size="lg" className="mt-4 w-full">
+            {apps.cta}
+          </ButtonLink>
+          <p className="mt-3 text-center text-xs text-ink-500">Free to apply. The organizer reviews every application and emails you.</p>
+        </>
+      ) : (
+        <p className="mt-2 text-sm text-ink-600">{apps.closed_reason}</p>
+      )}
+    </Card>
+  )
+  if (event.tickets_enabled === false) {
+    return (
+      <div className="space-y-4">
+        {appsCard}
+        <Card className="p-5">
+          <h2 className="text-base font-bold text-ink-900">{event.registration_mode === 'form' ? 'Registration' : 'Tickets'}</h2>
+          <p className="mt-2 text-sm text-ink-600">{event.registration_mode === 'form' ? 'Registration opens later.' : 'Tickets go on sale later.'}</p>
+        </Card>
+      </div>
+    )
+  }
   return (
+    <div className="space-y-4">
     <Card className="p-5">
       <h2 className="text-base font-bold text-ink-900">Registration</h2>
       <p className="mt-3 font-display text-3xl font-bold text-ink-900">{price}</p>
@@ -937,11 +985,13 @@ const RegistrationCard: React.FC<{ event: PublicEvent; state: ReturnType<typeof 
       ) : (
         state.open && (
           <p className="mt-3 text-center text-xs text-ink-500">
-            {event.registration_mode === 'apply' ? 'You get an email when your application is received, and again when it’s reviewed.' : event.registration_mode === 'form' ? 'Takes about a minute. You get a confirmation by email.' : 'Takes about a minute. Your QR pass appears right away.'}
+            {event.registration_mode === 'form' ? 'Takes about a minute. You get a confirmation by email.' : 'Takes about a minute. Your QR pass appears right away.'}
           </p>
         )
       )}
     </Card>
+    {appsCard}
+    </div>
   )
 }
 

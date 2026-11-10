@@ -13,7 +13,16 @@ export interface Event {
   /** Picked by the superadmin: listed first, with a badge */
   is_featured?: boolean
   /** 'form': registration only, no pass or check-in */
-  registration_mode?: 'pass' | 'form' | 'apply'
+  registration_mode?: 'pass' | 'form'
+  /** Stages (docs/plan-2026-11-event-journeys.md): tickets / registration on or off */
+  tickets_enabled?: boolean
+  /** Date and venue to be announced (only while tickets are off) */
+  date_tba?: boolean
+  /** Applications stage (module `applications`) */
+  applications_enabled?: boolean
+  application_form?: string | null
+  applications_close?: string | null
+  application_cta?: string
   /** Main button text set by the organizer ('' = from the registration type) */
   cta_label?: string
   title: string

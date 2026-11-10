@@ -96,6 +96,8 @@ class FormResponse(models.Model):
         on_delete=models.SET_NULL,
         related_name='form_response'
     )
+    # Applications: APP-<event>-0001, shown to the applicant and the organizer
+    number = models.CharField(max_length=30, blank=True)
     submitter_name = models.CharField(max_length=255)
     submitter_email = models.EmailField()
     submitter_phone = models.CharField(max_length=30, blank=True)

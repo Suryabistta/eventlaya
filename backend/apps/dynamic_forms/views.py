@@ -80,8 +80,6 @@ class EventRegisterView(APIView):
 
         if not name or not email:
             return Response({'error': 'Name and Email are required.'}, status=status.HTTP_400_BAD_REQUEST)
-        if event.is_application and not (event.registration_form and event.registration_form.status == Form.Status.PUBLISHED):
-            return Response({'error': 'Applications are not open yet.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             items = self._parse_items(request.data)
@@ -220,9 +218,9 @@ class EventRegisterView(APIView):
 
         if event.registration_only:
             from apps.core.email import send_registration_email
-            send_registration_email(tickets[0], event, application=event.is_application)
+            send_registration_email(tickets[0], event)
             return Response({
-                'message': f'Your application for {event.title} was received.' if event.is_application else f'You are registered for {event.title}.',
+                'message': f'You are registered for {event.title}.',
                 'registration_only': True,
                 'registration': self._registration_data(tickets[0]),
                 'form_response': FormResponseSerializer(form_response).data if form_response else None,
@@ -291,7 +289,7 @@ class EventRegisterView(APIView):
             submitter_email=email,
             submitter_phone=phone,
             # Open calls: the organizer screens every entry
-            review_status=FormResponse.ReviewStatus.PENDING if event.is_application else FormResponse.ReviewStatus.ACCEPTED,
+            review_status=FormResponse.ReviewStatus.ACCEPTED,
         )
         for field in form.fields.all():
             if str(field.id) in answers_map:
@@ -385,3 +383,79 @@ class FormUploadView(APIView):
                 return Response({'error': 'Use a JPG, PNG or WebP photo, or a PDF.'}, status=status.HTTP_400_BAD_REQUEST)
         path = default_storage.save(f'uploads/forms/{event.id}/{uuid.uuid4().hex}.{ext}', upload)
         return Response({'url': default_storage.url(path), 'name': upload.name[:120], 'size': upload.size}, status=status.HTTP_201_CREATED)
+
+
+def check_answers(form, answers_map, event):
+    """Error message for the first bad or missing answer, or None (shared by registration and applications)."""
+    from .validation import answer_error
+    if not isinstance(answers_map, dict):
+        return 'Invalid answers.'
+    for field in form.fields.all():
+        problem = answer_error(field, answers_map.get(str(field.id)), event.id)
+        if problem:
+            return problem
+    for field in form.fields.filter(required=True).exclude(field_type=FormField.FieldType.HEADING):
+        val = answers_map.get(str(field.id))
+        if val is None or val == '' or (isinstance(val, list) and len(val) == 0):
+            return f"'{field.label}' is required."
+    return None
+
+
+class ApplyView(APIView):
+    """POST /api/forms/events/<slug>/apply/ {name, email, phone, answers}: a participant applies (applications stage,
+    module `applications`). Creates a pending application (FormResponse without a ticket): no pass, no capacity used.
+    One per email; applying again returns the earlier application."""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = [OptionalJWTAuthentication]
+
+    def post(self, request, slug):
+        from apps.accounts.tenancy import scope_events
+        event = get_object_or_404(scope_events(Event.objects.select_related('application_form'), request), slug=slug)
+        closed = event.applications_closed_reason()
+        if closed:
+            return Response({'error': closed}, status=status.HTTP_400_BAD_REQUEST)
+        name = (request.data.get('name') or '').strip()[:255]
+        email = (request.data.get('email') or '').strip().lower()
+        phone = (request.data.get('phone') or '').strip()[:30]
+        if not name or not email:
+            return Response({'error': 'Name and email are required.'}, status=status.HTTP_400_BAD_REQUEST)
+        form = event.application_form
+        earlier = FormResponse.objects.filter(event=event, form=form, ticket__isnull=True, submitter_email__iexact=email).first()
+        if earlier:
+            return Response({'message': f'You already applied to {event.title}.', 'already_applied': True,
+                             'application': application_data(earlier)}, status=status.HTTP_200_OK)
+        answers = request.data.get('answers', {})
+        problem = check_answers(form, answers, event)
+        if problem:
+            return Response({'error': problem}, status=status.HTTP_400_BAD_REQUEST)
+        with transaction.atomic():
+            n = FormResponse.objects.select_for_update().filter(event=event, form=form, ticket__isnull=True).count() + 1
+            resp = FormResponse.objects.create(
+                form=form, event=event, submitter_name=name, submitter_email=email, submitter_phone=phone,
+                review_status=FormResponse.ReviewStatus.PENDING, number=f'APP-{str(event.id)[:4].upper()}-{n:04d}',
+            )
+            for field in form.fields.exclude(field_type=FormField.FieldType.HEADING):
+                if str(field.id) in answers:
+                    FormAnswer.objects.create(response=resp, field=field, value=answers[str(field.id)])
+        from apps.core.email import send_application_received
+        send_application_received(resp, event)
+        return Response({'message': f'Your application for {event.title} was received.', 'application': application_data(resp)},
+                        status=status.HTTP_201_CREATED)
+
+
+def application_data(resp):
+    return {'id': str(resp.id), 'number': resp.number, 'name': resp.submitter_name, 'email': resp.submitter_email,
+            'review_status': resp.review_status, 'submitted_at': resp.submitted_at}
+
+
+class EventApplicationsView(APIView):
+    """GET /api/forms/events/<event id>/applications/: the organizer's list of applications with answers."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, event_id):
+        from apps.events.views import can_manage_event
+        event = get_object_or_404(Event, id=event_id)
+        if not can_manage_event(request.user, event):
+            return Response({'error': 'Only the organizer can see applications.'}, status=status.HTTP_403_FORBIDDEN)
+        qs = FormResponse.objects.filter(event=event, ticket__isnull=True).prefetch_related('answers', 'answers__field')
+        return Response(FormResponseSerializer(qs, many=True).data)

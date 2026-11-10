@@ -6,7 +6,7 @@ from .views import (
     EventViewSet, PublicEventListView, PublicEventDetailView, GateScanView,
     GateStatsView, EventTicketListView, MyGateAssignmentView,
     StaffAssignmentManageView, EventBroadcastNotificationView,
-    ExportAttendeesCSVView, EventAnalyticsView, EventFundingView,
+    ExportAttendeesCSVView, ExportApplicationsCSVView, EventAnalyticsView, EventFundingView,
     EventTaskViewSet, EventGateListView, EventGateDetailView, EventPageView, PublicPassView
 )
 
@@ -50,5 +50,6 @@ urlpatterns = [
     path('<uuid:event_id>/tickets/', EventTicketListView.as_view(), name='event_tickets'),
     path('<uuid:event_id>/broadcast/', EventBroadcastNotificationView.as_view(), name='event_broadcast'),
     path('<uuid:event_id>/export-attendees/', ExportAttendeesCSVView.as_view(), name='export_attendees_csv'),
+    path('<uuid:event_id>/export-applications/', ExportApplicationsCSVView.as_view(), name='export_applications_csv'),
     path('', include(router.urls)),
 ]

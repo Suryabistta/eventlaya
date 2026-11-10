@@ -22,17 +22,18 @@ import {
   Copy,
   QrCode,
   Armchair,
+  FileText,
 } from 'lucide-react'
-import { api, tokenStore, type Event, type Ticket, type EventTask } from '@/services/api'
+import { api, request, tokenStore, type Event, type Ticket, type EventTask } from '@/services/api'
 import { eventPhase, startsInText } from '@/lib/phase'
 import { useAuth } from '@/lib/auth'
 import { useCurrentEvent } from '@/lib/event-context'
 import { TicketPassModal } from '@/components/TicketPassModal'
 import { RegistrationQrModal } from '@/components/RegistrationQrModal'
-import { ApplicationsCard } from '@/components/ApplicationsCard'
+import { AnswerValue, ApplicationsCard, type Answer } from '@/components/ApplicationsCard'
 import { SeatsModal } from '@/components/SeatsModal'
 import { useModuleEnabled } from '@/lib/modules'
-import { Badge, Button, ButtonLink, Card, CardHeader, EmptyState, ErrorState, Skeleton, useToast } from '@/components/ui'
+import { Badge, Button, ButtonLink, Card, CardHeader, EmptyState, ErrorState, Modal, Skeleton, useToast } from '@/components/ui'
 import { chartColors, fmtNpr, lineOptions } from '@/pages/analytics/charts'
 import { ChartCard, Legend } from '@/pages/analytics/shared'
 import { cn } from '@/lib/utils'
@@ -104,7 +105,7 @@ export const DashboardPage: React.FC = () => {
   const { currentEvent, isLoading: eventsLoading, isError: eventsError, error, refetch } = useCurrentEvent()
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const isOrganizer = user?.role === 'organizer' || user?.role === 'superadmin'
-  const formOnly = currentEvent?.registration_mode === 'form' || currentEvent?.registration_mode === 'apply'
+  const formOnly = currentEvent?.registration_mode === 'form'
 
   const eventId = currentEvent?.id
   const { data: gateStats } = useQuery({
@@ -461,6 +462,9 @@ export const DashboardPage: React.FC = () => {
         </div>
       )}
 
+      {/* Applications stage: participants to review (module `applications`) */}
+      {currentEvent.applications_enabled && <ApplicationsCard eventId={currentEvent.id} />}
+
       {/* Attendees + activity + tasks */}
       <div className="grid gap-6 xl:grid-cols-12">
         <AttendeesCard
@@ -469,7 +473,7 @@ export const DashboardPage: React.FC = () => {
           tickets={tickets}
           loading={ticketsLoading}
           formOnly={formOnly}
-          applications={currentEvent.registration_mode === 'apply'}
+          hasForm={Boolean(currentEvent.registration_form)}
           onOpen={setSelectedTicket}
           onCopyLink={copyLink}
         />
@@ -740,11 +744,19 @@ const AttendeesCard: React.FC<{
   loading: boolean
   /** Registration-only event: no passes or check-in, so no pass column or arrival statuses */
   formOnly?: boolean
-  /** Open call: the applications to review instead of an attendee list */
-  applications?: boolean
+  /** The event has a registration form: each attendee's answers can be opened */
+  hasForm?: boolean
   onOpen: (t: Ticket) => void
   onCopyLink: () => void
-}> = ({ className, eventId, tickets, loading, formOnly, applications, onOpen, onCopyLink }) => {
+}> = ({ className, eventId, tickets, loading, formOnly, hasForm, onOpen, onCopyLink }) => {
+  // Registration form answers per ticket (only the buyer's ticket carries them)
+  const { data: responses = [] } = useQuery({
+    queryKey: ['registration-answers', eventId],
+    queryFn: () => request<{ ticket: string | null; answers: Answer[] }[]>(`/forms/events/${eventId}/submissions/`),
+    enabled: Boolean(hasForm),
+  })
+  const answersByTicket = useMemo(() => new Map(responses.filter((r) => r.ticket).map((r) => [r.ticket!, r.answers])), [responses])
+  const [answersOf, setAnswersOf] = useState<Ticket | null>(null)
   const toast = useToast()
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
@@ -782,8 +794,6 @@ const AttendeesCard: React.FC<{
       setExporting(false)
     }
   }
-
-  if (applications) return <ApplicationsCard className={className} eventId={eventId} onExport={exportCsv} exporting={exporting} />
 
   return (
     <Card className={cn('overflow-hidden', className)}>
@@ -867,6 +877,9 @@ const AttendeesCard: React.FC<{
                 <th scope="col" className="px-4 py-2.5 font-medium">Status</th>
                 {!formOnly && <th scope="col" className="hidden whitespace-nowrap px-4 py-2.5 font-medium sm:table-cell">First in</th>}
                 <th scope="col" className="hidden px-4 py-2.5 font-medium md:table-cell">Registered</th>
+                <th scope="col" className="px-2 py-2.5 text-right font-medium">
+                  <span className="sr-only">Answers</span>
+                </th>
                 {!formOnly && (
                   <th scope="col" className="px-5 py-2.5 text-right font-medium">
                     <span className="sr-only">Pass</span>
@@ -909,6 +922,14 @@ const AttendeesCard: React.FC<{
                     <td className="hidden whitespace-nowrap px-4 py-3 tabular text-ink-600 md:table-cell">
                       {new Date(t.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
                     </td>
+                    <td className="whitespace-nowrap px-2 py-3 text-right">
+                      {answersByTicket.get(t.id) && (
+                        <Button variant="ghost" size="sm" onClick={() => setAnswersOf(t)} aria-label={`Form answers from ${t.attendee_name}`}>
+                          <FileText className="h-4 w-4 text-ink-500" aria-hidden />
+                          <span className="hidden sm:inline">Answers</span>
+                        </Button>
+                      )}
+                    </td>
                     {!formOnly && (
                       <td className="whitespace-nowrap px-5 py-3 text-right">
                         <Button variant="ghost" size="sm" onClick={() => onOpen(t)} aria-label={`View pass for ${t.attendee_name}`}>
@@ -923,6 +944,20 @@ const AttendeesCard: React.FC<{
             </tbody>
           </table>
         </div>
+      )}
+      {answersOf && (
+        <Modal open onClose={() => setAnswersOf(null)} size="lg" title={answersOf.attendee_name} description={`${answersOf.attendee_email} · ${answersOf.ticket_number}`}>
+          <dl className="divide-y divide-ink-100 rounded-xl border border-ink-200">
+            {(answersByTicket.get(answersOf.id) ?? []).map((a) => (
+              <div key={a.id} className="grid gap-1 p-4 sm:grid-cols-[180px_minmax(0,1fr)]">
+                <dt className="text-sm text-ink-500">{a.field_label}</dt>
+                <dd className="text-sm text-ink-900">
+                  <AnswerValue value={a.value} />
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </Modal>
       )}
     </Card>
   )

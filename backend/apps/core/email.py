@@ -179,18 +179,13 @@ Event page: {event_url(event)}
         return False
 
 
-def send_registration_email(ticket, event, application=False):
-    """Registration-only events (no pass): a plain confirmation of the registration, no QR or pass link.
-    Open calls (`application`): "application received", the organizer reviews it next."""
+def send_registration_email(ticket, event):
+    """Registration-only events (no pass): a plain confirmation of the registration, no QR or pass link."""
     from apps.events.sub_events import display_title
     title = display_title(event)
     when = f"{event.start_date} {event.start_time or ''}".strip()
     brand, powered = email_brand(event)
     signature = 'Organized via Eventlaya' if brand == 'Eventlaya' else (brand + ('\nPowered by Eventlaya' if powered else ''))
-    if application:
-        return _send_simple(event, ticket.attendee_email, f"Application received: {title}", ticket.attendee_name,
-                            f"We received your application for '{title}' (no. {ticket.ticket_number}).",
-                            "The organizer will review it and you'll get an email when it's accepted or not.", signature)
     text = f"""Namaste {ticket.attendee_name},
 
 Your registration for '{title}' is confirmed.
@@ -241,6 +236,17 @@ def _send_simple(event, to, subject, name, line1, line2, signature):
     except Exception as e:
         logger.warning(f"Failed to send email to {to}: {e}")
         return False
+
+
+def send_application_received(response, event):
+    """Applications stage: confirms the application; the organizer reviews it next (send_review_email)."""
+    from apps.events.sub_events import display_title
+    title = display_title(event)
+    brand, powered = email_brand(event)
+    signature = 'Organized via Eventlaya' if brand == 'Eventlaya' else (brand + ('\nPowered by Eventlaya' if powered else ''))
+    return _send_simple(event, response.submitter_email, f"Application received: {title}", response.submitter_name,
+                        f"We received your application for '{title}' (no. {response.number}).",
+                        "The organizer will review it and you'll get an email when it's accepted or not.", signature)
 
 
 def send_review_email(response, event):

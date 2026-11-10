@@ -69,39 +69,75 @@ class RegistrationOnlyTests(APITestCase):
         self.assertTrue(rows[1].endswith(',registered,' + rows[1].split(',')[5] + ',M'))
 
 
-class OpenCallTests(APITestCase):
+class StagesTests(APITestCase):
+    """Applications stage next to (or instead of) the tickets stage on one event."""
+
     def setUp(self):
         from datetime import datetime
         from django.utils import timezone
         from apps.dynamic_forms.models import Form, FormField
         self.organizer = User.objects.create_user(username='org2', email='org2@test.com', password='x', role=User.Role.ORGANIZER)
         self.client.force_authenticate(self.organizer)
-        deadline = timezone.make_aware(datetime.combine(date.today() + timedelta(days=20), datetime.min.time().replace(hour=17)))
-        r = self.client.post('/api/events/', {'title': 'Short Film Call', 'registration_mode': 'apply',
-                                              'registration_deadline': deadline.isoformat(), 'status': 'published'}, format='json')
+        self.form = Form.objects.create(organizer=self.organizer, title='Entry', slug='entry', status='published')
+        self.link = FormField.objects.create(form=self.form, label='Film link', field_type='url', required=True, order=1)
+        self.close = timezone.make_aware(datetime.combine(date.today() + timedelta(days=20), datetime.min.time().replace(hour=17)))
+        r = self.client.post('/api/events/', {
+            'title': 'Short Film Festival', 'status': 'published', 'date_tba': True, 'tickets_enabled': False,
+            'applications_enabled': True, 'application_form': str(self.form.id), 'applications_close': self.close.isoformat(),
+            'application_cta': 'Submit your film',
+        }, format='json')
         self.assertEqual(r.status_code, 201, r.data)
         self.event = Event.objects.get(id=r.data['id'])
-        self.form = Form.objects.create(organizer=self.organizer, event=self.event, title='Entry', slug='entry', status='published')
-        self.link = FormField.objects.create(form=self.form, label='Film link', field_type='text', required=True, order=1)
         self.client.force_authenticate(None)
+        self.apply_url = f'/api/forms/events/{self.event.slug}/apply/'
 
-    def test_no_date_or_venue_needed_and_listed_as_open_call(self):
-        self.assertEqual((self.event.location, self.event.start_date), ('Online', date.today() + timedelta(days=20)))
-        self.assertEqual([e['title'] for e in self.client.get('/api/events/public/?kind=open_calls').data], ['Short Film Call'])
+    def apply(self, email='ram@x.com', link='https://vimeo.com/1'):
+        return self.client.post(self.apply_url, {'name': 'Ram', 'email': email, 'answers': {str(self.link.id): link}}, format='json')
 
-    def test_apply_needs_a_form_then_review_emails_applicant(self):
-        url = f'/api/forms/events/{self.event.slug}/register/'
-        self.assertEqual(self.client.post(url, {'name': 'Ram', 'email': 'ram@x.com'}, format='json').status_code, 400)
-        self.event.registration_form = self.form
-        self.event.save()
-        r = self.client.post(url, {'name': 'Ram', 'email': 'ram@x.com', 'answers': {str(self.link.id): 'https://vimeo.com/1'}}, format='json')
+    def test_applications_only_event_has_no_date_or_venue_yet(self):
+        self.assertEqual((self.event.location, self.event.start_date), ('To be announced', self.close.date()))
+        self.assertEqual([e['title'] for e in self.client.get('/api/events/public/?kind=open_calls').data], ['Short Film Festival'])
+        page = self.client.get(f'/api/events/public/{self.event.slug}/').data['event']
+        self.assertEqual((page['applications']['open'], page['applications']['cta']), (True, 'Submit your film'))
+        self.assertFalse(page['registration_open'])  # tickets stage is off
+        r = self.client.post(f'/api/forms/events/{self.event.slug}/register/', {'name': 'A', 'email': 'a@x.com'}, format='json')
+        self.assertEqual(r.status_code, 400)
+
+    def test_apply_creates_pending_application_without_ticket_then_review(self):
+        self.assertIn('https://', self.apply(link='not a link').data['error'])
+        r = self.apply()
         self.assertEqual(r.status_code, 201, r.data)
+        self.assertTrue(r.data['application']['number'].startswith('APP-'))
+        self.assertEqual(EventTicket.objects.filter(event=self.event).count(), 0)
         self.assertIn('Application received', mail.outbox[-1].subject)
-        resp_id = r.data['form_response']['id']
-        self.assertEqual(r.data['form_response']['review_status'], 'pending')
-        review = f'/api/forms/responses/{resp_id}/review/'
-        self.assertEqual(self.client.post(review, {'status': 'accepted'}, format='json').status_code, 401)
+        self.assertTrue(self.apply().data['already_applied'])
         self.client.force_authenticate(self.organizer)
-        r = self.client.post(review, {'status': 'rejected', 'note': 'Too long'}, format='json')
-        self.assertEqual((r.data['review_status'], r.data['rejection_note']), ('rejected', 'Too long'))
-        self.assertIn('Too long', mail.outbox[-1].body)
+        apps = self.client.get(f'/api/forms/events/{self.event.id}/applications/').data
+        self.assertEqual((len(apps), apps[0]['review_status']), (1, 'pending'))
+        r = self.client.post(f"/api/forms/responses/{apps[0]['id']}/review/", {'status': 'accepted'}, format='json')
+        self.assertEqual(r.data['review_status'], 'accepted')
+        self.assertIn('accepted', mail.outbox[-1].subject)
+        csv_rows = self.client.get(f'/api/events/{self.event.id}/export-applications/').content.decode().splitlines()
+        self.assertEqual(len(csv_rows), 2)
+        self.assertIn('accepted', csv_rows[1])
+
+    def test_film_festival_takes_applications_and_sells_tickets_together(self):
+        self.client.force_authenticate(self.organizer)
+        r = self.client.patch(f'/api/events/{self.event.id}/', {
+            'date_tba': False, 'tickets_enabled': True, 'start_date': (date.today() + timedelta(days=40)).isoformat(),
+            'location': 'City Hall, Dharan',
+        }, format='json')
+        self.assertEqual(r.status_code, 200, r.data)
+        self.client.force_authenticate(None)
+        self.assertEqual(self.apply().status_code, 201)
+        r = self.client.post(f'/api/forms/events/{self.event.slug}/register/', {'name': 'Viewer', 'email': 'v@x.com'}, format='json')
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(EventTicket.objects.filter(event=self.event).count(), 1)  # only the viewer has a ticket
+
+    def test_module_off_stops_applications(self):
+        from apps.accounts.models import PlatformModule
+        from apps.accounts.modules import clear_cache
+        PlatformModule.objects.filter(slug='applications').update(is_globally_enabled=False)
+        clear_cache()
+        self.addCleanup(clear_cache)
+        self.assertEqual(self.apply().status_code, 403)

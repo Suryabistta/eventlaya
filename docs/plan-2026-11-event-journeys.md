@@ -1,6 +1,6 @@
 # Event journeys: applications, tickets and voting under one event
 
-Status: proposal for review, 2026-11-10. Nothing in this document is built yet.
+Status: Phase 1 built 2026-11-10 (applications and tickets as separate switchable stages, date to be announced, Apply page, module `applications`). Phases 2–4 not built.
 
 ## The three kinds of event we run
 

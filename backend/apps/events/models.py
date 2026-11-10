@@ -94,25 +94,46 @@ class Event(models.Model):
     class RegistrationMode(models.TextChoices):
         PASS = 'pass', 'With pass (QR ticket)'
         FORM = 'form', 'Registration only (no pass)'
-        APPLY = 'apply', 'Applications / submissions'
 
-    # APPLY: an open call (pageant applications, film submissions...). Like FORM, plus: no fixed date or venue
-    # (the event date is the application deadline), every entry starts Pending and the organizer accepts or
-    # rejects it (apps.dynamic_forms review endpoint), emailing the applicant.
     # FORM: people just fill in the registration form (runs, sign-ups, data collection). Free, one per person,
     # a confirmation email instead of a QR pass, no gate check-in. Registrations still count toward capacity.
-    # Text of the main button (Apply, Submit entry, Nominate...); blank = chosen from the registration type
-    cta_label = models.CharField(max_length=30, blank=True)
     registration_mode = models.CharField(max_length=10, choices=RegistrationMode.choices, default=RegistrationMode.PASS)
+    # Text of the main button (Get tickets, Register, Book a spot...); blank = chosen from the registration type
+    cta_label = models.CharField(max_length=30, blank=True)
+
+    # Stages (docs/plan-2026-11-event-journeys.md). Each one is switched on or off per event.
+    # Tickets / registration stage: off while only applications are open (tickets go on sale later).
+    tickets_enabled = models.BooleanField(default=True)
+    # Date and venue not decided yet (only while tickets are off); start_date then holds the applications deadline
+    date_tba = models.BooleanField(default=False)
+    # Applications stage (module `applications`): participants (filmmakers, contestants) apply with their own form;
+    # the organizer accepts or declines each one. Applying never creates a ticket or uses capacity.
+    applications_enabled = models.BooleanField(default=False)
+    application_form = models.ForeignKey(
+        'dynamic_forms.Form', null=True, blank=True, on_delete=models.SET_NULL, related_name='application_events',
+    )
+    applications_close = models.DateTimeField(null=True, blank=True)
+    application_cta = models.CharField(max_length=30, blank=True, help_text='Apply button text; blank = "Apply"')
 
     @property
     def registration_only(self):
-        """No pass or check-in: registration-only events and open calls."""
-        return self.registration_mode in (self.RegistrationMode.FORM, self.RegistrationMode.APPLY)
+        """No pass or check-in for the audience."""
+        return self.registration_mode == self.RegistrationMode.FORM
 
-    @property
-    def is_application(self):
-        return self.registration_mode == self.RegistrationMode.APPLY
+    def applications_closed_reason(self, now=None):
+        """Why participants can't apply right now, or None when applications are open."""
+        from django.utils import timezone
+        from apps.accounts.modules import module_enabled
+        now = now or timezone.now()
+        if not self.applications_enabled or not module_enabled('applications'):
+            return 'This event is not taking applications.'
+        if self.status not in (self.Status.PUBLISHED, self.Status.ONGOING):
+            return 'Applications are not open.'
+        if self.applications_close and now > self.applications_close:
+            return 'Applications have closed.'
+        if not (self.application_form and self.application_form.status == 'published'):
+            return 'Applications are not open yet.'
+        return None
 
     # Sub-events (module `sub_events`): a child of a main event, one level deep. It has its own form, capacity,
     # tickets and registration switch; organizer and white-label site come from the main event.
@@ -196,6 +217,8 @@ class Event(models.Model):
             return 'This event was cancelled by the organizer.'
         if phase == 'ended':
             return 'This event has ended.'
+        if not self.tickets_enabled:
+            return 'Tickets are not on sale yet.' if self.registration_mode == self.RegistrationMode.PASS else 'Registration is not open yet.'
         if not self.allow_registration:
             return 'Registration is currently closed for this event.'
         if self.registration_deadline and now > self.registration_deadline:

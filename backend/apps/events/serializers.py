@@ -99,10 +99,12 @@ class EventSerializer(serializers.ModelSerializer):
             'tagline', 'category', 'category_name', 'is_featured', 'phase', 'registration_open', 'registration_closed_reason',
             'max_tickets_per_order', 'show_spots_left',
             'managed_by', 'managed_by_logo', 'show_managed_by', 'managed_by_label', 'ticket_layout', 'show_seat_number', 'registration_mode', 'cta_label',
+            'tickets_enabled', 'date_tba', 'applications_enabled', 'application_form', 'applications_close', 'application_cta',
             'parent', 'parent_title',
         ]
         read_only_fields = ['id', 'organizer', 'is_featured', 'created_at', 'updated_at']
         # Open calls (registration_mode apply) have no date or venue of their own; validate() fills them in
+        # Events with date and venue to be announced (date_tba) don't send them; validate() fills them in
         extra_kwargs = {'start_date': {'required': False}, 'location': {'required': False, 'allow_blank': True}}
 
     def validate_parent(self, parent):
@@ -129,6 +131,15 @@ class EventSerializer(serializers.ModelSerializer):
         from apps.platform.catalog import safe_url
         return safe_url(value, 'Logo')
 
+
+    def validate_application_form(self, form):
+        """Only the organizer's own forms."""
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        owner = self.instance.organizer_id if self.instance else getattr(user, 'id', None)
+        if form and not getattr(user, 'is_superadmin', False) and form.organizer_id != owner:
+            raise serializers.ValidationError('Pick one of your own forms.')
+        return form
 
     def validate_category(self, value):
         return validate_event_category(value, self.instance)
@@ -199,18 +210,27 @@ class EventSerializer(serializers.ModelSerializer):
                     counter += 1
                 attrs['slug'] = slug
 
-        # Open call: the application deadline is the event's date; no venue needed
-        mode = attrs.get('registration_mode', getattr(self.instance, 'registration_mode', Event.RegistrationMode.PASS))
-        if mode == Event.RegistrationMode.APPLY:
-            deadline = attrs.get('registration_deadline') or (self.instance.registration_deadline if self.instance else None)
-            if not deadline:
-                raise serializers.ValidationError({'registration_deadline': 'Set the date applications close.'})
-            attrs['start_date'] = timezone.localtime(deadline).date()
+        # Stages (docs/plan-2026-11-event-journeys.md)
+        get = lambda k, d=None: attrs.get(k, getattr(self.instance, k, d) if self.instance else d)  # noqa: E731
+        if get('applications_enabled', False):
+            close = get('applications_close')
+            if not close:
+                raise serializers.ValidationError({'applications_close': 'Set when applications close.'})
+            if 'applications_close' in attrs and close < timezone.now() and not self.instance:
+                raise serializers.ValidationError({'applications_close': 'The closing time can’t be in the past.'})
+        if get('date_tba', False) and get('tickets_enabled', True):
+            raise serializers.ValidationError({'date_tba': 'Set the date and venue before turning on tickets or registration.'})
+        if get('date_tba', False):
+            # Date and venue to be announced: the event sorts and ends by the applications deadline meanwhile
+            close = get('applications_close')
+            if not close:
+                raise serializers.ValidationError({'applications_close': 'Take applications, or set the event date.'})
+            attrs['start_date'] = timezone.localtime(close).date()
             attrs['end_date'] = None
-            attrs['start_time'] = timezone.localtime(deadline).time().replace(second=0, microsecond=0)
+            attrs['start_time'] = timezone.localtime(close).time().replace(second=0, microsecond=0)
             attrs['end_time'] = None
             if not (attrs.get('location') or getattr(self.instance, 'location', '')).strip():
-                attrs['location'] = 'Online'
+                attrs['location'] = 'To be announced'
         else:
             if not (attrs.get('start_date') or getattr(self.instance, 'start_date', None)):
                 raise serializers.ValidationError({'start_date': 'Set the event date.'})

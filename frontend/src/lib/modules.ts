@@ -25,6 +25,7 @@ export type ModuleSlug =
   | 'packages'
   | 'sub_events'
   | 'offline_tickets'
+  | 'applications'
 
 interface ModulesResponse {
   role: string
