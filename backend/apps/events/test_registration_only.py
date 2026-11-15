@@ -22,7 +22,7 @@ class RegistrationOnlyTests(APITestCase):
         self.url = '/api/forms/events/run/register/'
 
     def register(self, email, **extra):
-        return self.client.post(self.url, {'name': 'Sita', 'email': email, **extra}, format='json')
+        return self.client.post(self.url, {'name': 'Sita', 'email': email, 'phone': '9800000000', **extra}, format='json')
 
     def test_free_single_registration_without_pass(self):
         r = self.register('sita@x.com', items=[{'ticket_type_id': None, 'quantity': 5}], payment_method='online')
@@ -100,7 +100,7 @@ class StagesTests(APITestCase):
         page = self.client.get(f'/api/events/public/{self.event.slug}/').data['event']
         self.assertEqual((page['applications']['open'], page['applications']['cta']), (True, 'Submit your film'))
         self.assertFalse(page['registration_open'])  # tickets stage is off
-        r = self.client.post(f'/api/forms/events/{self.event.slug}/register/', {'name': 'A', 'email': 'a@x.com'}, format='json')
+        r = self.client.post(f'/api/forms/events/{self.event.slug}/register/', {'name': 'A', 'email': 'a@x.com', 'phone': '9800000000'}, format='json')
         self.assertEqual(r.status_code, 400)
 
     def test_apply_creates_pending_application_without_ticket_then_review(self):
@@ -161,11 +161,25 @@ class StageTimelineAndContestTests(StagesTests):
         self.assertEqual([(s['kind'], s['state']) for s in stages], [('applications', 'open'), ('voting', 'upcoming'), ('tickets', 'upcoming')])
         self.client.force_authenticate(self.organizer)
         apps = self.client.get(f'/api/forms/events/{self.event.id}/applications/').data
-        self.client.post(f"/api/forms/responses/{apps[0]['id']}/review/", {'status': 'accepted'}, format='json')
+        # Accepting adds the applicant to the event's only contest right away, in one email (not two)
+        from django.core import mail
+        mail.outbox.clear()
+        with self.captureOnCommitCallbacks(execute=True):
+            r = self.client.post(f"/api/forms/responses/{apps[0]['id']}/review/", {'status': 'accepted'}, format='json')
+        to_applicant = [m for m in mail.outbox if apps[0]['submitter_email'] in m.to]
+        self.assertEqual(len(to_applicant), 1)
+        self.assertIn('contestant in', to_applicant[0].body)
+        self.assertEqual(r.data['added_to_contest'], 'Public vote')
+        c = poll.candidates.get()
+        self.assertEqual((c.photo_url, c.description), (img, 'I sing.'))
         url = f'/api/voting/contests/{poll.id}/contestants/from-applications/'
+        self.assertEqual(self.client.get(url).data, {'pending': 0})
+        # Accepted some other way (e.g. before contests existed): counted, then added with one click
+        from apps.dynamic_forms.models import FormResponse
+        FormResponse.objects.filter(pk=apps[1]['id']).update(review_status='accepted')
+        self.assertEqual(self.client.get(url).data, {'pending': 1})
         r = self.client.post(url)
-        self.assertEqual(r.status_code, 201, r.data)
-        self.assertEqual((len(r.data), r.data[0]['photo_url'], r.data[0]['description']), (1, img, 'I sing.'))
+        self.assertEqual((r.status_code, len(r.data)), (201, 1))
         self.assertEqual(self.client.post(url).status_code, 400)  # nothing new to add
 
 
@@ -200,8 +214,8 @@ class AuditStageFixTests(StagesTests):
         poll = Poll.objects.create(event=self.event, title='Vote', kind=Poll.Kind.CONTEST, status=Poll.Status.OPEN)
         self.client.force_authenticate(self.organizer)
         self.client.post(f'/api/forms/responses/{app_id}/review/', {'status': 'accepted'}, format='json')
-        added = self.client.post(f'/api/voting/contests/{poll.id}/contestants/from-applications/').data
-        self.assertEqual((added[0]['photo_url'], added[0]['gallery']), (face_url, []))  # never the ID document
+        added = Candidate.objects.get(application_id=app_id)
+        self.assertEqual((added.photo_url, added.gallery), (face_url, []))  # never the ID document
         self.client.post(f'/api/forms/responses/{app_id}/review/', {'status': 'rejected'}, format='json')
         self.assertEqual(Candidate.objects.get(application_id=app_id).status, 'withdrawn')
         self.client.post(f'/api/forms/responses/{app_id}/review/', {'status': 'accepted'}, format='json')

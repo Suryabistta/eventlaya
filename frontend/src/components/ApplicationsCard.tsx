@@ -106,11 +106,17 @@ export const ApplicationsCard: React.FC<{ className?: string; eventId: string }>
 
   const review = useMutation({
     mutationFn: (v: { id: string; status: Review; note?: string }) =>
-      request<Application>(`/forms/responses/${v.id}/review/`, { method: 'POST', body: JSON.stringify({ status: v.status, note: v.note ?? '' }) }),
+      request<Application & { added_to_contest?: string | null }>(`/forms/responses/${v.id}/review/`, { method: 'POST', body: JSON.stringify({ status: v.status, note: v.note ?? '' }) }),
     onSuccess: (a) => {
       qc.setQueryData<Application[]>(key, (list) => list?.map((x) => (x.id === a.id ? { ...x, ...a } : x)))
       setOpen(null)
-      toast.success(a.review_status === 'accepted' ? `Accepted ${a.submitter_name}` : a.review_status === 'rejected' ? `${a.submitter_name} not selected` : 'Moved back to review', a.review_status === 'pending' ? undefined : 'They’ve been emailed.')
+      qc.invalidateQueries({ queryKey: ['pending-applicants'] })
+      qc.invalidateQueries({ queryKey: ['contests'] })
+      toast.success(
+        a.review_status === 'accepted' ? `Accepted ${a.submitter_name}` : a.review_status === 'rejected' ? `${a.submitter_name} not selected` : 'Moved back to review',
+        a.review_status === 'pending' ? undefined
+          : a.added_to_contest ? `They’ve been emailed and added to “${a.added_to_contest}” as a contestant.` : 'They’ve been emailed.',
+      )
     },
     onError: (e: Error) => toast.error('Couldn’t save the review', e.message),
   })

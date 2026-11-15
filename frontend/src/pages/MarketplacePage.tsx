@@ -78,11 +78,11 @@ export const MarketplacePage: React.FC = () => {
 
   const listVenueAction = (
     <ButtonLink
-      to={signedIn ? '/app/listings/venues/new' : '/signup?type=vendor'}
+      to={signedIn ? '/app/listings' : '/signup?type=vendor'}
       variant={inApp ? 'primary' : 'secondary'}
       icon={<Plus className="h-4 w-4" aria-hidden />}
     >
-      List your venue
+      List your business
     </ButtonLink>
   )
 
@@ -90,9 +90,18 @@ export const MarketplacePage: React.FC = () => {
   const q = deferredSearch.toLowerCase()
   const allVendors = vendorsQuery.data ?? []
   const vendors = allVendors.filter((v) => (!category || v.category_slug === category) && (!q || v.business_name.toLowerCase().includes(q)))
-  const vendorsResult = { ...vendorsQuery, data: vendorsQuery.data && vendors }
-  const showVenueList = chip === 'all' || chip === 'venues'
-  const showVendorList = chip !== 'venues'
+  type Item = { kind: 'venue'; v: NonNullable<typeof venuesQuery.data>[number] } | { kind: 'vendor'; v: (typeof vendors)[number] }
+  const items: Item[] = [
+    ...(chip === 'all' || chip === 'venues' ? (venuesQuery.data ?? []).map((v) => ({ kind: 'venue' as const, v })) : []),
+    ...(chip !== 'venues' ? vendors.map((v) => ({ kind: 'vendor' as const, v })) : []),
+  ]
+  const combined = {
+    data: venuesQuery.data && vendorsQuery.data ? items : undefined,
+    isLoading: venuesQuery.isLoading || vendorsQuery.isLoading,
+    isError: venuesQuery.isError && vendorsQuery.isError,
+    error: venuesQuery.error ?? vendorsQuery.error,
+    refetch: () => { void venuesQuery.refetch(); void vendorsQuery.refetch() },
+  }
   const chips: { value: string; label: string; icon: React.ElementType; count?: number }[] = [
     { value: 'all', label: 'All', icon: LayoutGrid },
     { value: 'venues', label: 'Venues', icon: Building2, count: venuesQuery.data?.length },
@@ -107,7 +116,7 @@ export const MarketplacePage: React.FC = () => {
   return (
     <div className={inApp ? 'w-full space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 2xl:px-10' : 'mx-auto max-w-6xl space-y-8 px-4 py-12 sm:px-6'}>
       {inApp ? (
-        <PageHeader title="Vendors and venues" actions={listVenueAction} />
+        <PageHeader title="Vendors" actions={listVenueAction} />
       ) : (
         // The banner replaces the intro text; the heading stays for screen readers and search engines
         <h1 className="sr-only">Vendors and venues in Eastern Nepal</h1>
@@ -154,7 +163,7 @@ export const MarketplacePage: React.FC = () => {
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={chip === 'venues' ? 'Search venues by name' : chip === 'all' ? 'Search venues and vendors' : 'Search vendors by name'}
+              placeholder="Search by name"
               className={cn(controlClass, 'pl-9')}
             />
           </div>
@@ -178,45 +187,27 @@ export const MarketplacePage: React.FC = () => {
         {!inApp && <div className="sm:hidden">{listVenueAction}</div>}
       </div>
 
-      {showVenueList && (
-        <section aria-label="Venues" className="space-y-4">
-          {chip === 'all' && <h2 className="font-display text-lg font-bold text-ink-900">Venues</h2>}
-          <Results
-            query={venuesQuery}
-            gridClass={inApp ? 'grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4' : 'grid gap-5 md:grid-cols-2'}
-            skeletonClass="h-[440px]"
-            empty={
-              <EmptyState
-                icon={<Building2 className="h-6 w-6" />}
-                title={filtersActive ? 'No venues match these filters' : 'No venues listed yet'}
-                description={filtersActive ? 'Try another city or venue type.' : 'Own a hall, lawn or auditorium? List it and start getting inquiries.'}
-                action={filtersActive ? <Button variant="secondary" onClick={clearFilters}>Clear filters</Button> : listVenueAction}
-              />
-            }
-            render={(v) => <VenueCard key={v.id} venue={v} to={venuePath(base, v)} />}
-          />
-        </section>
-      )}
-
-      {showVendorList && (
-        <section aria-label="Vendors" className="space-y-4">
-          {chip === 'all' && <h2 className="font-display text-lg font-bold text-ink-900">Vendors</h2>}
-          <Results
-            query={vendorsResult}
-            gridClass={inApp ? 'grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4' : 'grid gap-5 sm:grid-cols-2 lg:grid-cols-3'}
-            skeletonClass="h-60"
-            empty={
-              <EmptyState
-                icon={<Store className="h-6 w-6" />}
-                title={filtersActive ? 'No vendors match these filters' : 'No vendors listed yet'}
-                description={filtersActive ? 'Try another city or category.' : 'Check back soon. New vendors are added every week.'}
-                action={filtersActive ? <Button variant="secondary" onClick={clearFilters}>Clear filters</Button> : undefined}
-              />
-            }
-            render={(v) => <VendorCard key={v.id} vendor={v} to={vendorPath(base, v)} />}
-          />
-        </section>
-      )}
+      {/* One list: venues are just another category, shown in the same 3-per-row grid as every vendor */}
+      <section aria-label="Listings">
+        <Results
+          query={combined}
+          gridClass={inApp ? 'grid gap-5 sm:grid-cols-2 xl:grid-cols-3' : 'grid gap-5 sm:grid-cols-2 lg:grid-cols-3'}
+          skeletonClass="h-80"
+          empty={
+            <EmptyState
+              icon={<Store className="h-6 w-6" />}
+              title={filtersActive ? 'Nothing matches these filters' : 'Nothing listed yet'}
+              description={filtersActive ? 'Try another city or category.' : 'Check back soon. New vendors and venues are added every week.'}
+              action={filtersActive ? <Button variant="secondary" onClick={clearFilters}>Clear filters</Button> : listVenueAction}
+            />
+          }
+          render={(item) =>
+            item.kind === 'venue'
+              ? <VenueCard key={`venue-${item.v.id}`} venue={item.v} to={venuePath(base, item.v)} />
+              : <VendorCard key={`vendor-${item.v.id}`} vendor={item.v} to={vendorPath(base, item.v)} />
+          }
+        />
+      </section>
     </div>
   )
 }

@@ -140,13 +140,22 @@ export const ApplyPage: React.FC = () => {
               <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
                 <Check className="h-7 w-7" aria-hidden />
               </span>
-              <h1 className="mt-4 text-2xl font-bold text-ink-900">{applied.existing ? 'You’ve already applied' : 'Application received'}</h1>
+              <h1 className="mt-4 text-2xl font-bold text-ink-900">{applied.existing ? 'You’ve already applied' : 'Thank you so much!'}</h1>
               <p className="mt-2 text-ink-600">
-                {applied.name}, your application for <span className="font-semibold text-ink-900">{event.title}</span> is in.
+                {applied.existing ? (
+                  <>
+                    {applied.name}, your application for <span className="font-semibold text-ink-900">{event.title}</span> has already been received.
+                  </>
+                ) : (
+                  <>
+                    Thank you, <span className="font-semibold text-ink-900">{applied.name}</span>! Your application for{' '}
+                    <span className="font-semibold text-ink-900">{event.title}</span> has been received.
+                  </>
+                )}
               </p>
               <p className="mt-1 text-sm text-ink-500">
-                Application no. <span className="font-mono font-semibold text-ink-800">{applied.number}</span>. A confirmation was sent to {applied.email}. You’ll
-                get another email once the organizer reviews it.
+                Application no. <span className="font-mono font-semibold text-ink-800">{applied.number}</span>. A confirmation was sent to{' '}
+                <span className="font-medium text-ink-700">{applied.email}</span>. You’ll get another email once the festival team reviews it.
               </p>
               <ButtonLink to={`/e/${slug}`} variant="secondary" className="mt-6">
                 Back to the event

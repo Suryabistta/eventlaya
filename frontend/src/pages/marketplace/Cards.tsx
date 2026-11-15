@@ -45,8 +45,6 @@ export const VenueCard: React.FC<{ venue: VenueWithSpaces; to: string }> = ({ ve
         </div>
       </div>
 
-      <p className="line-clamp-2 text-sm leading-relaxed text-ink-600">{venue.description}</p>
-
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-700">
         <span className="inline-flex items-center gap-1.5">
           <Users className="h-4 w-4 text-ink-400" aria-hidden />
@@ -70,7 +68,7 @@ export const VenueCard: React.FC<{ venue: VenueWithSpaces; to: string }> = ({ ve
 
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ink-100 px-5 py-3">
       <p className="min-w-0 text-sm text-ink-500">
-        {venue.contact_person && (
+        {venue.contact_person && venue.show_host !== false && (
           <>
             Hosted by <span className="font-medium text-ink-700">{venue.contact_person}</span>
           </>
@@ -86,12 +84,17 @@ export const VenueCard: React.FC<{ venue: VenueWithSpaces; to: string }> = ({ ve
 
 export const VendorCard: React.FC<{ vendor: Vendor; to: string }> = ({ vendor, to }) => (
   <Card className="relative flex flex-col overflow-hidden transition-shadow hover:shadow-md">
-    {(vendor.featured_image || vendor.portfolio_images?.[0]) && (
-      <Photo src={vendor.featured_image || vendor.portfolio_images[0]} icon={Store} className="h-40 w-full shrink-0" />
-    )}
+    {/* Same photo area as venue cards, with the vendor type on the top left */}
+    <div className="relative h-48 shrink-0 sm:h-60">
+      <Photo src={vendor.featured_image || vendor.portfolio_images?.[0]} icon={Store} className="h-full w-full" />
+      {vendor.category_name && (
+        <div className="absolute left-3 top-3">
+          <Badge className="bg-white/95 text-ink-800 shadow-2xs">{vendor.category_name}</Badge>
+        </div>
+      )}
+    </div>
     <div className="flex flex-1 flex-col gap-3 p-5">
-      <div className="flex items-start justify-between gap-3">
-        <Badge>{vendor.category_name}</Badge>
+      <div className="flex justify-end">
         <Rating value={vendor.review_average ?? vendor.rating} count={vendor.review_total || undefined} />
       </div>
       <div className="flex min-w-0 items-center gap-3">
@@ -109,7 +112,6 @@ export const VendorCard: React.FC<{ vendor: Vendor; to: string }> = ({ vendor, t
           </p>
         </div>
       </div>
-      <p className="line-clamp-3 text-sm leading-relaxed text-ink-600">{vendor.description}</p>
     </div>
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ink-100 px-5 py-3">
       <p className="text-sm text-ink-500">

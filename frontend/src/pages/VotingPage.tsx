@@ -5,6 +5,7 @@ import { BarChart3, CalendarDays, Copy, Crown, Lock, MonitorPlay, Pencil, Play, 
 import { useCurrentEvent } from '@/lib/event-context'
 import { Button, ButtonLink, Card, EmptyState, ErrorState, IconButton, PageHeader, Skeleton, useToast } from '@/components/ui'
 import { useModuleEnabled } from '@/lib/modules'
+import { contestApi } from './voting/contest/api'
 import { votingApi, type VotingPoll } from './voting/api'
 import { PollStatusBadge, scheduleText, voteModeLabel } from './voting/shared'
 
@@ -47,18 +48,19 @@ export const VotingPage: React.FC = () => {
   return (
     <div className={wrapClass}>
       <PageHeader
-        title={currentEvent?.applications_enabled && currentEvent.tickets_enabled === false ? 'Contest & voting' : 'Polls & voting'}
+        title="Voting"
         description={currentEvent ? `Audience polls and contests for ${currentEvent.title}. Counts refresh on their own.` : 'Audience polls and contests for your event.'}
         actions={
           <>
+            {/* Contests are the main thing; a quick poll is the small extra */}
+            <ButtonLink to="/app/voting/new" variant={contestsOn ? 'ghost' : 'primary'} size={contestsOn ? 'sm' : undefined} icon={<Plus className="h-4 w-4" />}>
+              New poll
+            </ButtonLink>
             {contestsOn && (
-              <ButtonLink to="/app/voting/contests/new" variant="secondary" icon={<Crown className="h-4 w-4" />}>
+              <ButtonLink to="/app/voting/contests/new" icon={<Crown className="h-4 w-4" />}>
                 New contest
               </ButtonLink>
             )}
-            <ButtonLink to="/app/voting/new" icon={<Plus className="h-4 w-4" />}>
-              New poll
-            </ButtonLink>
           </>
         }
       />
@@ -79,14 +81,14 @@ export const VotingPage: React.FC = () => {
             description="Run a quick audience question, or a full contest: pageants, talent shows and awards with rounds, judges and SMS-verified voting."
             action={
               <div className="flex flex-wrap justify-center gap-2">
-                <ButtonLink to="/app/voting/new" icon={<Plus className="h-4 w-4" />}>
-                  New poll
-                </ButtonLink>
                 {contestsOn && (
-                  <ButtonLink to="/app/voting/contests/new" variant="secondary" icon={<Crown className="h-4 w-4" />}>
+                  <ButtonLink to="/app/voting/contests/new" icon={<Crown className="h-4 w-4" />}>
                     New contest
                   </ButtonLink>
                 )}
+                <ButtonLink to="/app/voting/new" variant={contestsOn ? 'ghost' : 'primary'} icon={<Plus className="h-4 w-4" />}>
+                  New poll
+                </ButtonLink>
               </div>
             }
           />
@@ -101,7 +103,9 @@ export const VotingPage: React.FC = () => {
 }
 
 /** Contests get their own dashboard; the card links there. */
-const ContestCard: React.FC<{ poll: VotingPoll }> = ({ poll }) => (
+const ContestCard: React.FC<{ poll: VotingPoll }> = ({ poll }) => {
+  const remove = useDeleteContest(poll)
+  return (
   <Card className="flex flex-col">
     <div className="space-y-1 border-b border-ink-100 px-5 py-4">
       <div className="flex items-start justify-between gap-3">
@@ -136,9 +140,41 @@ const ContestCard: React.FC<{ poll: VotingPoll }> = ({ poll }) => (
       <ButtonLink to={`/app/voting/contests/${poll.id}/present`} size="sm" variant="secondary" icon={<MonitorPlay className="h-4 w-4" />}>
         Present
       </ButtonLink>
+      <IconButton label={`Delete ${poll.title}`} onClick={remove.ask} className="ml-auto text-red-600 hover:bg-red-50">
+        <Trash2 className="h-4 w-4" />
+      </IconButton>
     </div>
   </Card>
-)
+  )
+}
+
+/** Delete a contest after a clear confirmation (the server refuses while it's open with votes). */
+export function useDeleteContest(poll: { id: string; title: string; total_votes?: number; candidates?: unknown[] }, onDone?: () => void) {
+  const toast = useToast()
+  const qc = useQueryClient()
+  const del = useMutation({
+    mutationFn: () => contestApi.remove(poll.id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['voting-polls'] })
+      qc.invalidateQueries({ queryKey: ['contests'] })
+      toast.success(`Deleted “${poll.title}”`)
+      onDone?.()
+    },
+    onError: (e: Error) => toast.error('Couldn’t delete the contest', e.message),
+  })
+  const ask = async () => {
+    const votes = poll.total_votes ?? 0
+    const people = poll.candidates?.length ?? 0
+    const ok = await toast.confirm({
+      title: `Delete “${poll.title}”?`,
+      description: `${people} ${people === 1 ? 'contestant' : 'contestants'}${votes ? `, ${votes.toLocaleString()} votes` : ''} and all its settings, rounds and results are deleted for good. This can’t be undone.`,
+      confirmLabel: 'Delete contest',
+      danger: true,
+    })
+    if (ok) del.mutate()
+  }
+  return { ask, pending: del.isPending }
+}
 
 const PollCard: React.FC<{ poll: VotingPoll }> = ({ poll }) => {
   const toast = useToast()

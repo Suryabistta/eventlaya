@@ -260,7 +260,7 @@ class OnlineTicketTests(APITestCase):
         self.assertEqual(r.data['ticket']['payment']['label'], 'Pay Rs 1,000 at the venue')
         self.assertIn('to pay at the venue', mail.outbox[0].body)
         # Older clients send no payment_method: venue
-        r = self.client.post('/api/forms/events/dff/register/', {'name': 'Old', 'email': 'old@test.com',
+        r = self.client.post('/api/forms/events/dff/register/', {'name': 'Old', 'email': 'old@test.com', 'phone': '9800000000',
                                                                  'ticket_type_id': str(self.general.id)}, format='json')
         self.assertEqual(r.status_code, 201)
 

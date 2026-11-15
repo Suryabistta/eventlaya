@@ -223,7 +223,7 @@ def purchase_public(p):
         'votes': p.votes, 'bonus_votes': p.bonus_votes,
         'total_votes': p.total_votes, 'amount': str(p.amount), 'currency': 'NPR',
         'contestant': {'id': str(p.contestant_id), 'name': p.contestant.name, 'number': p.contestant.number,
-                       'display_number': p.poll.format_number(p.contestant.number), 'slug': p.contestant.slug} if p.contestant_id else None,
+                       'display_number': p.poll.public_number(p.contestant.number), 'slug': p.contestant.slug} if p.contestant_id else None,
         'auto_vote': p.auto_vote, 'auto_voted': p.auto_voted, 'auto_vote_note': p.auto_vote_note,
     }
 

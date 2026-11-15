@@ -21,7 +21,7 @@ class OrderTests(APITestCase):
         self.student = TicketType.objects.create(event=self.event, name='Student', price=Decimal('250'), order=2)
 
     def register(self, items=None, email='buyer@test.com', **extra):
-        body = {'name': 'Asha Rai', 'email': email, **extra}
+        body = {'name': 'Asha Rai', 'email': email, 'phone': '9800000000', **extra}
         if items is not None:
             body['items'] = items
         return self.client.post(f'/api/forms/events/{self.event.slug}/register/', body, format='json')

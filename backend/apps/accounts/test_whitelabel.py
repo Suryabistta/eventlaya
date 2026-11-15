@@ -178,7 +178,7 @@ class ScopingTests(TenantBase):
         self.assertEqual(self.client.get('/api/events/public/itahari-gig/', **self.on('eventlaya.com')).status_code, 200)
 
     def test_register(self):
-        body = {'name': 'Asha', 'email': 'asha@x.com'}
+        body = {'name': 'Asha', 'email': 'asha@x.com', 'phone': '9800000000'}
         res = self.client.post('/api/forms/events/itahari-gig/register/', body, format='json', **self.on(DFF_DOMAIN))
         self.assertEqual(res.status_code, 404)
         res = self.client.post('/api/forms/events/dff-opening/register/', body, format='json', **self.on(DFF_DOMAIN))
@@ -487,7 +487,7 @@ class ModuleTests(TenantBase):
 @override_settings(FRONTEND_URL='https://eventlaya.com', WHITELABEL_SUBDOMAINS_ENABLED=True)
 class EmailTests(TenantBase):
     def register(self, slug, **extra):
-        body = {'name': 'Asha', 'email': 'asha@x.com', **extra}
+        body = {'name': 'Asha', 'email': 'asha@x.com', 'phone': '9800000000', **extra}
         return self.client.post(f'/api/forms/events/{slug}/register/', body, format='json')
 
     def test_tenant_event_links_to_tenant_domain_with_brand(self):

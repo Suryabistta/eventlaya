@@ -4,8 +4,22 @@ from django.db import transaction
 from .models import ContestCategory, ContestRound, Criterion, Poll, ProfileField
 
 PRESETS = {
+    # The default: what most contests need. Rounds, judges and awards can still be added later under Advanced.
+    'simple': {
+        'name': 'Simple vote',
+        'description': 'People vote for their favourite until voting closes. Most votes wins. No rounds or judges.',
+        'settings': {
+            'vote_mode': Poll.VoteMode.SMS_OTP, 'votes_per_voter': None, 'votes_per_day': 5, 'votes_per_contestant': None,
+            'allow_split': True, 'max_votes_per_submit': 5, 'results_visibility': Poll.ResultsVisibility.RANKS_ONLY,
+            'results_top_n': 10, 'captcha_enabled': True, 'show_judge_breakdown': False, 'main_vote_enabled': True,
+            'placement_titles': ['Winner', '1st runner-up', '2nd runner-up'],
+        },
+        'profile_fields': [],
+        'rounds': [],
+        'categories': [],
+    },
     'pageant': {
-        'name': 'Pageant: online public vote + judges finale',
+        'name': 'Pageant with rounds & judges',
         'description': 'Miss/Mr-style pageant. Daily free online votes through the top rounds, judges score the finale '
                        '(70% judges + 30% public).',
         'settings': {

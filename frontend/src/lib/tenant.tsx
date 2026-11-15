@@ -100,7 +100,7 @@ export const TenantMark: React.FC<{ tenant: ResolvedTenant; className?: string; 
   const name = tenant.brand_name || tenant.organizer_name || 'Events'
   const size = large ? 'h-16 w-16 rounded-2xl text-2xl' : 'h-9 w-9 rounded-xl text-base'
   return (
-    <span className={`inline-flex min-w-0 items-center gap-2.5 ${className ?? ''}`}>
+    <span className={`inline-flex min-w-0 max-w-full items-center gap-2 sm:gap-2.5 ${className ?? ''}`}>
       {tenant.brand_logo && !failed ? (
         <img src={tenant.brand_logo} alt="" className={`${size} shrink-0 bg-white object-contain`} onError={() => setFailed(true)} />
       ) : (
@@ -108,7 +108,7 @@ export const TenantMark: React.FC<{ tenant: ResolvedTenant; className?: string; 
           {name.trim().charAt(0).toUpperCase()}
         </span>
       )}
-      {!large && <span className="truncate font-display text-lg font-bold text-ink-900">{name}</span>}
+      {!large && <span className="min-w-0 truncate font-display text-base font-bold text-ink-900 sm:text-lg">{name}</span>}
     </span>
   )
 }

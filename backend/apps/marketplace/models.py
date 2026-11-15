@@ -96,6 +96,7 @@ class VenueListing(models.Model):
     featured_image = models.CharField(max_length=500, blank=True)
 
     contact_person = models.CharField(max_length=100)
+    show_host = models.BooleanField(default=True, help_text='Show “Hosted by <contact person>” on the listing card')
     contact_phone = models.CharField(max_length=30)
     contact_email = models.EmailField(blank=True)
     

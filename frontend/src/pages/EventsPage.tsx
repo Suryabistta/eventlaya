@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { formatDate } from '@/lib/dates'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useModuleEnabled } from '@/lib/modules'
 import { useQuery } from '@tanstack/react-query'
 import { CalendarDays, Check, ClipboardList, ExternalLink, Link2, MapPin, Pencil, Plus, LayoutTemplate, QrCode } from 'lucide-react'
 import { RegistrationQrModal } from '@/components/RegistrationQrModal'
@@ -25,27 +26,34 @@ const KINDS: Record<EventKind, { title: string; description: string; create: str
   ticketing: {
     title: 'Ticketing',
     description: 'Concerts, shows and festivals: paid or free tickets with QR passes.',
-    create: 'New ticketed event',
-    empty: 'No ticketed events yet',
-    emptyText: 'Starts with General and VIP tickets and a short buyer form. Change anything before you publish.',
+    create: 'New ticketing event',
+    empty: 'No ticketing events yet',
+    emptyText: 'Starts with General and VIP tickets. You choose the buyer questions while creating it. Change anything before you publish.',
   },
   registration: {
     title: 'Registration',
     description: 'Seminars, workshops and open calls: a free sign-up form, no tickets.',
-    create: 'New registration',
+    create: 'New registration event',
     empty: 'No registration events yet',
-    emptyText: 'Starts with a sample sign-up form (organization, how they heard about you, meal preference).',
+    emptyText: 'You choose the sign-up form while creating it: a template, a copy of one of your forms, or name, email and phone only.',
   },
   pageant: {
-    title: 'Pageants',
+    title: 'Pageant',
     description: 'Applications, rounds, judging and voting, then winners.',
     create: 'New pageant',
     empty: 'No pageants yet',
-    emptyText: 'Starts with a sample application form (age, height, photos, bio) and a draft contest with rounds.',
+    emptyText: 'You choose the application form while creating it, and a draft contest with rounds is set up for voting.',
   },
 }
 
-export const EventsPage: React.FC<{ kind?: EventKind }> = ({ kind }) => {
+export const EventsPage: React.FC = () => {
+  const [params, setParams] = useSearchParams()
+  const contestsOn = useModuleEnabled('contests')
+  const kindParam = params.get('kind') as EventKind | null
+  // Pageants only while the contests module is on; ticketing and registration events never show voting
+  const kinds = (Object.keys(KINDS) as EventKind[]).filter((x) => x !== 'pageant' || contestsOn)
+  const kind = kindParam && kinds.includes(kindParam) ? kindParam : undefined
+  const setKind = (v?: EventKind) => setParams((p) => { if (v) p.set('kind', v); else p.delete('kind'); return p }, { replace: true })
   const k = kind ? KINDS[kind] : undefined
   const newLink = kind ? `/app/events/new?kind=${kind}` : '/app/events/new'
   const toast = useToast()
@@ -90,6 +98,19 @@ export const EventsPage: React.FC<{ kind?: EventKind }> = ({ kind }) => {
           </ButtonLink>
         }
       />
+
+      <div role="radiogroup" aria-label="Kind of event" className="-mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
+        {[undefined, ...kinds].map((x) => {
+          const n = x ? events.filter((e) => (e.event_kind ?? 'ticketing') === x).length : events.length
+          return (
+            <button key={x ?? 'all'} type="button" role="radio" aria-checked={kind === x} onClick={() => setKind(x)}
+              className={cn('h-9 shrink-0 rounded-full border px-4 text-sm font-semibold transition-colors',
+                kind === x ? 'border-ink-900 bg-ink-900 text-white' : 'border-ink-200 bg-white text-ink-700 hover:border-ink-400')}>
+              {x ? KINDS[x].title : 'All events'} <span className={kind === x ? 'text-white/70' : 'text-ink-400'}>{n}</span>
+            </button>
+          )
+        })}
+      </div>
 
       {isError ? (
         <ErrorState message={error?.message} onRetry={refetch} />
@@ -138,15 +159,12 @@ export const EventsPage: React.FC<{ kind?: EventKind }> = ({ kind }) => {
         </Card>
       )}
       {qrEvent && (
-        <RegistrationQrModal open onClose={() => setQrEvent(null)} url={`${window.location.origin}/e/${qrEvent.slug}`} title={qrEvent.title} />
+        <RegistrationQrModal open onClose={() => setQrEvent(null)} path={`/e/${qrEvent.slug}`} title={qrEvent.title} />
       )}
     </div>
   )
 }
 
-export const TicketingEventsPage = () => <EventsPage kind="ticketing" />
-export const RegistrationEventsPage = () => <EventsPage kind="registration" />
-export const PageantEventsPage = () => <EventsPage kind="pageant" />
 
 const EventRow: React.FC<{
   event: Event

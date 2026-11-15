@@ -36,6 +36,9 @@ class ContactView(APIView):
         message = (d.get('message') or '').strip()[:3000]
         if not name or not message:
             return Response({'error': 'Add your name and a message.'}, status=status.HTTP_400_BAD_REQUEST)
+        phone = (d.get('phone') or '').strip()[:30]
+        if not 7 <= sum(c.isdigit() for c in phone) <= 15:
+            return Response({'error': 'Enter a valid mobile number.'}, status=status.HTTP_400_BAD_REQUEST)
         try:
             validate_email(email)
         except ValidationError:
@@ -44,7 +47,7 @@ class ContactView(APIView):
         if ContactMessage.objects.filter(ip=ip, created_at__gte=timezone.now() - timedelta(hours=1)).count() >= PER_IP_PER_HOUR:
             return Response({'error': 'You’ve sent several messages already. We’ll reply soon.'}, status=status.HTTP_429_TOO_MANY_REQUESTS)
         role = d.get('role') if d.get('role') in ContactMessage.Role.values else ContactMessage.Role.USER
-        m = ContactMessage.objects.create(name=name, email=email, phone=(d.get('phone') or '').strip()[:30], role=role, message=message, ip=ip)
+        m = ContactMessage.objects.create(name=name, email=email, phone=phone, role=role, message=message, ip=ip)
         mail_admins(f'Contact: {name} ({m.get_role_display()})', f'{message}\n\n{email} {m.phone}', fail_silently=True)
         return Response({'ok': True}, status=status.HTTP_201_CREATED)
 

@@ -13,6 +13,7 @@ import { Badge, EmptyState, ErrorState, Skeleton } from '@/components/ui'
 import { eventPhase } from '@/lib/phase'
 import { applicationsOpen, bookLabel, callOnly, spotsInfo, useEventCategories } from '@/lib/event-page'
 import { cn } from '@/lib/utils'
+import { FavouriteButton } from '@/lib/favourites'
 
 type PublicEvent = Event & { organizer_name?: string }
 
@@ -205,6 +206,7 @@ export const EventCard: React.FC<{ event: PublicEvent; past: boolean }> = ({ eve
             onError={() => setBannerFailed(true)}
           />
         )}
+        <FavouriteButton eventId={e.id} eventSlug={e.slug} className="absolute right-3 top-3" />
         <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
           {e.is_featured && !over && (
             <Badge tone="warning" className="shadow-2xs">

@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/api_client.dart';
 import '../../payments/payment_models.dart';
 import '../models/contest.dart';
+import '../models/contest_card.dart';
 
 /// A refused contest call, with the server's machine-readable code
 /// (`captcha_required`, `verification_required`, `sign_in_required`,
@@ -121,6 +122,27 @@ class ContestApi {
       throw ContestFailure.from(e);
     }
   }
+
+  /// "Notify me" on an upcoming contest: one SMS or email when voting opens. Returns 'sms' or 'email'.
+  Future<String> remind(String slug, String ref, String destination) => _guard(() async {
+        final resp = await _api.post('${_base(slug, ref)}remind/', data: {'destination': destination});
+        return '${_map(resp.data)['channel'] ?? 'email'}';
+      });
+
+  /// Every public contest (the Voting tab): when = live | upcoming | past.
+  Future<ContestList> publicContests({String when = 'live', String search = '', String city = ''}) => _guard(() async {
+        final resp = await _api.get('/api/voting/public-contests/', queryParameters: {
+          'when': when,
+          if (search.isNotEmpty) 'search': search,
+          if (city.isNotEmpty) 'city': city,
+        });
+        final d = _map(resp.data);
+        return ContestList(
+          [for (final r in (d['results'] as List? ?? const [])) ContestCard.fromJson(_map(r))],
+          {for (final e in _map(d['counts']).entries) e.key: int.tryParse('${e.value}') ?? 0},
+          [for (final c in (d['cities'] as List? ?? const [])) '$c'],
+        );
+      });
 
   Future<Contest> contest(String slug, String ref) => _guard(() async {
         final resp = await _api.get(_base(slug, ref));

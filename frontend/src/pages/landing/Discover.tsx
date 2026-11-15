@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import {
+  SquareCheckBig,
   ArrowRight,
   BarChart3,
   CalendarDays,
@@ -38,6 +39,7 @@ import { useEventCategories } from '@/lib/event-page'
 import { safeHref, useHomeContent, type StepsTab } from '@/lib/home-content'
 import { useCities } from '@/lib/cities'
 import { cn } from '@/lib/utils'
+import { useModuleEnabled } from '@/lib/modules'
 import { EventCard } from '../ExploreEventsPage'
 import { VendorCard } from '../marketplace/Cards'
 import { Reveal } from './ProductTour'
@@ -45,14 +47,14 @@ import { SocialLinks } from '@/components/SocialLinks'
 
 /** Home page sections from the November 2026 design: search-first hero, live events and vendors, features, steps, contact. */
 
-const Eyebrow: React.FC<{ children: React.ReactNode; light?: boolean; center?: boolean }> = ({ children, light, center }) => (
+export const Eyebrow: React.FC<{ children: React.ReactNode; light?: boolean; center?: boolean }> = ({ children, light, center }) => (
   <p className={cn('flex items-center gap-3 text-xs font-bold uppercase tracking-[0.2em]', light ? 'text-brand-300' : 'text-brand-600', center && 'justify-center')}>
     <span className={cn('h-px w-6', light ? 'bg-brand-300' : 'bg-brand-600')} aria-hidden />
     {children}
   </p>
 )
 
-const H2: React.FC<{ children: React.ReactNode; light?: boolean; className?: string }> = ({ children, light, className }) => (
+export const H2: React.FC<{ children: React.ReactNode; light?: boolean; className?: string }> = ({ children, light, className }) => (
   <h2 className={cn('mt-3 font-display text-3xl font-extrabold tracking-[-0.02em] sm:text-[44px] sm:leading-[1.08]', light ? 'text-white' : 'text-ink-900', className)}>{children}</h2>
 )
 
@@ -79,7 +81,8 @@ const useVendorCategories = () => useQuery({ queryKey: ['marketplaceCategories']
 export const SearchHero: React.FC = () => {
   const { hero } = useHomeContent()
   const navigate = useNavigate()
-  const [mode, setMode] = useState<'events' | 'vendors'>('events')
+  const [mode, setMode] = useState<'events' | 'voting' | 'vendors'>('events')
+  const voting = useModuleEnabled('contests')
   const [q, setQ] = useState('')
   const [city, setCity] = useState('')
   const [category, setCategory] = useState('')
@@ -94,10 +97,10 @@ export const SearchHero: React.FC = () => {
     const p = new URLSearchParams()
     if (q.trim()) p.set('q', q.trim())
     if (city) p.set('city', city)
-    if (category) p.set('category', category)
-    navigate(`${mode === 'events' ? '/events' : '/marketplace'}${p.size ? `?${p}` : ''}`)
+    if (category) p.set(mode === 'voting' ? 'type' : 'category', category)
+    navigate(`${mode === 'events' ? '/events' : mode === 'voting' ? '/voting' : '/marketplace'}${p.size ? `?${p}` : ''}`)
   }
-  const types = mode === 'events' ? eventTypes.map((t) => ({ slug: t.slug, name: t.name })) : vendorTypes.map((t) => ({ slug: t.slug, name: t.name }))
+  const types = mode !== 'vendors' ? eventTypes.map((t) => ({ slug: t.slug, name: t.name })) : vendorTypes.map((t) => ({ slug: t.slug, name: t.name }))
 
   return (
     <section className="relative overflow-hidden bg-[#1c0f17] text-white">
@@ -121,8 +124,8 @@ export const SearchHero: React.FC = () => {
           {hero.subtitle}
         </p>
 
-        <div role="radiogroup" aria-label="Search for" className="mt-8 inline-flex gap-2">
-          {(['events', 'vendors'] as const).map((m) => (
+        <div role="radiogroup" aria-label="Search for" className="mt-8 flex flex-wrap justify-center gap-2">
+          {(voting ? (['events', 'voting', 'vendors'] as const) : (['events', 'vendors'] as const)).map((m) => (
             <button
               key={m}
               type="button"
@@ -133,12 +136,12 @@ export const SearchHero: React.FC = () => {
                 setCategory('')
               }}
               className={cn(
-                'inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold transition-colors',
+                'inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-sm sm:px-5 font-semibold transition-colors',
                 mode === m ? 'bg-brand-600 text-white' : 'bg-white/10 text-white/80 hover:bg-white/20',
               )}
             >
-              {m === 'events' ? <CalendarDays className="h-4 w-4" aria-hidden /> : <Store className="h-4 w-4" aria-hidden />}
-              {m === 'events' ? 'Events' : 'Vendors'}
+              {m === 'events' ? <CalendarDays className="h-4 w-4" aria-hidden /> : m === 'voting' ? <SquareCheckBig className="h-4 w-4" aria-hidden /> : <Store className="h-4 w-4" aria-hidden />}
+              {m === 'events' ? 'Events' : m === 'voting' ? 'Voting' : 'Vendors'}
             </button>
           ))}
         </div>
@@ -154,7 +157,7 @@ export const SearchHero: React.FC = () => {
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder={mode === 'events' ? 'What event are you looking for?' : 'Photographer, venue, decorator…'}
+              placeholder={mode === 'events' ? 'What event are you looking for?' : mode === 'voting' ? 'Contest or contestant name' : 'Photographer, venue, decorator…'}
               className="h-12 w-full border-0 bg-transparent text-base placeholder:text-ink-400 focus:outline-none focus:ring-0"
             />
           </label>
@@ -253,7 +256,7 @@ export const EventsShowcase: React.FC = () => {
             <Eyebrow>{sec.eyebrow}</Eyebrow>
             <H2>{sec.title}</H2>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {(['featured', 'upcoming'] as const).map((t) => (
               <button
                 key={t}
@@ -307,7 +310,7 @@ export const VendorsShowcase: React.FC = () => {
   const categories = useVendorCategories().data ?? []
   const [cat, setCat] = useState('')
   const used = categories.filter((c) => data.some((v) => v.category_slug === c.slug))
-  const list = (cat ? data.filter((v) => v.category_slug === cat) : data).slice(0, 4)
+  const list = (cat ? data.filter((v) => v.category_slug === cat) : data).slice(0, 6)
   if (!sec.show || (!isLoading && data.length === 0)) return null
 
   return (
@@ -337,7 +340,7 @@ export const VendorsShowcase: React.FC = () => {
             ))}
           </div>
         )}
-        <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {list.map((v) => (
             <VendorCard key={v.id} vendor={v} to={`/marketplace/vendors/${v.id}`} />
           ))}
@@ -458,7 +461,7 @@ export const StepsTabs: React.FC = () => {
           <Eyebrow center>{sec.eyebrow}</Eyebrow>
           <H2>{sec.title}</H2>
         </Reveal>
-        <div role="tablist" aria-label="I am" className="mx-auto mt-8 flex w-fit gap-1 rounded-full border border-ink-200 bg-white p-1">
+        <div role="tablist" aria-label="I am" className="mx-auto mt-8 flex w-fit max-w-full gap-1 overflow-x-auto rounded-full border border-ink-200 bg-white p-1">
           {(Object.keys(STEP_ICONS) as (keyof typeof STEP_ICONS)[]).map((k) => {
             const T = { ...sec[k], icon: STEP_ICONS[k].tab }
             return (
@@ -467,9 +470,9 @@ export const StepsTabs: React.FC = () => {
                 role="tab"
                 aria-selected={who === k}
                 onClick={() => setWho(k)}
-                className={cn('inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold sm:px-5', who === k ? 'bg-ink-900 text-white' : 'text-ink-600 hover:text-ink-900')}
+                className={cn('inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-2 text-sm font-semibold sm:gap-2 sm:px-5', who === k ? 'bg-ink-900 text-white' : 'text-ink-600 hover:text-ink-900')}
               >
-                <T.icon className="h-4 w-4" aria-hidden />
+                <T.icon className="hidden h-4 w-4 sm:block" aria-hidden />
                 {T.label}
               </button>
             )
@@ -564,7 +567,7 @@ export const ContactSection: React.FC = () => {
           <div className="grid gap-4 sm:grid-cols-2">
             <Input label="Full name" required value={form.name} onChange={set('name')} placeholder="Your name" />
             <Input label="Email" type="email" required value={form.email} onChange={set('email')} placeholder="you@example.com" />
-            <Input label="Phone" type="tel" value={form.phone} onChange={set('phone')} placeholder="98XXXXXXXX" hint="Optional" />
+            <Input label="Mobile number" type="tel" required value={form.phone} onChange={set('phone')} placeholder="98XXXXXXXX" autoComplete="tel" />
             <Select label="I am" value={form.role} onChange={set('role')}>
               <option value="user">Attending events</option>
               <option value="business">Organizing events</option>

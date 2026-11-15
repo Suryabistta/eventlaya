@@ -40,8 +40,20 @@ class BuyThrottle(OTPThrottle):
 def get_public_contest(request, slug, ref):
     from .views import get_public_event, sync_due_polls
     sync_due_polls()
-    event = get_public_event(slug, request)
-    qs = Poll.objects.filter(event=event, kind=Poll.Kind.CONTEST).exclude(status=Poll.Status.DRAFT).select_related('event')
+    try:
+        event = get_public_event(slug, request)
+    except Http404:
+        # The organizer may preview the contest of an event that isn't published yet
+        from apps.events.models import Event
+        from .views import can_manage
+        event = Event.objects.filter(slug=slug).first()
+        if event is None or not can_manage(getattr(request, 'user', None), event):
+            raise
+    qs = Poll.objects.filter(event=event, kind=Poll.Kind.CONTEST).select_related('event')
+    # Drafts: only the organizer, to preview the page before opening it
+    from .views import can_manage
+    if not can_manage(getattr(request, 'user', None), event):
+        qs = qs.exclude(status=Poll.Status.DRAFT)
     poll = (qs.filter(pk=ref).first() if UUID_RE.match(str(ref)) else None) or qs.filter(slug=str(ref).lower()).first()
     if poll is None:
         raise Http404('No such contest')
@@ -52,7 +64,9 @@ def get_public_contest(request, slug, ref):
 
 def contestant_public(poll, c, fields, in_round=None, detail=False):
     data = {
-        'id': str(c.id), 'number': c.number, 'display_number': poll.format_number(c.number), 'slug': c.slug, 'name': c.name,
+        # Numbers only when the organizer shows them (show_numbers); links then use the slug
+        'id': str(c.id), 'number': c.number if poll.show_numbers else None,
+        'display_number': poll.format_number(c.number) if poll.show_numbers else '', 'slug': c.slug, 'name': c.name,
         'subtitle': c.subtitle, 'photo_url': c.photo_url, 'status': c.status,
         'categories': [str(x.id) for x in c.categories.all()],
         'in_current_round': in_round,
@@ -88,6 +102,14 @@ def paid_public(poll, request=None):
     }
 
 
+def event_brief(e):
+    from apps.platform.models import EventCategory
+    label = EventCategory.objects.filter(slug=e.category).values_list('name', flat=True).first()
+    return {'title': e.title, 'slug': e.slug, 'location': e.location, 'terms': e.terms,
+            'organizer_name': getattr(e.organizer, 'organization_name', '') or '',
+            'category_label': '' if e.category == 'other' else (label or e.category.replace('_', ' ').title())}
+
+
 def contest_public_data(poll, request=None, with_contestants=True):
     rnd = current_round(poll)
     shown = display_round(poll)
@@ -100,9 +122,9 @@ def contest_public_data(poll, request=None, with_contestants=True):
         # Winners announced (organizer's announcement shown above the results)
         'winners_announced_at': poll.winners_announced_at, 'announcement': poll.announcement if poll.winners_announced_at else '',
         'cover_url': poll.cover_url, 'status': poll.status, 'opens_at': poll.opens_at, 'closes_at': poll.closes_at,
-        'event': {'title': poll.event.title, 'slug': poll.event.slug},
+        'event': event_brief(poll.event),
         'vote_mode': poll.vote_mode, 'require_checked_in': poll.require_checked_in,
-        'verification': {'method': poll.vote_mode, 'channel': channel_for(poll),
+        'verification': {'method': poll.vote_mode, 'channel': channel_for(poll), 'email_fallback': poll.vote_mode == Poll.VoteMode.SMS_OTP and poll.sms_email_fallback,
                          'captcha_site_key': captcha.site_key() if captcha.captcha_active(poll) else None},
         'rules': {
             'free_votes_enabled': poll.free_votes_enabled, 'votes_per_voter': poll.votes_per_voter, 'votes_per_day': poll.votes_per_day,
@@ -120,6 +142,10 @@ def contest_public_data(poll, request=None, with_contestants=True):
         'categories': [],
         'standings': public_standings(poll, shown) if poll.main_vote_enabled or has_rounds else None,
         'placement_titles': poll.placement_titles,
+        'show_standings': poll.show_standings,
+        'show_numbers': poll.show_numbers,
+        'show_ranks': poll.show_ranks,
+        'show_vote_counts': poll.show_vote_counts,
         'transparency_note': poll.transparency_note if poll.show_transparency else '',
     }
     for cat in poll.categories.all().prefetch_related('nominees'):
@@ -174,7 +200,7 @@ class PublicContestantView(APIView):
         ids = list(poll.candidates.order_by('order', 'number', 'name').values_list('id', flat=True))
         i = ids.index(c.id)
         neighbours = Candidate.objects.filter(id__in=[ids[i - 1] if i > 0 else None, ids[i + 1] if i + 1 < len(ids) else None])
-        nb = {n.id: {'id': str(n.id), 'name': n.name, 'display_number': poll.format_number(n.number), 'slug': n.slug, 'number': n.number}
+        nb = {n.id: {'id': str(n.id), 'name': n.name, 'display_number': poll.format_number(n.number) if poll.show_numbers else '', 'slug': n.slug, 'number': n.number if poll.show_numbers else None}
               for n in neighbours}
         data['previous'] = nb.get(ids[i - 1]) if i > 0 else None
         data['next'] = nb.get(ids[i + 1]) if i + 1 < len(ids) else None
@@ -257,6 +283,8 @@ class PublicOTPView(APIView):
                 return Response(verify_code(poll, request.data.get('destination'), request.data.get('code')))
         except OTPError as e:
             body = {'error': e.message}
+            if e.reason:
+                body['code'] = e.reason
             if e.retry_after:
                 body['retry_after'] = e.retry_after
             return Response(body, status=e.code)
@@ -321,11 +349,11 @@ class ContestOGView(APIView):
             c = find_contestant(poll, cref)
             if c is None:
                 raise Http404('No such contestant')
-            num = poll.format_number(c.number)
+            num = poll.public_number(c.number)
             title = f'Vote for {num} {c.name}'.replace('  ', ' ')
             desc = (c.description or c.subtitle or f'{c.name} is competing in {poll.title}. Tap to vote.')[:200]
             image = absolute(request, c.photo_url or poll.cover_url)
-            url = spa_url(poll.event, f'{base}/c/{c.number if c.number is not None else c.slug}')
+            url = spa_url(poll.event, f'{base}/c/{poll.public_ref(c)}')
             title = f'{title} · {poll.title}'
         else:
             title = poll.title
@@ -335,3 +363,113 @@ class ContestOGView(APIView):
         response = HttpResponse(og_html(title, desc, image, url, site), content_type='text/html; charset=utf-8')
         response['Cache-Control'] = 'public, max-age=300'
         return response
+
+
+class PublicContestListView(APIView):
+    """All public contests (the /voting page): ?when=live|upcoming|past, ?search=, ?city=, ?category=.
+
+    Same scoping as the events list (white-label sites see only their organizer) and only contests whose organizer
+    has the contests module on. Vote totals follow each contest's results visibility."""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = [OptionalJWTAuthentication]
+
+    def get(self, request):
+        from django.db.models import Count, Q
+        from apps.accounts.modules import module_enabled
+        from apps.accounts.tenancy import scope_events
+        from apps.events.models import Event
+        from apps.platform.models import EventCategory
+        from .access import user_of
+        from .scoring import visibility
+        from .serializers import polls_with_counts
+        from .views import PUBLIC_EVENT_STATUSES, sync_due_polls
+        sync_due_polls()
+        if not module_enabled(CONTESTS, user_of(request)):
+            return Response({'results': [], 'counts': {}, 'cities': []})
+        events = scope_events(Event.objects.filter(status__in=PUBLIC_EVENT_STATUSES), request)
+        qs = Poll.objects.filter(kind=Poll.Kind.CONTEST, show_on_public_page=True, event__in=events) \
+            .exclude(status=Poll.Status.DRAFT).select_related('event', 'event__organizer')
+        search = request.query_params.get('search', '').strip()
+        if search:
+            qs = qs.filter(Q(title__icontains=search) | Q(event__title__icontains=search)
+                           | Q(candidates__name__icontains=search)).distinct()
+        city = request.query_params.get('city', '').strip()
+        if city:
+            qs = qs.filter(event__location__icontains=city)
+        category = request.query_params.get('category', '').strip()
+        if category:
+            qs = qs.filter(event__category=category)
+        organizers_on = {}
+
+        def allowed(p):
+            oid = p.event.organizer_id
+            if oid not in organizers_on:
+                organizers_on[oid] = module_enabled(CONTESTS, p.event.organizer)
+            return organizers_on[oid]
+
+        # Contestants counted in a subquery: joining them into the vote Sum would multiply the vote total
+        from django.db.models import IntegerField, OuterRef, Subquery
+        from django.db.models.functions import Coalesce
+        n_sub = Candidate.objects.filter(poll=OuterRef('pk')).order_by().values('poll').annotate(n=Count('id')).values('n')
+        polls = [p for p in polls_with_counts(qs).annotate(n_contestants=Coalesce(Subquery(n_sub, output_field=IntegerField()), 0)) if allowed(p)]
+        group = {'live': Poll.Status.OPEN, 'upcoming': Poll.Status.SCHEDULED, 'past': Poll.Status.CLOSED}
+        counts = {k: sum(1 for p in polls if p.status == s) for k, s in group.items()}
+        cities = sorted({p.event.location.split(',')[-1].strip() for p in polls if p.event.location})
+        when = request.query_params.get('when', 'live')
+        shown = [p for p in polls if p.status == group.get(when, Poll.Status.OPEN)]
+        far = '9999'
+        if when == 'past':
+            shown.sort(key=lambda p: str(p.closes_at or ''), reverse=True)
+        else:
+            shown.sort(key=lambda p: str((p.closes_at if when == 'live' else p.opens_at) or far))
+        labels = dict(EventCategory.objects.values_list('slug', 'name'))
+        out = []
+        for p in shown:
+            e = p.event
+            level, _ = visibility(p)
+            out.append({
+                'id': str(p.id), 'slug': p.slug, 'title': p.title, 'status': p.status, 'cover_url': p.cover_url,
+                'opens_at': p.opens_at, 'closes_at': p.closes_at, 'contestants': p.n_contestants,
+                'total_votes': p.total_votes if level == 'full' and p.show_vote_counts else None,
+                'organizer_name': getattr(e.organizer, 'organization_name', '') or '',
+                'event': {'slug': e.slug, 'title': e.title, 'location': e.location, 'category': e.category,
+                          'category_label': '' if e.category == 'other' else labels.get(e.category, e.category.replace('_', ' ').title()),
+                          'banner': request.build_absolute_uri(e.banner.url) if e.banner else None},
+            })
+        return Response({'results': out, 'counts': counts, 'cities': cities})
+
+
+class ReminderThrottle(SimpleRateThrottle):
+    scope = 'contest_reminder'
+    rate = '20/hour'
+
+    def get_cache_key(self, request, view):
+        return self.cache_format % {'scope': self.scope, 'ident': self.get_ident(request)}
+
+
+class PublicContestReminderView(APIView):
+    """POST {destination: phone or email} on an upcoming contest: one message when voting opens ("Notify me")."""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = [OptionalJWTAuthentication]
+    throttle_classes = [ReminderThrottle]
+
+    def post(self, request, slug, ref):
+        import re
+        from .models import ContestReminder
+        from .sms import normalize_nepal_mobile
+        poll = get_public_contest(request, slug, ref)
+        if poll.status not in (Poll.Status.SCHEDULED, Poll.Status.DRAFT):
+            return Response({'error': 'Voting is already open or has closed.'}, status=400)
+        raw = (request.data.get('destination') or '').strip()
+        if '@' in raw:
+            dest = raw.lower()
+            if not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', dest) or len(dest) > 254:
+                return Response({'error': 'That email address doesn’t look right.'}, status=400)
+            channel = 'email'
+        else:
+            try:
+                dest, channel = normalize_nepal_mobile(raw), 'sms'
+            except ValueError as e:
+                return Response({'error': str(e)}, status=400)
+        ContestReminder.objects.get_or_create(poll=poll, destination=dest, defaults={'channel': channel})
+        return Response({'ok': True, 'channel': channel}, status=201)

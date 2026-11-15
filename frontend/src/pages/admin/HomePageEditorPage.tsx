@@ -91,6 +91,11 @@ export const HomePageEditorPage: React.FC = () => {
         <p className="text-sm text-ink-500">Shows your upcoming events, featured ones first. Choose which events are featured in Featured events.</p>
       </Block>
 
+      <Block title="Live voting (live)" show={c.voting.show} onShow={(v) => set('voting', { show: v })} onReset={() => reset('voting')}>
+        {head('voting')}
+        <p className="text-sm text-ink-500">Shows contests open for voting right now. Hidden when none are live or the Contests module is off.</p>
+      </Block>
+
       <Block title="Featured vendors (live)" show={c.vendors.show} onShow={(v) => set('vendors', { show: v })} onReset={() => reset('vendors')}>
         {head('vendors')}
       </Block>

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../data/favourites.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../core/legal.dart';
@@ -136,6 +137,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   chevron: true,
                   onTap: () => openChangePassword(context),
                 ),
+                if (ref.watch(moduleEnabledProvider(AppModule.favourites)))
+                  ListRow(
+                    leading: const RowIcon(Icons.favorite_rounded, background: AppColors.brand),
+                    title: 'Saved events',
+                    chevron: true,
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SavedEventsScreen())),
+                  ),
                 if (reviews)
                   ListRow(
                     leading: const RowIcon(Icons.star_rounded, background: AppColors.marigold),

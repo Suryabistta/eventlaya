@@ -111,6 +111,8 @@ class Poll(models.Model):
         BOTH = 'both', 'Email and SMS'
 
     contestant_notify = models.CharField(max_length=5, choices=Notify.choices, default=Notify.EMAIL)
+    sms_email_fallback = models.BooleanField(default=True, help_text='SMS-code contests: when SMS can’t be sent, voters may get the code by email instead')
+    contestants_can_edit = models.BooleanField(default=True, help_text='Contestants may update their own photo, bio and links through a private link')
     # Winners announced: results become public, the event timeline shows Results, winners are notified
     winners_announced_at = models.DateTimeField(null=True, blank=True)
     announcement = models.TextField(blank=True, max_length=2000)
@@ -130,6 +132,10 @@ class Poll(models.Model):
     flag_device_voters = models.PositiveIntegerField(default=4, help_text='Flag when one device is used by this many voters (0 = off)')
     transparency_note = models.TextField(blank=True)
     show_transparency = models.BooleanField(default=False)
+    show_standings = models.BooleanField(default=True, help_text='Show the Standings list on the public contest page')
+    show_numbers = models.BooleanField(default=False, help_text='Show contestant numbers (#01…) to the public')
+    show_ranks = models.BooleanField(default=False, help_text='Show rank badges (Rank 3, Leading) on public contestant cards')
+    show_vote_counts = models.BooleanField(default=False, help_text='Show vote counts on public contestant cards and the contest list')
 
     # --- Contest: judges and display
     judges_see_others = models.BooleanField(default=False, help_text='Judges can see the other judges\' submitted scores')
@@ -186,6 +192,14 @@ class Poll(models.Model):
             return ''
         return f'{self.number_prefix}{str(number).zfill(self.number_padding or 1)}'
 
+    def public_number(self, number):
+        """The number as the public may see it: '' unless the organizer shows numbers (show_numbers)."""
+        return self.format_number(number) if self.show_numbers else ''
+
+    def public_ref(self, candidate):
+        """How public links point at a contestant: their number when numbers are shown, else their slug."""
+        return candidate.number if (self.show_numbers and candidate.number is not None) else candidate.slug
+
 
 class Candidate(models.Model):
     """A poll option, or a contest contestant (number, profile, gallery, status)."""
@@ -212,6 +226,10 @@ class Candidate(models.Model):
     profile = models.JSONField(default=dict, blank=True, help_text='Values of the contest\'s custom profile fields, by key')
     # Added from an accepted application (event applications stage): that FormResponse, so it isn't imported twice
     application_id = models.UUIDField(null=True, blank=True)
+    # Private link for the contestant to edit their own profile (made on first use; see ensure_edit_token)
+    edit_token = models.CharField(max_length=43, blank=True, db_index=True)
+    # When the "voting is open, here's your link" message went out (sent once)
+    invited_at = models.DateTimeField(null=True, blank=True)
     # For contestant notifications (from the application, or typed by the organizer); never shown publicly
     contact_email = models.EmailField(blank=True)
     contact_phone = models.CharField(max_length=30, blank=True)
@@ -232,6 +250,13 @@ class Candidate(models.Model):
     def display_number(self):
         return self.poll.format_number(self.number)
 
+
+    def ensure_edit_token(self):
+        if not self.edit_token:
+            import secrets
+            self.edit_token = secrets.token_urlsafe(32)
+            Candidate.objects.filter(pk=self.pk).update(edit_token=self.edit_token)
+        return self.edit_token
 
 class ProfileField(models.Model):
     """Organizer-defined contestant profile field (Age, Height, District…)."""
@@ -583,6 +608,18 @@ class VotePurchase(models.Model):
     @property
     def total_votes(self):
         return self.votes + self.bonus_votes
+
+
+class ContestReminder(models.Model):
+    """"Notify me" on an upcoming contest: one message when voting opens, then the row is deleted."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    poll = models.ForeignKey(Poll, on_delete=models.CASCADE, related_name='reminders')
+    channel = models.CharField(max_length=5, choices=[('sms', 'SMS'), ('email', 'Email')])
+    destination = models.CharField(max_length=254, help_text='Normalized phone or email; deleted once the reminder is sent')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['poll', 'destination'], name='one_reminder_per_destination')]
 
 
 class VoteOTP(models.Model):

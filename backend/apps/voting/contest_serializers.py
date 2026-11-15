@@ -47,13 +47,22 @@ class ContestantSerializer(serializers.ModelSerializer):
     categories = serializers.SerializerMethodField()
     rounds = serializers.SerializerMethodField()
     number = serializers.IntegerField(required=False, allow_null=True, min_value=0, max_value=99999)
+    edit_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Candidate
         fields = ['id', 'poll', 'name', 'subtitle', 'description', 'photo_url', 'gallery', 'social_links', 'profile',
                   'number', 'display_number', 'slug', 'status', 'order', 'votes', 'categories', 'rounds',
-                  'contact_email', 'contact_phone', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'poll', 'display_number', 'votes', 'categories', 'rounds', 'created_at', 'updated_at']
+                  'contact_email', 'contact_phone', 'invited_at', 'edit_url', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'poll', 'display_number', 'votes', 'categories', 'rounds', 'invited_at', 'edit_url',
+                            'created_at', 'updated_at']
+
+    def get_edit_url(self, obj):
+        # The contestant's private profile-edit link, for the organizer to pass on (organizer views only)
+        if not obj.pk or not obj.poll.contestants_can_edit:
+            return None
+        from .self_edit_views import profile_links
+        return profile_links(obj)['edit_url']
         extra_kwargs = {'slug': {'required': False}, 'order': {'required': False}}
 
     @property
@@ -332,7 +341,7 @@ SETTINGS_FIELDS = [
     'contestant_cap_period', 'allow_split', 'max_votes_per_submit', 'paid_votes_enabled', 'price_per_vote', 'currency',
     'max_packs_per_day', 'buy_and_vote',
     'captcha_enabled', 'ip_votes_per_minute', 'device_votes_per_minute', 'flag_ip_burst', 'flag_subnet_burst',
-    'flag_device_voters', 'transparency_note', 'show_transparency', 'judges_see_others', 'show_judge_breakdown',
+    'flag_device_voters', 'transparency_note', 'show_transparency', 'show_standings', 'show_numbers', 'show_ranks', 'show_vote_counts', 'contestants_can_edit', 'sms_email_fallback', 'judges_see_others', 'show_judge_breakdown',
     'placement_titles', 'contestant_notify', 'announcement',
 ]
 

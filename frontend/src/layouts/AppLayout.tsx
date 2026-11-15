@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { formatDate as formatSiteDate } from '@/lib/dates'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
-  LayoutDashboard,
+  Heart, LayoutDashboard,
   CalendarDays,
   CalendarCheck,
   FileText,
@@ -44,8 +44,6 @@ import {
   GalleryHorizontal,
   Image as ImageIcon,
   Printer,
-  ClipboardList,
-  Crown,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
@@ -82,6 +80,9 @@ interface NavExtras {
   chatUnread: number
   reviews: boolean
   marketplace: boolean
+  favourites?: boolean
+  /** Organizer with no events yet: a short menu so the first step is obvious */
+  firstRun?: boolean
   whiteLabel: boolean
   payments: boolean
   printedTickets: boolean
@@ -100,7 +101,7 @@ const noExtras: NavExtras = { chat: false, chatUnread: 0, reviews: false, market
 function useNavExtras(): NavExtras {
   const modules = useModules()
   const chat = useChat()
-  const { currentEvent } = useCurrentEvent()
+  const { currentEvent, events, isLoading: eventsLoading } = useCurrentEvent()
   const appsOn = Boolean(currentEvent?.applications_enabled) && modules.enabled('applications')
   // Same query as the Applications page, so the badge updates when one is reviewed
   const { data: applications } = useQuery({
@@ -120,6 +121,8 @@ function useNavExtras(): NavExtras {
     reviews: modules.enabled('reviews'),
     printedTickets: modules.enabled('offline_tickets'),
     marketplace: modules.enabled('marketplace'),
+    favourites: modules.enabled('favourites'),
+    firstRun: !eventsLoading && events.length === 0,
     whiteLabel: modules.enabled('white_label'),
     payments: modules.enabled('payments'),
     contests: modules.enabled('voting') && modules.enabled('contests'),
@@ -138,7 +141,6 @@ const hasBusinessPortal = (u: ShellUser | null) => isVendor(u) || u?.marketplace
 /** The event menu follows the selected event: ticketing, free registration or pageant each see only their own tools. */
 const eventTools = (x: NavExtras): NavGroup => {
   const k = x.kind
-  const formLabel = k === 'pageant' ? 'Application form' : k === 'registration' ? 'Sign-up form' : 'Buyer questions'
   const checkIn: NavItem = {
     label: 'Check-in',
     to: '/app/scanner',
@@ -154,25 +156,20 @@ const eventTools = (x: NavExtras): NavGroup => {
       end: true,
       icon: CalendarDays,
       roles: ORGANIZER,
-      children: [
-        { label: 'Ticketing', to: '/app/events/ticketing', icon: Ticket },
-        { label: 'Registration', to: '/app/events/registration', icon: ClipboardList },
-        ...(x.contests ? [{ label: 'Pageants', to: '/app/events/pageants', icon: Crown }] : []),
-      ],
     },
   ]
   if (k === 'pageant' || x.applications) {
     items.push({ label: 'Applications', to: '/app/applications', icon: Inbox, roles: ORGANIZER, badge: x.applicationsPending })
   }
-  if (k) items.push({ label: formLabel, to: '/app/forms', icon: FileText, roles: ORGANIZER })
-  if (k === 'pageant') items.push({ label: 'Contest & voting', to: '/app/voting', icon: Vote, roles: ORGANIZER })
+  if (k) items.push({ label: 'Dynamic forms', to: '/app/forms', icon: FileText, roles: ORGANIZER })
+  if (k === 'pageant') items.push({ label: 'Voting', to: '/app/voting', icon: Vote, roles: ORGANIZER })
   if (x.ticketsOn && k !== 'registration') {
     items.push({ label: k === 'pageant' ? 'Finale tickets' : 'Tickets & prices', to: '/app/tickets', icon: Ticket, roles: ORGANIZER })
     items.push({ label: 'Orders & payments', to: '/app/payments', icon: Wallet, roles: ORGANIZER })
     if (x.printedTickets) items.push({ label: 'Printed tickets', to: '/app/printed-tickets', icon: Printer, roles: ORGANIZER })
   }
   if (x.passes) items.push(checkIn)
-  if (k && k !== 'pageant') items.push({ label: 'Polls', to: '/app/voting', icon: Vote, roles: ORGANIZER })
+  if (k && k !== 'pageant') items.push({ label: 'Voting', to: '/app/voting', icon: Vote, roles: ORGANIZER })
   if (k) items.push({ label: 'Analytics', to: '/app/analytics', icon: BarChart3, roles: ORGANIZER })
   items.push(
     { label: 'Team members', to: '/app/team', icon: UsersRound, roles: ORGANIZER },
@@ -200,6 +197,7 @@ function buildNav(user: ShellUser | null, pending: PendingApprovals = noPending,
         label: 'Your events',
         items: [
           { label: 'My tickets', to: '/app/my/tickets', icon: Ticket },
+          ...(x.favourites ? [{ label: 'Saved events', to: '/app/my/saved', icon: Heart }] : []),
           ...(x.marketplace ? [{ label: 'My inquiries', to: '/app/my/inquiries', icon: Inbox }] : []),
           ...(x.payments ? [{ label: 'My payments', to: '/app/my/payments', icon: Receipt }] : []),
           ...(x.reviews ? [{ label: 'My reviews', to: '/app/my/reviews', icon: Star }] : []),
@@ -234,6 +232,7 @@ function buildNav(user: ShellUser | null, pending: PendingApprovals = noPending,
         ? [{ label: 'List your business', to: '/app/marketplace-access', icon: Store }]
         : []),
       ...(user.role === 'organizer' ? [{ label: 'My tickets', to: '/app/my/tickets', icon: Ticket }] : []),
+      ...(user.role === 'organizer' && x.favourites ? [{ label: 'Saved events', to: '/app/my/saved', icon: Heart }] : []),
       ...(user.role === 'organizer' && x.payments ? [{ label: 'My payments', to: '/app/my/payments', icon: Receipt }] : []),
       ...account.items,
     ],
@@ -279,6 +278,13 @@ function buildNav(user: ShellUser | null, pending: PendingApprovals = noPending,
     ]
   }
 
+  // No events yet: only what helps create the first one (the full menu appears once an event exists)
+  if (x.firstRun && user.role === 'organizer' && !hasBusinessPortal(user)) {
+    return [
+      { label: 'Get started', items: [{ label: 'Overview', to: '/app', icon: LayoutDashboard, end: true }, { label: 'Events', to: '/app/events', end: true, icon: CalendarDays }] },
+      { label: 'Account', items: [{ label: 'Plan & billing', to: '/app/billing', icon: CreditCard }, ...account.items] },
+    ]
+  }
   return [eventTools(x), ...(hasBusinessPortal(user) ? [business] : []), workspace]
 }
 

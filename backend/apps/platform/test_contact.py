@@ -9,12 +9,12 @@ User = get_user_model()
 class ContactFormTests(APITestCase):
     def test_send_list_and_mark_done(self):
         url = '/api/platform/contact/'
-        self.assertEqual(self.client.post(url, {'name': 'Sita', 'email': 'bad', 'message': 'Hi'}, format='json').status_code, 400)
-        r = self.client.post(url, {'name': 'Sita', 'email': 'sita@x.com', 'role': 'business', 'message': 'We run a college fest.'}, format='json')
+        self.assertEqual(self.client.post(url, {'name': 'Sita', 'email': 'bad', 'phone': '9800000000', 'message': 'Hi'}, format='json').status_code, 400)
+        r = self.client.post(url, {'name': 'Sita', 'email': 'sita@x.com', 'phone': '9800000000', 'role': 'business', 'message': 'We run a college fest.'}, format='json')
         self.assertEqual(r.status_code, 201, r.data)
         for _ in range(4):
-            self.client.post(url, {'name': 'S', 'email': 's@x.com', 'message': 'again'}, format='json')
-        self.assertEqual(self.client.post(url, {'name': 'S', 'email': 's@x.com', 'message': 'spam'}, format='json').status_code, 429)
+            self.client.post(url, {'name': 'S', 'email': 's@x.com', 'phone': '9800000000', 'message': 'again'}, format='json')
+        self.assertEqual(self.client.post(url, {'name': 'S', 'email': 's@x.com', 'phone': '9800000000', 'message': 'spam'}, format='json').status_code, 429)
         self.assertEqual(self.client.get('/api/platform/contact/messages/').status_code, 401)
         admin = User.objects.create_user(username='a', email='a@x.com', password='x', role='superadmin')
         self.client.force_authenticate(admin)
@@ -36,3 +36,13 @@ class HomeContentTests(APITestCase):
         self.assertEqual(self.client.put(url, {'data': {'hero': {'badge': 'Hello'}}}, format='json').status_code, 200)
         self.client.force_authenticate(None)
         self.assertEqual(self.client.get(url).data['data']['hero']['badge'], 'Hello')
+
+
+class ContactPhoneRequiredTests(APITestCase):
+    def test_mobile_number_is_required(self):
+        url = '/api/platform/contact/'
+        r = self.client.post(url, {'name': 'Sita', 'email': 'sita@x.com', 'message': 'Hi'}, format='json')
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('mobile', r.data['error'])
+        r = self.client.post(url, {'name': 'Sita', 'email': 'sita@x.com', 'phone': '98', 'message': 'Hi'}, format='json')
+        self.assertEqual(r.status_code, 400)

@@ -376,8 +376,9 @@ class _StandingTiles extends StatelessWidget {
     return Semantics(
       liveRegion: true,
       child: Wrap(spacing: 10, runSpacing: 10, children: [
-        if (s.rank != null) tile(placement ?? 'Rank', '${s.rank}${s.tied ? '=' : ''}', dark: true),
-        if (full && s.votes != null) tile('Votes', '${s.votes}'),
+        // The winner's placement always shows once closed; a live rank only when the organizer shows ranks
+        if (s.rank != null && (placement != null || contest.showRanks)) tile(placement ?? 'Rank', '${s.rank}${s.tied ? '=' : ''}', dark: true),
+        if (full && s.votes != null && contest.showVoteCounts) tile('Votes', '${s.votes}'),
         if (full && s.finalScore != null) tile('Score', s.finalScore!.toStringAsFixed(1)),
       ]),
     );

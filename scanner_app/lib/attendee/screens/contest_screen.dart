@@ -10,6 +10,7 @@ import '../data/contest_api.dart';
 import '../models/contest.dart';
 import '../providers/contest_providers.dart';
 import '../widgets/attendee_widgets.dart';
+import '../widgets/stage.dart';
 import '../widgets/contest_widgets.dart';
 import 'contest_results_screen.dart';
 import 'contestant_screen.dart';
@@ -185,7 +186,7 @@ class _ContestScreenState extends ConsumerState<ContestScreen> {
                       const SizedBox(height: 14),
                       _WinnerBanner(contest: c, winner: c.winner!, onTap: () => _openResults(c)),
                     ],
-                    if (c.standings != null || c.categories.any((x) => x.standings != null) || c.isClosed) ...[
+                    if (c.showStandings && (c.standings != null || c.categories.any((x) => x.standings != null) || c.isClosed)) ...[
                       const SizedBox(height: 14),
                       _ResultsButton(contest: c, onTap: () => _openResults(c)),
                     ],
@@ -209,8 +210,8 @@ class _ContestScreenState extends ConsumerState<ContestScreen> {
                     _SearchBar(
                       controller: _search,
                       sort: _sort,
-                      canRank: standings != null,
-                      canVotes: standings?.full == true,
+                      canRank: c.showRanks && standings != null,
+                      canVotes: c.showRanks && standings?.full == true,
                       onChanged: (v) => setState(() => _query = v),
                       onSort: (s) => setState(() => _sort = s),
                     ),
@@ -267,7 +268,7 @@ class _ContestScreenState extends ConsumerState<ContestScreen> {
                             : (cat.votingOpen && x.status != 'withdrawn' && x.status != 'eliminated');
                         return ContestantCard(
                           contestant: x,
-                          rank: ranks[x.id],
+                          rank: c.showRanks ? ranks[x.id] : null,
                           canVote: canVote,
                           onOpen: () => openContestant(context, contest: c, contestant: x),
                           onVote: () => voteFor(context, c, x, category: cat),
@@ -322,7 +323,7 @@ class _Cover extends StatelessWidget {
     return SliverAppBar(
       pinned: true,
       stretch: true,
-      expandedHeight: 210 + topPad * 0.3,
+      expandedHeight: 250 + topPad * 0.3,
       backgroundColor: AppColors.brandDark,
       foregroundColor: Colors.white,
       systemOverlayStyle: SystemUiOverlayStyle.light,
@@ -351,12 +352,7 @@ class _Cover extends StatelessWidget {
       flexibleSpace: FlexibleSpaceBar(
         stretchModes: const [StretchMode.zoomBackground],
         background: Stack(fit: StackFit.expand, children: [
-          contest.coverUrl == null
-              ? const DecoratedBox(
-                  decoration: BoxDecoration(gradient: brandGradient),
-                  child: Center(child: Icon(Icons.emoji_events_rounded, size: 72, color: Colors.white54)),
-                )
-              : NetImage(url: contest.coverUrl, icon: Icons.emoji_events_rounded),
+          contest.coverUrl == null ? StageArt(seed: contest.id) : NetImage(url: contest.coverUrl, icon: Icons.emoji_events_rounded),
           const DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -367,11 +363,50 @@ class _Cover extends StatelessWidget {
               ),
             ),
           ),
-          Positioned(left: 16, bottom: 14, child: GlassChip(contest.eventTitle.isEmpty ? 'Contest' : contest.eventTitle)),
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 14,
+            child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              if (contest.countdownTarget != null && contest.countdownTarget!.isAfter(DateTime.now()))
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                    Text(contest.isScheduled ? 'VOTING OPENS IN' : 'VOTING CLOSES IN',
+                        style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 1)),
+                    const SizedBox(height: 6),
+                    CountdownBoxes(target: contest.countdownTarget!, dark: true),
+                  ]),
+                )
+              else
+                Expanded(child: Align(alignment: Alignment.centerLeft, child: GlassChip(contest.eventTitle.isEmpty ? 'Contest' : contest.eventTitle))),
+              const SizedBox(width: 10),
+              if (contest.contestants.isNotEmpty) _BannerStat('Contestants', '${contest.contestants.length}'),
+            ]),
+          ),
         ]),
       ),
     );
   }
+}
+
+class _BannerStat extends StatelessWidget {
+  final String label;
+  final String value;
+  const _BannerStat(this.label, this.value);
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: .12),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withValues(alpha: .25)),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 10)),
+          Text(value, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
+        ]),
+      );
 }
 
 class _Glass extends StatelessWidget {
@@ -404,6 +439,11 @@ class _Header extends StatelessWidget {
       ]),
       const SizedBox(height: 10),
       Text(c.title, style: AppType.heading(28, weight: FontWeight.w800)),
+      if (c.organizerName.isNotEmpty || c.categoryLabel.isNotEmpty) ...[
+        const SizedBox(height: 4),
+        Text([if (c.organizerName.isNotEmpty) 'By ${c.organizerName}', if (c.categoryLabel.isNotEmpty) c.categoryLabel].join(' · '),
+            style: const TextStyle(color: AppColors.brand, fontWeight: FontWeight.w500)),
+      ],
       if (c.description.isNotEmpty) ...[
         const SizedBox(height: 6),
         _Expandable(text: c.description),

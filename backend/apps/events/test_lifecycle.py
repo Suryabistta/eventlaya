@@ -43,7 +43,7 @@ class PhaseTests(APITestCase):
             self.assertEqual(self.event.phase(before), expected)
 
     def register(self, email='a@test.com'):
-        return self.client.post(f'/api/forms/events/{self.event.slug}/register/', {'name': 'A', 'email': email}, format='json')
+        return self.client.post(f'/api/forms/events/{self.event.slug}/register/', {'name': 'A', 'email': email, 'phone': '9800000000'}, format='json')
 
     def test_registration_follows_phase(self):
         self.assertEqual(self.register('a@test.com').status_code, 201)

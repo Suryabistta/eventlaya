@@ -25,7 +25,7 @@ class TicketingBase(APITestCase):
         return f'/api/events/{self.event.id}/{suffix}'
 
     def register(self, email='a@test.com', **body):
-        return self.client.post(f'/api/forms/events/{self.event.slug}/register/', {'name': 'Asha', 'email': email, **body}, format='json')
+        return self.client.post(f'/api/forms/events/{self.event.slug}/register/', {'name': 'Asha', 'email': email, 'phone': '9800000000', **body}, format='json')
 
 
 class RegistrationTests(TicketingBase):

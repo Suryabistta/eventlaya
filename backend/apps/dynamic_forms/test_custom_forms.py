@@ -33,7 +33,7 @@ class CustomFormTests(APITestCase):
     def submit(self, **answers):
         base = {str(self.dob.id): (date.today() - timedelta(days=365 * 21)).isoformat(), str(self.height.id): '168'}
         base.update({str(getattr(self, k).id): v for k, v in answers.items()})
-        return self.client.post('/api/forms/events/miss-koshi/register/', {'name': 'Sita', 'email': 's@x.com', 'answers': base}, format='json')
+        return self.client.post('/api/forms/events/miss-koshi/register/', {'name': 'Sita', 'email': 's@x.com', 'phone': '9800000000', 'answers': base}, format='json')
 
     def upload(self, data, name='p.png'):
         return self.client.post('/api/forms/events/miss-koshi/upload/', {'file': SimpleUploadedFile(name, data)}, format='multipart')
@@ -86,7 +86,7 @@ class PhaseBTests(APITestCase):
 
     def register(self, email, ticket, answers):
         return self.client.post('/api/forms/events/run/register/', {
-            'name': 'Ram', 'email': email, 'items': [{'ticket_type_id': str(ticket.id), 'quantity': 1}],
+            'name': 'Ram', 'email': email, 'phone': '9800000000', 'items': [{'ticket_type_id': str(ticket.id), 'quantity': 1}],
             'answers': {str(k.id): v for k, v in answers.items()}}, format='json')
 
     def test_conditional_and_ticket_type_questions(self):

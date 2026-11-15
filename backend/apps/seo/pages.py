@@ -436,12 +436,12 @@ def tenant_home(ctx):
     events = [e for e in _upcoming_events(ctx.request)][:50]
     items = [(e.title, f'/e/{e.slug}') for e in events]
     description = truncate(f'Upcoming events by {name}. Register online and get your QR pass.')
-    return PageMeta(
+    meta = PageMeta(
         title=f'Events by {name}', description=description, canonical=ctx.url('/'), site_name=name,
-        image=jsonld.absolute(t.brand_logo, ctx.base) if getattr(t, 'brand_logo', '') else None,
         jsonld=[jsonld.item_list(f'Events by {name}', ctx.url('/'), [ctx.url(u) for _, u in items])],
         noscript=f'<h1>Events by {escape(name)}</h1>{links_html(items)}',
     )
+    return meta.set_image(og_images.for_tenant(t, host=ctx.base.replace('https://', '')))
 
 
 # ---------------------------------------------------------------------------

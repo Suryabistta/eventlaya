@@ -37,3 +37,50 @@ def send_sms(phone, text):
     except requests.RequestException as e:
         logger.warning('SMS to %s failed: %s', to, e)
         return False
+
+
+def send_application_sms(response, event):
+    """Text an applicant when their application is received (Aakash SMS, Nepal). Async thread, never raises."""
+    phone = getattr(response, 'submitter_phone', '')
+    if not phone or not sms_enabled():
+        return False
+    to = normalize(phone)
+    if not to:
+        return False
+    import threading
+    from apps.events.sub_events import display_title
+    title = display_title(event)
+    name = (response.submitter_name or 'there').strip().split()[0]
+    msg = f"Namaste {name}, your application for '{title}' has been received (App No: {response.number}). The festival team will review your submission."
+
+    def run():
+        send_sms(to, msg)
+
+    threading.Thread(target=run, daemon=True).start()
+    return True
+
+
+def send_review_sms(response, event):
+    """Text an applicant when their application is accepted or rejected. Async thread, never raises."""
+    phone = getattr(response, 'submitter_phone', '')
+    if not phone or not sms_enabled():
+        return False
+    to = normalize(phone)
+    if not to:
+        return False
+    import threading
+    from apps.events.sub_events import display_title
+    title = display_title(event)
+    name = (response.submitter_name or 'there').strip().split()[0]
+    if response.review_status == 'accepted':
+        msg = f"Namaste {name}, congratulations! Your application for '{title}' has been accepted. Check your email for details."
+    elif response.review_status == 'rejected':
+        msg = f"Namaste {name}, thank you for applying to '{title}'. We regret that your application was not selected this time."
+    else:
+        return False
+
+    def run():
+        send_sms(to, msg)
+
+    threading.Thread(target=run, daemon=True).start()
+    return True

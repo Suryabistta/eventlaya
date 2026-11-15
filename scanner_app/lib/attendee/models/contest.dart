@@ -543,6 +543,15 @@ class Contest {
   final List<String> placementTitles;
   final String transparencyNote;
 
+  final String organizerName;
+  /// Organizer's switch for the Standings list (on unless turned off)
+  final bool showStandings;
+  /// Rank badges and vote sorting on contestant cards (off unless the organizer turns it on)
+  final bool showRanks;
+  /// Vote counts on public pages (off unless the organizer turns it on)
+  final bool showVoteCounts;
+  final String categoryLabel;
+
   /// Not sent on the event's voting list.
   final List<Contestant> contestants;
   final int? contestantCount;
@@ -558,6 +567,11 @@ class Contest {
     this.closesAt,
     this.eventTitle = '',
     this.eventSlug = '',
+    this.organizerName = '',
+    this.showStandings = true,
+    this.showRanks = false,
+    this.showVoteCounts = false,
+    this.categoryLabel = '',
     this.voteMode = 'open',
     this.requireCheckedIn = false,
     this.captchaSiteKey,
@@ -589,6 +603,11 @@ class Contest {
       closesAt: _t(j['closes_at']),
       eventTitle: _s(event['title']) ?? '',
       eventSlug: _s(event['slug']) ?? '',
+      organizerName: _s(event['organizer_name']) ?? '',
+      showStandings: j['show_standings'] != false,
+      showRanks: j['show_ranks'] == true,
+      showVoteCounts: j['show_vote_counts'] == true,
+      categoryLabel: _s(event['category_label']) ?? '',
       voteMode: _s(verification['method'] ?? j['vote_mode']) ?? 'open',
       requireCheckedIn: j['require_checked_in'] == true,
       captchaSiteKey: _s(verification['captcha_site_key']),

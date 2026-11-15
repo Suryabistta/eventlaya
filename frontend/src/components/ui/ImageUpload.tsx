@@ -16,13 +16,14 @@ function validate(file: File): string | null {
 }
 
 /** Uploads one image to /api/uploads/ and reports progress (0–100). */
-export function uploadImage(file: File, kind: UploadKind, onProgress?: (pct: number) => void): Promise<string> {
+/** `url` overrides the endpoint (e.g. a contestant's private upload link, which needs no sign-in). */
+export function uploadImage(file: File, kind: UploadKind, onProgress?: (pct: number) => void, url = '/api/uploads/'): Promise<string> {
   return new Promise((resolve, reject) => {
     const body = new FormData()
     body.append('file', file)
     body.append('kind', kind)
     const xhr = new XMLHttpRequest()
-    xhr.open('POST', '/api/uploads/')
+    xhr.open('POST', url)
     const token = tokenStore.access
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
     xhr.upload.onprogress = (e) => e.lengthComputable && onProgress?.(Math.round((e.loaded / e.total) * 100))
@@ -49,17 +50,19 @@ const dropzoneBase =
 
 interface ImageUploadProps {
   label: string
+  /** Upload endpoint override (default /api/uploads/, which needs sign-in) */
+  uploadUrl?: string
   value: string | null | undefined
   onChange: (url: string | null) => void
   kind: UploadKind
   hint?: string
   /** "square" for logos and avatars, "wide" for banners and photos */
-  shape?: 'square' | 'wide'
+  shape?: 'square' | 'wide' | 'portrait'
   className?: string
 }
 
 /** One image: drop or choose a file, see it, replace or remove it. */
-export const ImageUpload: React.FC<ImageUploadProps> = ({ label, value, onChange, kind, hint, shape = 'wide', className }) => {
+export const ImageUpload: React.FC<ImageUploadProps> = ({ label, value, onChange, kind, hint, shape = 'wide', className, uploadUrl }) => {
   const toast = useToast()
   const id = useId()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -76,7 +79,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ label, value, onChange
     }
     setProgress(0)
     try {
-      const url = await uploadImage(file, kind, setProgress)
+      const url = await uploadImage(file, kind, setProgress, uploadUrl)
       setBroken(false)
       onChange(url)
       toast.success(`${label} uploaded`)
@@ -90,6 +93,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ label, value, onChange
 
   const uploading = progress !== null
   const square = shape === 'square'
+  const portrait = shape === 'portrait'
 
   return (
     <div className={cn('space-y-1.5', className)}>
@@ -113,7 +117,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ label, value, onChange
           <div
             className={cn(
               'relative shrink-0 overflow-hidden rounded-xl border border-ink-200 bg-ink-50',
-              square ? 'h-24 w-24' : 'aspect-[16/7] w-full',
+              square ? 'h-24 w-24' : portrait ? 'aspect-[4/5] w-full' : 'aspect-[16/7] w-full',
               dragging && 'ring-2 ring-brand-500',
             )}
           >
@@ -127,7 +131,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ label, value, onChange
           <div
             className={cn(
               dropzoneBase,
-              square ? 'h-24 w-24 shrink-0 px-2' : 'aspect-[16/6] min-h-[140px]',
+              square ? 'h-24 w-24 shrink-0 px-2' : portrait ? 'aspect-[4/5] w-full' : 'aspect-[16/6] min-h-[140px]',
               dragging ? 'border-brand-500 bg-brand-50' : 'border-ink-200 bg-ink-50 hover:border-brand-300 hover:bg-brand-50/40',
             )}
           >
@@ -199,6 +203,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ label, value, onChange
 
 interface GalleryProps {
   label: string
+  uploadUrl?: string
   value: string[]
   onChange: (urls: string[]) => void
   kind: UploadKind
@@ -208,7 +213,7 @@ interface GalleryProps {
 }
 
 /** Several images: add many at once, reorder, pick the cover (first), remove. */
-export const ImageGalleryUpload: React.FC<GalleryProps> = ({ label, value, onChange, kind, max = 8, hint, className }) => {
+export const ImageGalleryUpload: React.FC<GalleryProps> = ({ label, value, onChange, kind, max = 8, hint, className, uploadUrl }) => {
   const toast = useToast()
   const id = useId()
   const [pending, setPending] = useState<{ key: string; name: string; progress: number }[]>([])
@@ -233,7 +238,7 @@ export const ImageGalleryUpload: React.FC<GalleryProps> = ({ label, value, onCha
         const key = `${file.name}-${Math.random().toString(36).slice(2)}`
         setPending((p) => [...p, { key, name: file.name, progress: 0 }])
         try {
-          const url = await uploadImage(file, kind, (pct) => setPending((p) => p.map((x) => (x.key === key ? { ...x, progress: pct } : x))))
+          const url = await uploadImage(file, kind, (pct) => setPending((p) => p.map((x) => (x.key === key ? { ...x, progress: pct } : x))), uploadUrl)
           latest.current = [...latest.current, url]
           onChange(latest.current)
           added++

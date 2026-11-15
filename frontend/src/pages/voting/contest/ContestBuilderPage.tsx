@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  AlertTriangle, ArrowDown, ArrowUp, Award, BarChart3, CalendarDays, Check, ChevronRight, Crown, ExternalLink, Gavel, Layers, ListChecks,
+  AlertTriangle, ArrowDown, ArrowUp, Award, BarChart3, CalendarDays, Check, ChevronRight, Crown, ExternalLink, Gavel, Heart, Layers, ListChecks,
   Mic2, Plus, Settings2, ShieldCheck, Sparkles, Trash2, Trophy, Users, Vote as VoteIcon,
 } from 'lucide-react'
 import { useCurrentEvent } from '@/lib/event-context'
@@ -14,6 +14,7 @@ import {
   type ContestVoteMode, type Criterion, type PresetKey, type ProfileField, type Visibility, type VotePack,
 } from './api'
 import { ContestantsManager } from './ContestantsManager'
+import { useDeleteContest } from '../../VotingPage'
 import { JudgesManager } from './JudgesManager'
 import { ChoiceGroup, LimitField, ModuleOff, Note, Section, Toggle, fromLocalInput, isModuleOff, toLocalInput } from './kit'
 import { useModuleEnabled } from '@/lib/modules'
@@ -22,6 +23,7 @@ import { allowanceText, visibilityInfo, voteModeInfo } from './shared'
 const wrapClass = 'w-full space-y-6 px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-10 lg:pt-8 2xl:px-10'
 
 const presetIcon: Record<string, React.ReactNode> = {
+  simple: <Heart className="h-6 w-6" aria-hidden />,
   pageant: <Crown className="h-6 w-6" aria-hidden />,
   talent: <Mic2 className="h-6 w-6" aria-hidden />,
   awards: <Award className="h-6 w-6" aria-hidden />,
@@ -37,7 +39,7 @@ export const ContestCreatePage: React.FC = () => {
   const { currentEvent, isLoading: eventsLoading } = useCurrentEvent()
   const contestsOn = useModuleEnabled('contests')
   const presets = useQuery({ queryKey: ['contest-presets'], queryFn: contestApi.presets, enabled: contestsOn })
-  const [preset, setPreset] = useState<PresetKey>('pageant')
+  const [preset, setPreset] = useState<PresetKey>('simple')
   const [title, setTitle] = useState('')
   const create = useMutation({
     mutationFn: () => contestApi.create({ event: currentEvent!.id, title: title.trim(), preset }),
@@ -102,7 +104,10 @@ export const ContestCreatePage: React.FC = () => {
                     {presetIcon[p.key]}
                   </span>
                   <span className="min-w-0">
-                    <span className="block font-semibold text-ink-900">{p.name}</span>
+                    <span className="flex items-center gap-2 font-semibold text-ink-900">
+                      {p.name}
+                      {p.key === 'simple' && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Recommended</span>}
+                    </span>
                     <span className="mt-0.5 block text-sm text-ink-600">{p.description}</span>
                     {(p.rounds.length > 0 || p.categories.length > 0) && (
                       <span className="mt-2 block text-xs text-ink-500">
@@ -136,7 +141,7 @@ export const ContestCreatePage: React.FC = () => {
 const Breadcrumb: React.FC<{ current: string; contest?: Contest }> = ({ current, contest }) => (
   <nav aria-label="Breadcrumb">
     <ol className="flex flex-wrap items-center gap-1 text-sm text-ink-500">
-      <li><Link to="/app/voting" className="font-medium hover:text-ink-900 hover:underline">Live voting</Link></li>
+      <li><Link to="/app/voting" className="font-medium hover:text-ink-900 hover:underline">Voting</Link></li>
       {contest && (
         <>
           <ChevronRight className="h-4 w-4 text-ink-400" aria-hidden />
@@ -158,7 +163,7 @@ type Draft = Pick<
   | 'results_visibility' | 'results_top_n' | 'show_on_public_page' | 'number_prefix' | 'number_padding' | 'main_vote_enabled'
   | 'free_votes_enabled' | 'votes_per_voter' | 'votes_per_day' | 'votes_per_round' | 'votes_per_contestant' | 'contestant_cap_period'
   | 'allow_split' | 'max_votes_per_submit' | 'paid_votes_enabled' | 'price_per_vote' | 'max_packs_per_day' | 'buy_and_vote' | 'captcha_enabled' | 'ip_votes_per_minute'
-  | 'device_votes_per_minute' | 'flag_ip_burst' | 'flag_subnet_burst' | 'flag_device_voters' | 'transparency_note' | 'show_transparency'
+  | 'device_votes_per_minute' | 'flag_ip_burst' | 'flag_subnet_burst' | 'flag_device_voters' | 'transparency_note' | 'show_transparency' | 'show_standings' | 'show_numbers' | 'show_ranks' | 'show_vote_counts' | 'contestants_can_edit' | 'sms_email_fallback'
   | 'judges_see_others' | 'show_judge_breakdown' | 'placement_titles' | 'rounds' | 'profile_fields' | 'vote_packs' | 'contestant_notify'
 > & { categories: (ContestCategory & { round_ref: string; criterion_ref: string })[] }
 
@@ -167,7 +172,7 @@ const DRAFT_KEYS: (keyof Draft)[] = [
   'results_top_n', 'show_on_public_page', 'number_prefix', 'number_padding', 'main_vote_enabled', 'free_votes_enabled', 'votes_per_voter',
   'votes_per_day', 'votes_per_round', 'votes_per_contestant', 'contestant_cap_period', 'allow_split', 'max_votes_per_submit',
   'paid_votes_enabled', 'price_per_vote', 'max_packs_per_day', 'buy_and_vote', 'captcha_enabled', 'ip_votes_per_minute', 'device_votes_per_minute', 'flag_ip_burst',
-  'flag_subnet_burst', 'flag_device_voters', 'transparency_note', 'show_transparency', 'judges_see_others', 'show_judge_breakdown',
+  'flag_subnet_burst', 'flag_device_voters', 'transparency_note', 'show_transparency', 'show_standings', 'show_numbers', 'show_ranks', 'show_vote_counts', 'contestants_can_edit', 'sms_email_fallback', 'judges_see_others', 'show_judge_breakdown',
   'placement_titles', 'rounds', 'profile_fields', 'vote_packs', 'categories', 'contestant_notify',
 ]
 
@@ -181,11 +186,12 @@ function toDraft(c: Contest): Draft {
 const SECTIONS = [
   { id: 'basics', label: 'Basics', icon: Settings2 },
   { id: 'contestants', label: 'Contestants', icon: Users },
-  { id: 'categories', label: 'Categories', icon: Award },
-  { id: 'rounds', label: 'Rounds', icon: Layers },
-  { id: 'judges', label: 'Judges & criteria', icon: Gavel },
   { id: 'rules', label: 'Voting rules', icon: ShieldCheck },
   { id: 'results', label: 'Results & display', icon: BarChart3 },
+  // Advanced: most contests never need these (folded until used)
+  { id: 'categories', label: 'Categories', icon: Award, advanced: true },
+  { id: 'rounds', label: 'Rounds', icon: Layers, advanced: true },
+  { id: 'judges', label: 'Judges & criteria', icon: Gavel, advanced: true },
   { id: 'review', label: 'Review', icon: ListChecks },
 ] as const
 
@@ -207,8 +213,22 @@ const Builder: React.FC<{ contest: Contest }> = ({ contest }) => {
   const [active, setActive] = useState<string>(() => window.location.hash.slice(1) || params.get('step') || 'basics')
   const judgingOn = useModuleEnabled('judging')
   const paidOn = useModuleEnabled('paid_votes')
-  const sections = SECTIONS.filter((x) => judgingOn || x.id !== 'judges')
+  const usesAdvanced = contest.rounds.length > 0 || contest.categories.length > 0 || (contest.judges?.length ?? 0) > 0
+  const [advanced, setAdvanced] = useState(() => usesAdvanced || ['categories', 'rounds', 'judges'].includes(active))
+  const sections = SECTIONS.filter((x) => (judgingOn || x.id !== 'judges') && (advanced || !('advanced' in x)))
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved)
+  const simplify = useMutation({
+    mutationFn: () => contestApi.applyPreset(contest.id, 'simple'),
+    onSuccess: (c) => {
+      qc.setQueryData(['contest', contest.id], c)
+      const fresh = toDraft(c)
+      setSaved(fresh)
+      setDraft(fresh)
+      setAdvanced(false)
+      toast.success('Switched to Simple vote', 'People vote until voting closes; most votes wins.')
+    },
+    onError: (e: Error) => toast.error('Couldn’t switch', e.message),
+  })
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }))
 
   // Keep the draft in step when other screens change the contest (judges, contestants) and nothing is unsaved here
@@ -317,16 +337,49 @@ const Builder: React.FC<{ contest: Contest }> = ({ contest }) => {
 
         <div className="min-w-0 space-y-6">
           <BasicsSection draft={draft} set={set} contest={contest} />
-          <Section id="contestants" title="2. Contestants" description="Numbers are given automatically (you can change them). Drag or use the arrows to set the order shown to voters. Saved immediately.">
+          <Section id="contestants" title="Contestants" description="Numbers are given automatically (you can change them). Drag or use the arrows to set the order shown to voters. Saved immediately.">
             <ContestantsManager contest={contest} />
+            <Toggle
+              label="Contestants can update their own photo and bio"
+              hint="When voting opens, each contestant gets their voting page and a private link to edit their photos, tagline, bio and social links. Name and number stay with you. Saved with “Save changes”."
+              checked={draft.contestants_can_edit ?? true}
+              onChange={(v) => set('contestants_can_edit', v)}
+            />
             <ProfileFieldsEditor fields={draft.profile_fields} onChange={(v) => set('profile_fields', v)} />
           </Section>
-          <CategoriesSection draft={draft} set={set} contest={contest} judgingOn={judgingOn} />
-          <RoundsSection draft={draft} set={set} contest={contest} judgingOn={judgingOn} />
-          {judgingOn && <JudgingSection draft={draft} set={set} contest={contest} />}
           <RulesSection draft={draft} set={set} contest={contest} paidOn={paidOn} />
           <ResultsSection draft={draft} set={set} />
+          <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
+            <div>
+              <p className="font-semibold text-ink-900">Advanced</p>
+              <p className="text-sm text-ink-600">Award categories, rounds (Top 20 → Top 10 → Finale) and judges. Most contests don’t need them.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {usesAdvanced && !contest.has_votes && (
+                <Button variant="ghost" loading={simplify.isPending} onClick={async () => {
+                  const ok = await toast.confirm({
+                    title: 'Switch to Simple vote?',
+                    description: 'Removes the rounds, judges’ criteria and award categories, and resets the voting rules to the simple defaults (SMS code, 5 free votes a day). Contestants stay.',
+                    confirmLabel: 'Switch to Simple vote',
+                    danger: true,
+                  })
+                  if (ok) simplify.mutate()
+                }}>Switch to Simple vote</Button>
+              )}
+              <Button variant="secondary" onClick={() => setAdvanced((v) => !v)} aria-expanded={advanced}>
+                {advanced ? 'Hide advanced' : 'Show advanced'}
+              </Button>
+            </div>
+          </Card>
+          {advanced && (
+            <>
+              <CategoriesSection draft={draft} set={set} contest={contest} judgingOn={judgingOn} />
+              <RoundsSection draft={draft} set={set} contest={contest} judgingOn={judgingOn} />
+              {judgingOn && <JudgingSection draft={draft} set={set} contest={contest} />}
+            </>
+          )}
           <ReviewSection draft={draft} contest={contest} dirty={dirty} onSave={() => save.mutate()} saving={save.isPending} />
+          <DeleteContest contest={contest} />
         </div>
       </div>
 
@@ -367,7 +420,7 @@ interface SectionProps {
 const BasicsSection: React.FC<SectionProps> = ({ draft, set, contest }) => {
   const start = draft.status === 'scheduled' ? 'scheduled' : draft.status
   return (
-    <Section id="basics" title="1. Basics">
+    <Section id="basics" title="Basics">
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">
           <Input label="Contest name" required value={draft.title} onChange={(e) => set('title', e.target.value)} />
@@ -450,7 +503,7 @@ const CategoriesSection: React.FC<SectionProps> = ({ draft, set, contest, judgin
   return (
     <Section
       id="categories"
-      title="3. Categories (sub-awards)"
+      title="Categories (sub-awards)"
       description="Extra awards inside the contest, such as People’s Choice or Miss Photogenic. Each has its own way of choosing the winner."
       actions={<Button size="sm" variant="secondary" icon={<Plus className="h-4 w-4" />} onClick={() => set('categories', [...cats, { name: '', description: '', selection: 'public_vote', nominees: [], votes_per_voter: null, votes_per_day: null, results_visibility: '', winner: null, round_ref: '', criterion_ref: '' }])}>Add category</Button>}
     >
@@ -545,7 +598,7 @@ const RoundsSection: React.FC<SectionProps> = ({ draft, set, judgingOn = true })
   return (
     <Section
       id="rounds"
-      title="4. Rounds & eliminations"
+      title="Rounds & eliminations"
       description="Rounds run in order (e.g. Audition → Top 20 → Finale). Each has its own schedule, scoring and how many go through. With no rounds, the contest is one public vote."
       actions={<Button size="sm" variant="secondary" icon={<Plus className="h-4 w-4" />} onClick={() => set('rounds', [...rounds, blankRound(rounds.length)])}>Add round</Button>}
     >
@@ -656,7 +709,7 @@ const JudgingSection: React.FC<SectionProps> = ({ draft, set, contest }) => {
   const updateCriteria = (i: number, criteria: Criterion[]) => set('rounds', draft.rounds.map((r, j) => (j === i ? { ...r, criteria } : r)))
   const copyFrom = (i: number, from: number) => updateCriteria(i, draft.rounds[from].criteria.map(({ id: _id, ...c }) => ({ ...c })))
   return (
-    <Section id="judges" title="5. Judges & criteria" description="Judges score each contestant on a tablet or phone. Scores are hidden from other judges unless you allow it.">
+    <Section id="judges" title="Judges & criteria" description="Judges score each contestant on a tablet or phone. Scores are hidden from other judges unless you allow it.">
       <JudgesManager contest={contest} />
       <div className="space-y-4 border-t border-ink-100 pt-4">
         <h3 className="text-sm font-bold text-ink-900">Criteria per round</h3>
@@ -709,7 +762,7 @@ const RulesSection: React.FC<SectionProps> = ({ draft, set, contest, paidOn = tr
   const packs = draft.vote_packs
   const updatePack = (i: number, patch: Partial<VotePack>) => set('vote_packs', packs.map((p, j) => (j === i ? { ...p, ...patch } : p)))
   return (
-    <Section id="rules" title="6. Voting rules" description="Who can vote, how many times, and protection against cheating.">
+    <Section id="rules" title="Voting rules" description="Who can vote, how many times, and protection against cheating.">
       <ChoiceGroup
         legend="How voters prove who they are"
         name="vote_mode"
@@ -723,6 +776,14 @@ const RulesSection: React.FC<SectionProps> = ({ draft, set, contest, paidOn = tr
             ? 'SMS isn’t connected on this server yet (development mode: codes are written to the server log). Set SMS_PROVIDER=aakash and AAKASH_SMS_TOKEN to send real texts.'
             : `Codes are sent with ${contest.sms_provider === 'aakash' ? 'Aakash SMS' : 'Sparrow SMS'}. Each code costs one SMS credit.`}
         </Note>
+      )}
+      {draft.vote_mode === 'sms_otp' && (
+        <Toggle
+          label="If SMS fails, let voters get the code by email"
+          hint="Keeps voting working when SMS is down or out of balance. Voters only see the email option after an SMS fails."
+          checked={draft.sms_email_fallback ?? true}
+          onChange={(v) => set('sms_email_fallback', v)}
+        />
       )}
       {draft.vote_mode === 'ticket' && <Toggle label="Only checked-in attendees" hint="Tickets must have been scanned at the gate." checked={draft.require_checked_in} onChange={(v) => set('require_checked_in', v)} />}
 
@@ -825,7 +886,7 @@ const RulesSection: React.FC<SectionProps> = ({ draft, set, contest, paidOn = tr
 /* ---------- 7. Results ---------- */
 
 const ResultsSection: React.FC<Omit<SectionProps, 'contest'>> = ({ draft, set }) => (
-  <Section id="results" title="7. Results & display" description="What the public sees. Rounds can override this. You always see everything.">
+  <Section id="results" title="Results & display" description="What the public sees. Rounds can override this. You always see everything.">
     <ChoiceGroup
       legend="Public results"
       name="visibility"
@@ -834,6 +895,30 @@ const ResultsSection: React.FC<Omit<SectionProps, 'contest'>> = ({ draft, set })
       options={Object.entries(visibilityInfo).map(([value, label]) => ({ value, label }))}
     />
     {draft.results_visibility === 'top_n' && <LimitField label="How many to show" value={draft.results_top_n} onChange={(v) => set('results_top_n', v ?? 3)} className="max-w-xs" />}
+    <Toggle
+      label="Show the Standings list on the contest page"
+      hint="Off: no ranked list on the page. Vote counts on contestant cards still follow “Public results” above."
+      checked={draft.show_standings ?? true}
+      onChange={(v) => set('show_standings', v)}
+    />
+    <Toggle
+      label="Show contestant numbers"
+      hint="#01, #02… on cards, profiles and share images. Off: names only."
+      checked={draft.show_numbers ?? false}
+      onChange={(v) => set('show_numbers', v)}
+    />
+    <Toggle
+      label="Show vote counts"
+      hint="“38 votes” on each contestant card and the total on the Voting page. Needs “Public results” to show counts."
+      checked={draft.show_vote_counts ?? false}
+      onChange={(v) => set('show_vote_counts', v)}
+    />
+    <Toggle
+      label="Show rank badges"
+      hint="“Rank 3” and “Leading” on contestant cards, and a “Most votes” sort. Off for most pageants."
+      checked={draft.show_ranks ?? false}
+      onChange={(v) => set('show_ranks', v)}
+    />
     <Select
       label="Notify contestants"
       hint="When they're added, when a round is decided and when winners are announced. Uses the email and phone from their application. Each SMS uses one of your SMS credits (see Plan & billing); with no credits left, only email is sent."
@@ -901,7 +986,7 @@ const ReviewSection: React.FC<{ draft: Draft; contest: Contest; dirty: boolean; 
   })
 
   return (
-    <Section id="review" title="8. Review">
+    <Section id="review" title="Review">
       <ul className="space-y-2">
         {checks.map((c) => (
           <li key={c.text} className="flex items-start gap-2 text-sm">
@@ -919,5 +1004,25 @@ const ReviewSection: React.FC<{ draft: Draft; contest: Contest; dirty: boolean; 
         </a>
       </div>
     </Section>
+  )
+}
+
+const DeleteContest: React.FC<{ contest: Contest }> = ({ contest }) => {
+  const navigate = useNavigate()
+  const del = useDeleteContest(
+    { id: contest.id, title: contest.title, total_votes: contest.stats.votes, candidates: new Array(contest.stats.contestants) },
+    () => navigate('/app/voting'),
+  )
+  const live = contest.status === 'open' && contest.stats.votes > 0
+  return (
+    <Card className="flex flex-wrap items-center justify-between gap-3 border-red-200 p-5">
+      <div>
+        <p className="font-semibold text-ink-900">Delete this contest</p>
+        <p className="text-sm text-ink-600">
+          {live ? 'People are voting right now. Close voting on the dashboard first, then you can delete it.' : 'Removes the contest, its contestants, votes and results for good.'}
+        </p>
+      </div>
+      <Button variant="secondary" className="text-red-700" disabled={live} loading={del.pending} onClick={del.ask}>Delete contest</Button>
+    </Card>
   )
 }

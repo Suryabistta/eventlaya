@@ -26,7 +26,7 @@ class RegistrationLinkingTests(APITestCase):
         clear_cache()
         self.org = make_user('org@x.com', 'organizer')
         self.event = make_event(self.org, 'fest', 3)
-        self.user = make_user('asha@x.com', first_name='Asha', last_name='Rai', phone='9800', email_verified=True)
+        self.user = make_user('asha@x.com', first_name='Asha', last_name='Rai', phone='9800000000', email_verified=True)
 
     def register(self, **body):
         return self.client.post('/api/forms/events/fest/register/', body, format='json')
@@ -41,7 +41,7 @@ class RegistrationLinkingTests(APITestCase):
         self.assertEqual(res.status_code, 201, res.content)
         ticket = EventTicket.objects.get()
         self.assertEqual((ticket.user, ticket.attendee_name, ticket.attendee_email, ticket.attendee_phone),
-                         (self.user, 'Asha Rai', 'asha@x.com', '9800'))
+                         (self.user, 'Asha Rai', 'asha@x.com', '9800000000'))
 
     def test_registering_someone_else_is_not_linked(self):
         self.login(self.user)
@@ -64,7 +64,7 @@ class RegistrationLinkingTests(APITestCase):
 
     def test_stale_token_does_not_block_guest_registration(self):
         self.client.credentials(HTTP_AUTHORIZATION='Bearer not-a-real-token')
-        res = self.register(name='Guest', email='g@x.com')
+        res = self.register(name='Guest', email='g@x.com', phone='9800000000')
         self.assertEqual(res.status_code, 201)
         self.assertIsNone(EventTicket.objects.get().user)
 

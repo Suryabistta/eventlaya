@@ -33,8 +33,60 @@ def notify(candidate, subject, message):
 
 
 def added(candidate):
-    notify(candidate, 'You are in the contest',
-           f'You have been added to {candidate.poll.title}. Share your contestant page so people can vote for you.')
+    """Added to the contest. While it's open they get their links right away; otherwise when voting opens."""
+    if candidate.poll.status == Poll.Status.OPEN:
+        invite(candidate)
+    else:
+        notify(candidate, 'You are in the contest',
+               f'You have been added to {candidate.poll.title}. We will send your own voting link when voting opens.')
+
+
+def invite(candidate):
+    """Voting is open: the contestant's own page to share, plus (when allowed) the private link to edit it. Once."""
+    from django.utils import timezone
+    from .self_edit_views import profile_links
+    if candidate.invited_at or candidate.status != Candidate.Status.ACTIVE:
+        return
+    links = profile_links(candidate)
+    msg = (f'Voting is open in {candidate.poll.title}! Share your page so friends can vote for you: {links["profile_url"]}')
+    if candidate.poll.contestants_can_edit:
+        msg += f'\n\nUpdate your photo and bio here (private link, don\'t share it): {links["edit_url"]}'
+    notify(candidate, 'Voting is open: share your page', msg)
+    Candidate.objects.filter(pk=candidate.pk).update(invited_at=timezone.now())
+
+
+def voting_opened(poll):
+    """Called when a contest opens (button or schedule): invite every active contestant not invited yet, and send
+    the "Notify me" reminders (each once; the contact is deleted after)."""
+    for c in poll.candidates.filter(status=Candidate.Status.ACTIVE, invited_at__isnull=True):
+        invite(c)
+    send_reminders(poll)
+
+
+def send_reminders(poll):
+    from django.conf import settings
+    from django.core.mail import send_mail
+    from apps.core.email import site_url
+    from .models import ContestReminder
+    rows = list(ContestReminder.objects.filter(poll=poll))
+    if not rows:
+        return
+    ContestReminder.objects.filter(pk__in=[r.pk for r in rows]).delete()
+    url = f'{site_url(poll.event)}/e/{poll.event.slug}/vote/{poll.slug or poll.id}'
+    title = poll.title[:60].encode('ascii', 'ignore').decode().strip() or 'the contest'
+
+    def send():
+        from apps.platform.sms_credits import send_paid_sms
+        for r in rows:
+            try:
+                if r.channel == 'email':
+                    send_mail(subject=f'Voting is open: {poll.title}', from_email=settings.DEFAULT_FROM_EMAIL, recipient_list=[r.destination],
+                              message=f'Namaste,\n\nVoting is now open in {poll.title}. Vote for your favourite here:\n{url}\n\nYou asked us to tell you. We won\'t message you again about it.\n\nEventlaya')
+                else:
+                    send_paid_sms(poll.event.organizer, r.destination, f'Voting is open in {title}. Vote here: {url}', f'{title}: reminder')
+            except Exception as e:  # one failed reminder must not stop the rest
+                logger.warning('Contest reminder failed (%s): %s', poll.pk, e)
+    transaction.on_commit(send)
 
 
 def round_decided(poll, summary):

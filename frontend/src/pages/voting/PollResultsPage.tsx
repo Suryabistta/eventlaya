@@ -106,7 +106,7 @@ export const PollResultsPage: React.FC = () => {
       <div className="space-y-2">
         <nav aria-label="Breadcrumb">
           <ol className="flex flex-wrap items-center gap-1 text-sm text-ink-500">
-            <li><Link to="/app/voting" className="font-medium hover:text-ink-900 hover:underline">Live voting</Link></li>
+            <li><Link to="/app/voting" className="font-medium hover:text-ink-900 hover:underline">Voting</Link></li>
             <ChevronRight className="h-4 w-4 text-ink-400" aria-hidden />
             <li aria-current="page" className="truncate text-ink-700">{poll.title}</li>
           </ol>
