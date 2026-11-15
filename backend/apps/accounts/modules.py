@@ -54,6 +54,8 @@ MODULES = [
      'with their own form; organizers accept or decline each one.', 'FileCheck', 20, ['organizer', 'staff', 'attendee']),
     ('guest_management', 'Guest management', 'Guest tags and notes, arrival alerts for the host, messages and reminders '
      'to guests.', 'UserCheck', 21, ['organizer', 'staff']),
+    ('favourites', 'Saved events', 'Signed-in people save events they like and find them again on any device.', 'Heart', 23,
+     ['organizer', 'staff', 'attendee', 'vendor']),
     ('sms', 'SMS messages', 'Text messages to contestants and guests, paid from SMS credits: included with the plan '
      'and topped up on request.', 'MessageSquareText', 22, ['organizer']),
 ]
@@ -93,6 +95,7 @@ PATH_MODULES = [
     (re.compile(r'^/api/payments/(return|test)/'), None),
     (re.compile(r'^/api/payments/intents/[0-9a-f-]{36}/$'), None),
     (re.compile(r'^/api/payments/'), 'payments'),
+    (re.compile(r'^/api/me/favourites/'), 'favourites'),
     (re.compile(r'^/api/me/tickets/'), 'events'),  # attendee's own tickets
     (re.compile(r'^/api/me/inquiries/'), 'marketplace'),  # attendee's sent marketplace inquiries
     # Organizer branding + requests. Not the public resolve endpoint: visitors of a tenant site must get an

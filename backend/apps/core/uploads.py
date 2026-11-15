@@ -14,6 +14,27 @@ ALLOWED_FORMATS = {'JPEG': 'jpg', 'PNG': 'png', 'WEBP': 'webp', 'GIF': 'gif'}
 KINDS = {'logo', 'banner', 'venue', 'space', 'vendor', 'avatar', 'chat', 'contestant', 'blog', 'misc'}
 
 
+def store_image(upload, prefix):
+    """Checks and saves one image under <prefix>/. Returns {url, width, height, size}; raises ValueError with a
+    message for people when the file is missing, too big or not an image."""
+    if not upload:
+        raise ValueError('Choose an image to upload.')
+    if upload.size > MAX_BYTES:
+        raise ValueError('Images must be 5 MB or smaller.')
+    try:
+        image = Image.open(upload)
+        image.verify()
+    except (UnidentifiedImageError, OSError, SyntaxError):
+        raise ValueError('That file isn’t an image we can read. Use JPG, PNG, WebP or GIF.')
+    ext = ALLOWED_FORMATS.get(image.format or '')
+    if not ext:
+        raise ValueError('Use a JPG, PNG, WebP or GIF image.')
+    upload.seek(0)
+    path = default_storage.save(f'{prefix}/{uuid.uuid4().hex}.{ext}', upload)
+    width, height = image.size
+    return {'url': default_storage.url(path), 'width': width, 'height': height, 'size': upload.size}
+
+
 class ImageUploadView(APIView):
     """POST multipart `file` (+ optional `kind`) → {url, width, height, size}."""
 

@@ -118,7 +118,7 @@ class EventRegisterView(APIView):
 
         if not name or not email:
             return Response({'error': 'Name and Email are required.'}, status=status.HTTP_400_BAD_REQUEST)
-        phone_problem = phone_error(phone, event.phone_required)
+        phone_problem = phone_error(phone, True)
         if phone_problem:
             return Response({'error': phone_problem, 'field': 'phone'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -388,10 +388,20 @@ class ResponseReviewView(APIView):
                 Candidate.objects.filter(application_id=resp.pk, status=Candidate.Status.ACTIVE).update(status=Candidate.Status.WITHDRAWN)
             elif new == FormResponse.ReviewStatus.ACCEPTED:
                 Candidate.objects.filter(application_id=resp.pk, status=Candidate.Status.WITHDRAWN).update(status=Candidate.Status.ACTIVE)
+        added = None
+        if changed and new == FormResponse.ReviewStatus.ACCEPTED:
+            # Accepting puts them straight into the event's contest (when there is one open or being set up)
+            from apps.voting.access import CONTESTS
+            from apps.accounts.modules import module_enabled
+            if module_enabled(CONTESTS, resp.event.organizer):
+                from apps.voting.contest_views import auto_add_applicant
+                added = auto_add_applicant(resp, request.user)
         if changed and new != FormResponse.ReviewStatus.PENDING:
             from apps.core.email import send_review_email
-            send_review_email(resp, resp.event)
-        return Response(FormResponseSerializer(resp).data)
+            from apps.core.sms import send_review_sms
+            send_review_email(resp, resp.event, contestant=added)
+            send_review_sms(resp, resp.event)
+        return Response({**FormResponseSerializer(resp).data, 'added_to_contest': added.poll.title if added else None})
 
 
 class FormUploadThrottle(AnonRateThrottle):
@@ -488,7 +498,7 @@ class ApplyView(APIView):
         phone = (request.data.get('phone') or '').strip()[:30]
         if not name or not email:
             return Response({'error': 'Name and email are required.'}, status=status.HTTP_400_BAD_REQUEST)
-        phone_problem = phone_error(phone, event.phone_required)
+        phone_problem = phone_error(phone, True)
         if phone_problem:
             return Response({'error': phone_problem, 'field': 'phone'}, status=status.HTTP_400_BAD_REQUEST)
         form = event.application_form
@@ -513,8 +523,10 @@ class ApplyView(APIView):
                 if str(field.id) in answers and is_visible(field, answers):
                     FormAnswer.objects.create(response=resp, field=field, value=answers[str(field.id)])
         from apps.core.email import send_application_received
+        from apps.core.sms import send_application_sms
         send_application_received(resp, event)
-        return Response({'message': f'Your application for {event.title} was received.', 'application': application_data(resp)},
+        send_application_sms(resp, event)
+        return Response({'message': f'Thank you so much! Your application for {event.title} has been received.', 'application': application_data(resp)},
                         status=status.HTTP_201_CREATED)
 
 
@@ -537,7 +549,7 @@ class EventApplicationsView(APIView):
 
 
 def phone_error(phone, required):
-    """Organizers need a number to reach guests (Event.phone_required, on by default)."""
+    """A mobile number is required on every registration and application (platform rule)."""
     if not required:
         return None
     if not phone:

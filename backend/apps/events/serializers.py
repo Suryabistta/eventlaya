@@ -94,10 +94,20 @@ class EventSerializer(serializers.ModelSerializer):
     phase = serializers.SerializerMethodField()
     registration_open = serializers.SerializerMethodField()
     registration_closed_reason = serializers.SerializerMethodField()
+    # Why the public can't apply right now (None = open). Organizer screens show this exact reason.
+    applications_closed_reason = serializers.SerializerMethodField()
     category_name = serializers.SerializerMethodField()
     event_kind = serializers.SerializerMethodField()
     # New events ask for a phone number unless the organizer turns it off
-    phone_required = serializers.BooleanField(default=True)
+    # Always on: every registration and application needs a mobile number (kept for older clients)
+    phone_required = serializers.SerializerMethodField()
+
+    def get_phone_required(self, obj):
+        return True
+
+    def get_applications_closed_reason(self, obj):
+        return obj.applications_closed_reason() if obj.applications_enabled else None
+
 
     class Meta:
         model = Event
@@ -107,7 +117,7 @@ class EventSerializer(serializers.ModelSerializer):
             'capacity', 'status', 'allow_registration', 'registration_deadline',
             'is_paid', 'ticket_price', 'registration_form', 'registration_form_title',
             'registered_count', 'checked_in_count', 'created_at', 'updated_at',
-            'tagline', 'category', 'category_name', 'event_kind', 'is_featured', 'phase', 'registration_open', 'registration_closed_reason',
+            'tagline', 'category', 'category_name', 'event_kind', 'is_featured', 'phase', 'registration_open', 'registration_closed_reason', 'applications_closed_reason',
             'max_tickets_per_order', 'show_spots_left',
             'managed_by', 'managed_by_logo', 'show_managed_by', 'managed_by_label', 'ticket_layout', 'show_seat_number', 'registration_mode', 'cta_label',
             'tickets_enabled', 'date_tba', 'applications_enabled', 'application_form', 'applications_close', 'application_cta',

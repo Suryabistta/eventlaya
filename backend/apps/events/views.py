@@ -1254,7 +1254,7 @@ def event_stages(event, data):
             if poll.winners_announced_at:
                 stages.append({'kind': 'results', 'title': f'{poll.title or "Contest"} results', 'cta': 'See winners', 'state': 'open',
                                'opens_at': poll.winners_announced_at, 'closes_at': None, 'href': f'/e/{event.slug}/vote/{poll.slug or poll.id}'})
-    if event.tickets_enabled or stages:
+    if event.tickets_enabled or (stages and any(s['kind'] in ('voting', 'results') for s in stages)):
         phase = data.get('phase')
         state = 'closed' if phase in ('ended', 'cancelled') else ('open' if data.get('registration_open') else 'upcoming')
         stages.append({'kind': 'tickets', 'title': event.title if stages else 'Tickets', 'cta': event.cta_label or None,

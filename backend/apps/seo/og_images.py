@@ -307,3 +307,36 @@ def for_post(post):
     card = {'title': post.title, 'line1': f'{post.reading_minutes} min read · Eventlaya blog',
             'line2': ', '.join(post.cities[:3]), 'eyebrow': post.get_category_display(), 'footer': 'eventlaya.com/blog'}
     return _photo_or_card('blog', post.id, post.cover_image, post.cover_alt or post.title, card)
+
+
+def for_tenant(t, host=''):
+    name = t.brand_name or 'Events'
+    domain = getattr(t, 'custom_domain', '') or (f'{t.subdomain}.eventlaya.com' if getattr(t, 'subdomain', '') else 'eventlaya.com')
+    # 1. If tenant has an event with an uploaded banner, use that event's banner
+    try:
+        from apps.events.models import Event
+        ev = Event.objects.filter(organizer_id=t.organizer_id).exclude(banner='').order_by('-start_date').first()
+        if ev and ev.banner:
+            return _photo_or_card('events', ev.id, ev.banner.name, name, {
+                'title': name, 'line1': 'Online registration & QR passes', 'line2': '',
+                'eyebrow': 'Events', 'footer': host or domain, 'brand': name,
+            })
+    except Exception:
+        pass
+    # 2. If brand_logo is set, use it
+    if getattr(t, 'brand_logo', ''):
+        logo = t.brand_logo
+        url = logo if logo.startswith('http') else media_url(logo)
+        return OgImage(url=url, alt=name)
+    # 3. Fallback: dynamically rendered 1200x630 card for this tenant
+    card = {
+        'title': name, 'line1': 'Online registration & QR passes', 'line2': getattr(t, 'support_email', '') or '',
+        'eyebrow': 'Events', 'footer': host or domain, 'brand': name,
+    }
+    try:
+        path = _cached('tenants', t.id, _key('card', *card.values()), lambda: render_card(**card))
+        return OgImage(url=media_url(path), alt=name)
+    except Exception:
+        log.exception('og image: card failed for tenant %s', t.id)
+        return default_image(name)
+

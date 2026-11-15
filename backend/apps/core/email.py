@@ -245,8 +245,8 @@ def send_application_received(response, event):
     brand, powered = email_brand(event)
     signature = 'Organized via Eventlaya' if brand == 'Eventlaya' else (brand + ('\nPowered by Eventlaya' if powered else ''))
     return _send_simple(event, response.submitter_email, f"Application received: {title}", response.submitter_name,
-                        f"We received your application for '{title}' (no. {response.number}).",
-                        "The organizer will review it and you'll get an email when it's accepted or not.", signature)
+                        f"Thank you so much! We have received your application for '{title}' (Application No. {response.number}).",
+                        "The organizers will review your submission and notify you once a decision is made.", signature)
 
 
 def send_simple_event_email(event, to, name, subject, line1, line2):
@@ -259,16 +259,32 @@ def send_simple_event_email(event, to, name, subject, line1, line2):
     return _send_simple(event, to, f'{subject}: {display_title(event)}', name or 'there', line1, line2, signature)
 
 
-def send_review_email(response, event):
-    """Open calls: tell the applicant their application was accepted or not (with the organizer's note)."""
+def send_review_email(response, event, contestant=None):
+    """Open calls: tell the applicant their application was accepted or not (with the organizer's note).
+    `contestant`: accepting also made them a contestant, so this one email says so (and carries their voting
+    links when voting is already open) instead of a second "you're in the contest" message."""
     from apps.events.sub_events import display_title
     title = display_title(event)
     brand, powered = email_brand(event)
     signature = 'Organized via Eventlaya' if brand == 'Eventlaya' else (brand + ('\nPowered by Eventlaya' if powered else ''))
     if response.review_status == 'accepted':
+        next_steps = "The organizer will contact you with the next steps."
+        if contestant is not None:
+            from django.utils import timezone
+            from apps.voting.models import Candidate, Poll
+            from apps.voting.self_edit_views import profile_links
+            poll = contestant.poll
+            if poll.status == Poll.Status.OPEN:
+                links = profile_links(contestant)
+                next_steps = (f"You are now a contestant in '{poll.title}' and voting is open. Share your page so friends "
+                              f"can vote for you:\n{links['profile_url']}")
+                if poll.contestants_can_edit:
+                    next_steps += f"\n\nUpdate your photo and bio here (private link, don't share it):\n{links['edit_url']}"
+                Candidate.objects.filter(pk=contestant.pk).update(invited_at=timezone.now())
+            else:
+                next_steps = (f"You are now a contestant in '{poll.title}'. We will send your own voting link when voting opens.")
         return _send_simple(event, response.submitter_email, f"Application accepted: {title}", response.submitter_name,
-                            f"Good news: your application for '{title}' has been accepted.",
-                            "The organizer will contact you with the next steps.", signature)
+                            f"Good news: your application for '{title}' has been accepted.", next_steps, signature)
     note = f"Note from the organizer:\n{response.rejection_note}" if response.rejection_note else 'Thank you for applying.'
     return _send_simple(event, response.submitter_email, f"Application update: {title}", response.submitter_name,
                         f"Thank you for applying to '{title}'. Your application was not selected this time.", note, signature)

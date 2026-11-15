@@ -23,6 +23,15 @@ def slot_summary(slot):
     }
 
 
+
+def require_phone(value):
+    """Every inquiry, booking request and contact message needs a mobile number."""
+    value = (value or '').strip()
+    digits = sum(c.isdigit() for c in value)
+    if digits < 7 or digits > 15:
+        raise serializers.ValidationError('Enter a valid mobile number.')
+    return value
+
 class BookingRequestFieldsMixin(serializers.Serializer):
     """`slot_id` (write) picks an availability slot; the view reserves it. `slot` (read) describes it."""
     slot_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
@@ -178,7 +187,10 @@ class VenueInquirySerializer(BookingRequestFieldsMixin, serializers.ModelSeriali
         ]
         read_only_fields = ['id', 'status', 'owner_note', 'created_at', 'updated_at']
         # A booking request takes its date from the slot; plain inquiries still need one (see validate).
-        extra_kwargs = {'event_date': {'required': False}}
+        extra_kwargs = {'event_date': {'required': False}, 'sender_phone': {'required': True, 'allow_blank': False}}
+
+    def validate_sender_phone(self, value):
+        return require_phone(value)
 
     def validate(self, attrs):
         if self.instance is None and not attrs.get('slot_id') and not attrs.get('event_date'):
@@ -213,7 +225,7 @@ class VenueListingSerializer(AdminOnlyFieldsMixin, serializers.ModelSerializer):
             'id', 'owner', 'owner_name', 'name', 'slug', 'venue_type',
             'venue_type_display', 'city', 'address', 'capacity_min',
             'capacity_max', 'price_per_day', 'price_from', 'amenities', 'images', 'featured_image',
-            'contact_person', 'contact_phone', 'contact_email',
+            'contact_person', 'show_host', 'contact_phone', 'contact_email',
             'description', 'rules_policy', 'is_verified', 'is_featured',
             'rating', 'review_count', 'inquiries_count', 'spaces',
             'listing_status', 'review_note', 'is_paused', 'slot_presets', 'created_at', 'updated_at'
@@ -263,6 +275,10 @@ class VendorInquirySerializer(BookingRequestFieldsMixin, serializers.ModelSerial
             'created_at', 'updated_at', 'package', 'package_name',
         ]
         read_only_fields = ['id', 'vendor', 'status', 'owner_note', 'created_at', 'updated_at']
+        extra_kwargs = {'sender_phone': {'required': True, 'allow_blank': False}}
+
+    def validate_sender_phone(self, value):
+        return require_phone(value)
 
     def validate(self, attrs):
         attrs = super().validate(attrs)

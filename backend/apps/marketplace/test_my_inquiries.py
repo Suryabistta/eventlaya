@@ -21,11 +21,11 @@ class MyInquiriesTests(APITestCase):
 
     def test_lists_both_kinds_for_sender_only(self):
         VenueInquiry.objects.create(venue=self.venue, user=self.asha, sender_name='A', sender_email='a@x.com',
-                                    sender_phone='1', event_date='2030-01-01', message='hi')
+                                    sender_phone='9800000000', event_date='2030-01-01', message='hi')
         VendorInquiry.objects.create(vendor=self.vendor, user=self.asha, sender_name='A', sender_email='a@x.com',
-                                     sender_phone='1', message='hi')
+                                     sender_phone='9800000000', message='hi')
         VenueInquiry.objects.create(venue=self.venue, sender_name='G', sender_email='g@x.com',
-                                    sender_phone='1', event_date='2030-01-01', message='guest')
+                                    sender_phone='9800000000', event_date='2030-01-01', message='guest')
         self.client.force_authenticate(self.asha)
         data = self.client.get('/api/me/inquiries/').data
         self.assertEqual(data['count'], 2)
@@ -37,7 +37,7 @@ class MyInquiriesTests(APITestCase):
 
     def test_vendor_owner_sees_and_updates_vendor_inquiries(self):
         res = self.client.post(f'/api/marketplace/vendors/{self.vendor.id}/inquiries/', {
-            'sender_name': 'Guest', 'sender_email': 'g@x.com', 'sender_phone': '98', 'message': 'Price?'}, format='json')
+            'sender_name': 'Guest', 'sender_email': 'g@x.com', 'sender_phone': '9800000000', 'message': 'Price?'}, format='json')
         self.assertEqual(res.status_code, 201, res.data)
         self.assertIsNone(VendorInquiry.objects.get().user)
         self.assertEqual(self.client.get(f'/api/marketplace/vendors/{self.vendor.id}/inquiries/').status_code, 403)

@@ -165,12 +165,12 @@ class EventlayaCoreTests(APITestCase):
         self.event.save()
 
         # Fill capacity
-        payload1 = {'name': 'User One', 'email': 'user1@test.com', 'answers': {str(self.field1.id): 'A'}}
+        payload1 = {'name': 'User One', 'email': 'user1@test.com', 'phone': '9800000000', 'answers': {str(self.field1.id): 'A'}}
         res1 = self.client.post(f'/api/forms/events/{self.event.slug}/register/', data=payload1, format='json')
         self.assertEqual(res1.status_code, status.HTTP_201_CREATED)
 
         # Try to register second attendee
-        payload2 = {'name': 'User Two', 'email': 'user2@test.com', 'answers': {str(self.field1.id): 'B'}}
+        payload2 = {'name': 'User Two', 'email': 'user2@test.com', 'phone': '9800000000', 'answers': {str(self.field1.id): 'B'}}
         res2 = self.client.post(f'/api/forms/events/{self.event.slug}/register/', data=payload2, format='json')
         self.assertEqual(res2.status_code, status.HTTP_409_CONFLICT)
         self.assertIn('capacity', res2.data['error'])

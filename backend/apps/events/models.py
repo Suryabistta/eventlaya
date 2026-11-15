@@ -793,3 +793,14 @@ class GuestMessage(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+
+
+class EventFavourite(models.Model):
+    """A signed-in person saved this event ("Saved" / wishlist). Module `favourites`."""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='favourite_events')
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='favourites')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['user', 'event'], name='one_favourite_per_event')]
+        ordering = ['-created_at']

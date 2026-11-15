@@ -49,7 +49,7 @@ class PackageTests(APITestCase):
     def test_inquiry_can_name_a_package_of_that_vendor_only(self):
         pid = self.create().data['id']
         self.client.force_authenticate(None)
-        body = {'sender_name': 'A', 'sender_email': 'a@x.com', 'sender_phone': '98', 'message': 'Hi', 'event_date': '2030-01-01'}
+        body = {'sender_name': 'A', 'sender_email': 'a@x.com', 'sender_phone': '9800000000', 'message': 'Hi', 'event_date': '2030-01-01'}
         r = self.client.post(f'/api/marketplace/vendors/{self.vendor.id}/inquiries/', {**body, 'package': pid}, format='json')
         self.assertEqual(r.status_code, 201, r.data)
         self.assertEqual(VendorInquiry.objects.get().package_id is not None, True)

@@ -282,7 +282,7 @@ class PublicAvailabilityTests(Base):
         o = slot(self.venue, d=1, space=self.hall, note='Morning')
         held = slot(self.venue, d=2, status=Slot.Status.HELD, note='Ram wedding')
         VenueInquiry.objects.create(venue=self.venue, slot=held, sender_name='Secret Person', sender_email='s@x.com',
-                                    sender_phone='98', event_date=held.date, message='m')
+                                    sender_phone='9800000000', event_date=held.date, message='m')
         slot(self.venue, d=3, status=Slot.Status.BOOKED)
         slot(self.venue, d=4, status=Slot.Status.BLOCKED, note='Private')
         slot(self.venue, d=-1)  # past
@@ -425,7 +425,7 @@ class BookingRequestTests(Base):
         s = slot(self.vendor, d=8, start='16:00', end='20:00')
         with self.captureOnCommitCallbacks(execute=True):
             res = self.client.post(self.vendor_inquiry_url(), {
-                'slot_id': str(s.id), 'sender_name': 'Guest', 'sender_email': 'g@x.com', 'sender_phone': '98',
+                'slot_id': str(s.id), 'sender_name': 'Guest', 'sender_email': 'g@x.com', 'sender_phone': '9800000000',
                 'message': 'Reception shoot'}, format='json')
         self.assertEqual(res.status_code, 201, res.content)
         self.assertEqual((res.json()['event_date'], res.json()['slot']['end_time']), (str(s.date), '20:00'))
@@ -455,7 +455,7 @@ class BookingRequestTests(Base):
     def test_slot_id_cannot_be_attached_without_reserving(self):
         s = slot(self.venue, d=5)
         inquiry = VenueInquiry.objects.create(venue=self.venue, sender_name='A', sender_email='a@x.com',
-                                              sender_phone='1', event_date=day(5), message='m')
+                                              sender_phone='9800000000', event_date=day(5), message='m')
         self.as_(self.owner)
         res = self.client.patch(f'/api/marketplace/inquiries/{inquiry.id}/', {'slot_id': str(s.id)}, format='json')
         self.assertEqual(res.status_code, 200)
@@ -569,7 +569,7 @@ class CustomerCancelTests(Base):
         self.slot = slot(self.venue, d=10)
         self.inquiry = VenueInquiry.objects.create(
             venue=self.venue, slot=self.slot, user=self.customer, sender_name='Asha', sender_email='asha@x.com',
-            sender_phone='98', event_date=self.slot.date, message='m')
+            sender_phone='9800000000', event_date=self.slot.date, message='m')
         Slot.objects.filter(pk=self.slot.pk).update(status=Slot.Status.HELD)
 
     def cancel(self, kind='venue', pk=None, user=None):
@@ -604,7 +604,7 @@ class CustomerCancelTests(Base):
         today_slot = slot(self.venue, d=0, start='23:00', end='23:30', status=Slot.Status.BOOKED)
         booked_today = VenueInquiry.objects.create(
             venue=self.venue, slot=today_slot, user=self.customer, sender_name='A', sender_email='a@x.com',
-            sender_phone='1', event_date=today_slot.date, message='m', status='booked')
+            sender_phone='9800000000', event_date=today_slot.date, message='m', status='booked')
         res = self.cancel(pk=booked_today.id)
         self.assertEqual(res.status_code, 409)
         today_slot.refresh_from_db()
@@ -619,7 +619,7 @@ class CustomerCancelTests(Base):
 
     def test_my_inquiries_show_slot_and_cancel_flag(self):
         legacy = VendorInquiry.objects.create(vendor=self.vendor, user=self.customer, sender_name='A',
-                                              sender_email='a@x.com', sender_phone='1', message='hi')
+                                              sender_email='a@x.com', sender_phone='9800000000', message='hi')
         self.as_(self.customer)
         rows = {r['id']: r for r in self.client.get('/api/me/inquiries/').json()['results']}
         mine = rows[str(self.inquiry.id)]
@@ -634,7 +634,7 @@ class ModuleSwitchTests(Base):
     def test_marketplace_off_blocks_slot_and_booking_endpoints(self):
         s = slot(self.venue, d=5)
         inquiry = VenueInquiry.objects.create(venue=self.venue, user=self.customer, sender_name='A',
-                                              sender_email='asha@x.com', sender_phone='1', event_date=day(5),
+                                              sender_email='asha@x.com', sender_phone='9800000000', event_date=day(5),
                                               message='m')
         clear_cache()
         PlatformModule.objects.update_or_create(slug='marketplace', defaults={

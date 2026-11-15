@@ -156,7 +156,7 @@ class ListingReviewTests(ReviewBase):
         url = f'/api/reviews/vendors/{self.vendor.id}/'
         self.assertEqual(self.client.post(url, {'rating': 5}, format='json').status_code, 403)
         res = self.client.post(f'/api/marketplace/vendors/{self.vendor.id}/inquiries/',
-                               {'message': 'Need sound', 'sender_phone': '98'}, format='json')
+                               {'message': 'Need sound', 'sender_phone': '9800000000'}, format='json')
         self.assertEqual(res.status_code, 201, res.data)
         self.assertEqual(VendorInquiry.objects.get().user, self.asha)
         res = self.client.post(url, {'rating': 4, 'text': 'Loud indeed'}, format='json')
@@ -179,7 +179,7 @@ class ListingReviewTests(ReviewBase):
         self.assertEqual((before['rating'], before['review_count'], before['review_average'], before['review_total']),
                          ('4.80', 12, None, 0))
         VenueInquiry.objects.create(venue=self.venue, user=self.asha, sender_name='A', sender_email='asha@x.com',
-                                    sender_phone='1', event_date='2030-01-01', message='hi')
+                                    sender_phone='9800000000', event_date='2030-01-01', message='hi')
         self.as_(self.asha)
         url = f'/api/reviews/venues/{self.venue.id}/'
         self.assertEqual(self.client.post(url, {'rating': 3}, format='json').status_code, 201)
@@ -192,7 +192,7 @@ class ListingReviewTests(ReviewBase):
     def test_signed_in_venue_inquiry_stores_user(self):
         self.as_(self.asha)
         res = self.client.post(f'/api/marketplace/venues/{self.venue.id}/inquiries/', {
-            'sender_phone': '98', 'event_date': '2030-01-01', 'message': 'Wedding'}, format='json')
+            'sender_phone': '9800000000', 'event_date': '2030-01-01', 'message': 'Wedding'}, format='json')
         self.assertEqual(res.status_code, 201, res.data)
         inquiry = VenueInquiry.objects.get()
         self.assertEqual((inquiry.user, inquiry.sender_email, inquiry.sender_name), (self.asha, 'asha@x.com', 'Asha Rai'))
