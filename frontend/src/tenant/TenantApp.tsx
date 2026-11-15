@@ -28,6 +28,7 @@ const PublicEventPage = lazyPage(() => import('@/pages/PublicEventPage'), 'Publi
 const EventRegisterPage = lazyPage(() => import('@/pages/EventRegisterPage'), 'EventRegisterPage')
 const ApplyPage = lazyPage(() => import('@/pages/ApplyPage'), 'ApplyPage')
 const PublicPassPage = lazyPage(() => import('@/pages/PublicPassPage'), 'PublicPassPage')
+const ContestantSelfPage = lazyPage(() => import('@/pages/voting/contest/ContestantSelfPage'), 'ContestantSelfPage')
 const PublicVotePage = lazyPage(() => import('@/pages/voting/PublicVotePage'), 'PublicVotePage')
 const MyTicketsPage = lazyPage(() => import('@/pages/account/MyTicketsPage'), 'MyTicketsPage')
 const VerifyEmailPage = lazyPage(() => import('@/pages/account/VerifyEmailPage'), 'VerifyEmailPage')
@@ -71,6 +72,7 @@ export const TenantApp: React.FC = () => {
           <Route path="/e/:slug/vote/:pollId" element={<PublicVotePage />} />
           <Route path="/e/:slug/vote/:pollId/c/:cref" element={<PublicVotePage />} />
           <Route path="/ticket/:token" element={<PublicPassPage />} />
+          <Route path="/contestant/:token" element={<ContestantSelfPage />} />
           <Route path="/my/tickets" element={<RequireAuth><MyTicketsPage /></RequireAuth>} />
           {/* Links shared with eventlaya.com (registration success, pass page) */}
           <Route path="/app/my/tickets" element={<Navigate to="/my/tickets" replace />} />
@@ -103,22 +105,31 @@ const TenantLayout: React.FC = () => {
   const { user, status, logout } = useAuth()
   const location = useLocation()
   const navClass = ({ isActive }: { isActive: boolean }) =>
-    cn('rounded-lg px-2.5 py-2 text-sm font-semibold transition-colors sm:px-3', isActive ? 'bg-brand-50 text-brand-700' : 'text-ink-600 hover:bg-ink-100 hover:text-ink-900')
+    cn('rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors sm:px-3 sm:py-2 sm:text-sm', isActive ? 'bg-brand-50 text-brand-700' : 'text-ink-600 hover:bg-ink-100 hover:text-ink-900')
 
   return (
     <div className="flex min-h-screen flex-col bg-ink-50">
       <div className="h-1 bg-brand-600" style={{ backgroundColor: 'rgb(var(--tenant-accent, var(--brand-600)))' }} aria-hidden />
       <header className="sticky top-0 z-30 border-b border-ink-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
-          <Link to="/" className="mr-auto min-w-0" aria-label={`${tenant.brand_name} home`}>
+        <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-3 sm:gap-3 sm:px-6">
+          <Link to="/" className="mr-2 flex min-w-0 flex-1 items-center sm:mr-auto" aria-label={`${tenant.brand_name} home`}>
             <TenantMark tenant={tenant} />
           </Link>
-          <nav aria-label="Main" className="flex shrink-0 items-center gap-1">
+          <nav aria-label="Main" className="flex shrink-0 items-center gap-1 sm:gap-1.5">
             <NavLink to="/" end className={navClass}>
               Events
             </NavLink>
             {status === 'authenticated' ? (
               <>
+                {user && ['organizer', 'superadmin', 'staff'].includes(user.role) && (
+                  <a
+                    href={platformUrl('/app')}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-brand-50 px-2.5 py-1.5 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-100 sm:px-3 sm:py-2 sm:text-sm"
+                  >
+                    <span>Dashboard</span>
+                    <ArrowUpRight className="h-4 w-4" aria-hidden />
+                  </a>
+                )}
                 <NavLink to="/my/tickets" className={navClass}>
                   <span className="hidden sm:inline">My tickets</span>
                   <Ticket className="h-5 w-5 sm:hidden" aria-label="My tickets" />
@@ -157,41 +168,23 @@ const TenantFooter: React.FC<{ tenant: ResolvedTenant }> = ({ tenant }) => {
   const { pathname } = useLocation()
   return (
     <footer className={cn('border-t border-ink-200 bg-white', bottomBarPadding(pathname))}>
-      <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 text-sm text-ink-600 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <div className="space-y-1">
+      <div className="mx-auto flex max-w-6xl flex-col items-center justify-center gap-4 px-4 py-8 text-center text-sm text-ink-600 sm:flex-row sm:items-center sm:justify-between sm:text-left sm:px-6">
+        <div className="flex flex-col items-center space-y-1 text-center sm:items-start sm:text-left">
           <p className="font-semibold text-ink-900">{tenant.brand_name}</p>
           {tenant.footer_text && <p>{tenant.footer_text}</p>}
           {tenant.support_email && (
-            <a href={`mailto:${tenant.support_email}`} className="inline-flex items-center gap-1.5 hover:text-brand-700 hover:underline">
+            <a href={`mailto:${tenant.support_email}`} className="inline-flex items-center justify-center gap-1.5 hover:text-brand-700 hover:underline sm:justify-start">
               <Mail className="h-4 w-4" aria-hidden />
               {tenant.support_email}
             </a>
           )}
         </div>
         {!tenant.remove_watermark && (
-          <a href={platformUrl('/')} className="inline-flex items-center gap-2 text-xs text-ink-500 hover:text-ink-800">
+          <a href={platformUrl('/')} className="inline-flex items-center justify-center gap-2 text-xs text-ink-500 hover:text-ink-800 sm:justify-end">
             Powered by
             <img src="/brand/logo.png" alt="Eventlaya" className="h-5 w-auto" />
           </a>
         )}
-      </div>
-      {/* The site runs on Eventlaya, so Eventlaya's policies apply (they open on eventlaya.com) */}
-      <div className="border-t border-ink-100">
-        <nav aria-label="Legal" className="mx-auto flex max-w-6xl flex-wrap gap-x-4 gap-y-1 px-4 py-4 text-xs text-ink-500 sm:px-6">
-          <span>Registration and passes by Eventlaya</span>
-          {(
-            [
-              ['Privacy', LEGAL_PATHS.privacy],
-              ['Terms', LEGAL_PATHS.terms],
-              ['Community guidelines', LEGAL_PATHS.community],
-              ['Delete account', LEGAL_PATHS.deleteAccount],
-            ] as const
-          ).map(([label, path]) => (
-            <a key={path} href={legalHref(path)} className="hover:text-ink-800 hover:underline">
-              {label}
-            </a>
-          ))}
-        </nav>
       </div>
     </footer>
   )
@@ -215,23 +208,8 @@ const TenantHome: React.FC = () => {
 
   return (
     <div>
-      <section className="border-b border-ink-200 bg-white">
-        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10 sm:flex-row sm:items-center sm:px-6 sm:py-14">
-          <TenantMark tenant={tenant} large />
-          <div className="min-w-0">
-            <h1 className="font-display text-3xl font-extrabold tracking-[-0.03em] text-ink-900 sm:text-5xl">{name}</h1>
-            <p className="mt-2 max-w-2xl text-lg text-ink-600">
-              {live.length > 0
-                ? `${live.length === 1 ? 'An event is' : `${live.length} events are`} happening now.`
-                : next.length > 0
-                  ? 'Register for an upcoming event and get your pass straight away.'
-                  : 'See what’s coming up and catch up on past events.'}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <div className="mx-auto max-w-6xl space-y-12 px-4 pb-20 pt-10 sm:px-6">
+      <h1 className="sr-only">{name}</h1>
+      <div className="mx-auto max-w-6xl space-y-12 px-4 pb-20 pt-6 sm:px-6 sm:pt-8">
         {upcomingQ.isError ? (
           <ErrorState message={(upcomingQ.error as Error)?.message} onRetry={() => void upcomingQ.refetch()} />
         ) : upcomingQ.isLoading ? (

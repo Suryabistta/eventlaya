@@ -25,6 +25,8 @@ export interface Event {
   /** Applications stage (module `applications`) */
   applications_enabled?: boolean
   application_form?: string | null
+  /** Why the public can't apply right now (null = open); same text the public page shows */
+  applications_closed_reason?: string | null
   applications_close?: string | null
   application_cta?: string
   /** Guests (docs/plan-2026-11-guest-management.md) */
@@ -325,6 +327,8 @@ export interface VenueListing {
   /** Cover photo ('' = use the first photo) */
   featured_image?: string
   contact_person: string
+  /** Show “Hosted by …” on listing cards */
+  show_host?: boolean
   contact_phone: string
   contact_email: string
   description: string

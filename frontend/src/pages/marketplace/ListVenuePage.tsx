@@ -37,6 +37,7 @@ interface VenueForm {
   photos: string[]
   cover: string
   contactPerson: string
+  showHost: boolean
   contactPhone: string
   contactEmail: string
 }
@@ -119,6 +120,7 @@ const formFromVenue = (v: VenueWithSpaces): VenueForm => {
     photos: v.images,
     cover: v.featured_image ?? '',
     contactPerson: v.contact_person,
+    showHost: v.show_host ?? true,
     contactPhone: v.contact_phone,
     contactEmail: v.contact_email || '',
   }
@@ -220,6 +222,7 @@ const VenueFormPage: React.FC<{ existing?: VenueWithSpaces; existingSpaces?: Ven
           photos: [],
           cover: '',
           contactPerson: '',
+          showHost: true,
           contactPhone: user?.phone || '',
           contactEmail: user?.email || '',
         },
@@ -279,6 +282,7 @@ const VenueFormPage: React.FC<{ existing?: VenueWithSpaces; existingSpaces?: Ven
       images,
       featured_image: form.cover,
       contact_person: form.contactPerson,
+      show_host: form.showHost,
       contact_phone: form.contactPhone,
       contact_email: form.contactEmail,
       description: form.description || 'Your description appears here.',
@@ -340,6 +344,7 @@ const VenueFormPage: React.FC<{ existing?: VenueWithSpaces; existingSpaces?: Ven
       images,
       featured_image: form.cover,
       contact_person: form.contactPerson.trim(),
+      show_host: form.showHost,
       contact_phone: form.contactPhone.trim(),
       contact_email: form.contactEmail.trim(),
     }
@@ -524,6 +529,13 @@ const VenueFormPage: React.FC<{ existing?: VenueWithSpaces; existingSpaces?: Ven
                   containerClassName="sm:col-span-2"
                 />
               </div>
+              <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-ink-200 bg-white p-3 hover:bg-ink-50">
+                <input type="checkbox" checked={form.showHost} onChange={(e) => set('showHost', e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-ink-300 text-brand-600 focus:ring-brand-500/30" />
+                <span>
+                  <span className="block text-sm font-medium text-ink-900">Show “Hosted by” on my listing card</span>
+                  <span className="block text-xs text-ink-500">Off: the card shows no host name. Your contact details stay on the venue page.</span>
+                </span>
+              </label>
             </Section>
           </form>
           {existing && <PackagesManager listing={{ venue: existing.id }} />}

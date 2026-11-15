@@ -27,9 +27,6 @@ const ResetPasswordPage = lazyPage(() => import('./pages/auth/PasswordResetPages
 const DashboardPage = lazyPage(() => import('./pages/DashboardPage'), 'DashboardPage')
 const EventsPage = lazyPage(() => import('./pages/EventsPage'), 'EventsPage')
 const ApplicationsPage = lazyPage(() => import('./pages/ApplicationsPage'), 'ApplicationsPage')
-const TicketingEventsPage = lazyPage(() => import('./pages/EventsPage'), 'TicketingEventsPage')
-const RegistrationEventsPage = lazyPage(() => import('./pages/EventsPage'), 'RegistrationEventsPage')
-const PageantEventsPage = lazyPage(() => import('./pages/EventsPage'), 'PageantEventsPage')
 const EventFormPage = lazyPage(() => import('./pages/EventFormPage'), 'EventFormPage')
 const FormBuilderPage = lazyPage(() => import('./pages/FormBuilderPage'), 'FormBuilderPage')
 const GateScannerPage = lazyPage(() => import('./pages/GateScannerPage'), 'GateScannerPage')
@@ -41,9 +38,11 @@ const VotingPage = lazyPage(() => import('./pages/VotingPage'), 'VotingPage')
 const PollBuilderPage = lazyPage(() => import('./pages/voting/PollBuilderPage'), 'PollBuilderPage')
 const PollResultsPage = lazyPage(() => import('./pages/voting/PollResultsPage'), 'PollResultsPage')
 const PresenterPage = lazyPage(() => import('./pages/voting/PresenterPage'), 'PresenterPage')
+const VotingListPage = lazyPage(() => import('./pages/voting/VotingListPage'), 'VotingListPage')
 const PublicVotePage = lazyPage(() => import('./pages/voting/PublicVotePage'), 'PublicVotePage')
 // Contests / pageants (pages/voting/contest, docs/voting.md)
 const ContestCreatePage = lazyPage(() => import('./pages/voting/contest/ContestBuilderPage'), 'ContestCreatePage')
+const ContestantEditPage = lazyPage(() => import('./pages/voting/contest/ContestantsManager'), 'ContestantEditPage')
 const ContestBuilderPage = lazyPage(() => import('./pages/voting/contest/ContestBuilderPage'), 'ContestBuilderPage')
 const ContestDashboardPage = lazyPage(() => import('./pages/voting/contest/ContestDashboardPage'), 'ContestDashboardPage')
 const ContestPresenterPage = lazyPage(() => import('./pages/voting/contest/ContestPresenterPage'), 'ContestPresenterPage')
@@ -66,6 +65,7 @@ const PublicEventPage = lazyPage(() => import('./pages/PublicEventPage'), 'Publi
 const EventRegisterPage = lazyPage(() => import('./pages/EventRegisterPage'), 'EventRegisterPage')
 const ApplyPage = lazyPage(() => import('./pages/ApplyPage'), 'ApplyPage')
 const PublicPassPage = lazyPage(() => import('./pages/PublicPassPage'), 'PublicPassPage')
+const ContestantSelfPage = lazyPage(() => import('./pages/voting/contest/ContestantSelfPage'), 'ContestantSelfPage')
 const ExploreEventsPage = lazyPage(() => import('./pages/ExploreEventsPage'), 'ExploreEventsPage')
 const AdminOverviewPage = lazyPage(() => import('./pages/admin/OverviewPage'), 'OverviewPage')
 const OrganizationsPage = lazyPage(() => import('./pages/admin/OrganizationsPage'), 'OrganizationsPage')
@@ -93,6 +93,7 @@ const TaskFormPage = lazyPage(() => import('./pages/tasks/TaskFormPage'), 'TaskF
 const WhiteLabelPage = lazyPage(() => import('./pages/WhiteLabelPage'), 'default')
 const PricingPage = lazyPage(() => import('./pages/PricingPage'), 'default')
 const VerifyEmailPage = lazyPage(() => import('./pages/account/VerifyEmailPage'), 'VerifyEmailPage')
+const SavedEventsPage = lazyPage(() => import('./pages/account/SavedEventsPage'), 'SavedEventsPage')
 const MyTicketsPage = lazyPage(() => import('./pages/account/MyTicketsPage'), 'MyTicketsPage')
 const MyInquiriesPage = lazyPage(() => import('./pages/account/MyInquiriesPage'), 'MyInquiriesPage')
 const MyPaymentsPage = lazyPage(() => import('./pages/account/MyPaymentsPage'), 'MyPaymentsPage')
@@ -173,6 +174,7 @@ export const App: React.FC = () => {
               <Route element={<MarketingLayout />}>
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/events" element={<ExploreEventsPage />} />
+                <Route path="/voting" element={<VotingListPage />} />
                 <Route path="/pricing" element={<PricingPage />} />
                 <Route path="/marketplace" element={<MarketplacePage />} />
                 <Route path="/marketplace/venues/:slug" element={<VenueDetailPage />} />
@@ -195,6 +197,7 @@ export const App: React.FC = () => {
                 <Route path="/e/:slug/vote/:pollId" element={<PublicVotePage />} />
                 <Route path="/e/:slug/vote/:pollId/c/:cref" element={<PublicVotePage />} />
                 <Route path="/ticket/:token" element={<PublicPassPage />} />
+                <Route path="/contestant/:token" element={<ContestantSelfPage />} />
               </Route>
 
               {/* Auth */}
@@ -222,9 +225,9 @@ export const App: React.FC = () => {
               >
                 <Route index element={<AppHome><DashboardPage /></AppHome>} />
                 <Route path="events" element={organizer(<EventsPage />)} />
-                <Route path="events/ticketing" element={organizer(<TicketingEventsPage />)} />
-                <Route path="events/registration" element={organizer(<RegistrationEventsPage />)} />
-                <Route path="events/pageants" element={organizer(<PageantEventsPage />)} />
+                <Route path="events/ticketing" element={<Navigate to="/app/events?kind=ticketing" replace />} />
+                <Route path="events/registration" element={<Navigate to="/app/events?kind=registration" replace />} />
+                <Route path="events/pageants" element={<Navigate to="/app/events?kind=pageant" replace />} />
                 <Route path="forms" element={organizer(<FormBuilderPage />)} />
                 <Route path="scanner" element={<RequireAuth roles={['organizer', 'staff', 'superadmin']}><GateScannerPage /></RequireAuth>} />
                 <Route path="gates" element={organizer(<GatesPage />)} />
@@ -237,6 +240,7 @@ export const App: React.FC = () => {
                 <Route path="voting/contests/new" element={organizer(<ContestCreatePage />)} />
                 <Route path="voting/contests/:id" element={organizer(<ContestDashboardPage />)} />
                 <Route path="voting/contests/:id/edit" element={organizer(<ContestBuilderPage />)} />
+                <Route path="voting/contests/:id/contestants/:cid" element={organizer(<ContestantEditPage />)} />
                 <Route path="voting/:id" element={organizer(<PollResultsPage />)} />
                 <Route path="voting/:id/edit" element={organizer(<PollBuilderPage />)} />
                 <Route path="analytics" element={organizer(<EventAnalyticsPage />)} />
@@ -263,6 +267,7 @@ export const App: React.FC = () => {
                 <Route path="billing" element={<RequireAuth roles={['organizer', 'superadmin', 'vendor']}><PricingPage /></RequireAuth>} />
                 {/* Your own account: attendees, and organizers who attend events too */}
                 <Route path="my/tickets" element={<MyTicketsPage />} />
+                <Route path="my/saved" element={<SavedEventsPage />} />
                 <Route path="my/inquiries" element={<MyInquiriesPage />} />
                 <Route path="my/payments" element={<MyPaymentsPage />} />
                 <Route path="my/reviews" element={<MyReviewsPage />} />

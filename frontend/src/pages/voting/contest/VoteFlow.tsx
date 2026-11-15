@@ -131,6 +131,8 @@ interface VoteFlowProps {
   contestant: VoteTarget | null
   category?: VoteCategory | null
   onVoted?: (res: ContestVoteResult) => void
+  /** Buy votes for this contestant (paid packs); the parent opens the payment flow */
+  onBuy?: (choice: { pack: string } | { votes: number }) => void
 }
 
 /** Modal that verifies the voter (per the contest's method), picks how many votes, and casts them. */
@@ -140,7 +142,7 @@ export const VoteFlow: React.FC<VoteFlowProps> = (props) => {
   return <VoteFlowInner key={key} {...props} />
 }
 
-const VoteFlowInner: React.FC<VoteFlowProps> = ({ open, onClose, contest, slug, contestRef, contestant, category, onVoted }) => {
+const VoteFlowInner: React.FC<VoteFlowProps> = ({ open, onClose, contest, slug, contestRef, contestant, category, onVoted, onBuy }) => {
   const toast = useToast()
   const queryClient = useQueryClient()
   const { user } = useAuth()
@@ -173,7 +175,11 @@ const VoteFlowInner: React.FC<VoteFlowProps> = ({ open, onClose, contest, slug, 
     return () => clearInterval(t)
   }, [resendAt])
 
-  const channelWord = mode === 'sms_otp' ? 'phone number' : 'email'
+  // SMS-code contests fall back to an email code when SMS isn't working (organizer setting, on by default)
+  const [byEmail, setByEmail] = useState(false)
+  const [smsDown, setSmsDown] = useState(false)
+  const smsMode = mode === 'sms_otp' && !byEmail
+  const channelWord = smsMode ? 'phone number' : 'email'
 
   /** Identity fields for vote/allowance requests, or null when the voter still has to identify. */
   const identity = useCallback((): Omit<ContestVoteInput, 'contestant'> | null => {
@@ -223,7 +229,7 @@ const VoteFlowInner: React.FC<VoteFlowProps> = ({ open, onClose, contest, slug, 
   const sendCode = async () => {
     setError(undefined)
     if (!destination.trim()) {
-      setError(mode === 'sms_otp' ? 'Enter your mobile number.' : 'Enter your email address.')
+      setError(smsMode ? 'Enter your mobile number.' : 'Enter your email address.')
       return
     }
     if (siteKey && !captcha) {
@@ -240,6 +246,7 @@ const VoteFlowInner: React.FC<VoteFlowProps> = ({ open, onClose, contest, slug, 
       requestAnimationFrame(() => codeInput.current?.focus())
     } catch (e) {
       handleError(e)
+      if (e instanceof ApiError && e.code === 'sms_unavailable' && contest.verification.email_fallback) setSmsDown(true)
       const retry = e instanceof ApiError ? (e.data as { retry_after?: number } | null)?.retry_after : undefined
       if (retry) setResendAt(Date.now() + retry * 1000)
     } finally {
@@ -364,13 +371,28 @@ const VoteFlowInner: React.FC<VoteFlowProps> = ({ open, onClose, contest, slug, 
       }
     >
       <div className="space-y-5">
-        <div className="flex items-center gap-3">
-          <ContestantPhoto name={contestant.name} photo={contestant.photo_url} className="h-16 w-14 shrink-0" rounded="rounded-xl" />
+        <div className="relative flex items-center gap-4 overflow-hidden rounded-2xl bg-gradient-to-br from-[#3b0a1f] to-[#7a1a3c] p-3 text-white">
+          <ContestantPhoto name={contestant.name} photo={contestant.photo_url} className="h-20 w-16 shrink-0 ring-2 ring-white/30" rounded="rounded-xl" />
           <div className="min-w-0">
             <NumberTag value={contestant.display_number} />
-            <p className="mt-1 truncate font-semibold text-ink-900">{contestant.name}</p>
+            <p className="mt-1 truncate font-display text-lg font-bold">{contestant.name}</p>
+            <p className="truncate text-xs text-white/70">{category ? category.name : contest.title}</p>
           </div>
         </div>
+
+        {/* Where the voter is: verify → choose votes → confirm */}
+        <ol className="grid grid-cols-3 gap-2 text-[11px] font-semibold" aria-label="Steps">
+          {['Verify', 'Votes', 'Confirm'].map((label, i) => {
+            const step = needsIdentity ? 0 : outOfVotes ? 1 : 2
+            const state = i < step ? 'done' : i === step ? 'now' : 'next'
+            return (
+              <li key={label} aria-current={state === 'now' ? 'step' : undefined} className="space-y-1">
+                <span className={cn('block h-1 rounded-full', state === 'next' ? 'bg-ink-100' : 'bg-brand-600')} />
+                <span className={state === 'next' ? 'text-ink-400' : 'text-ink-800'}>{i + 1}. {label}</span>
+              </li>
+            )
+          })}
+        </ol>
 
         {/* Who is voting */}
         {otp && (
@@ -421,16 +443,24 @@ const VoteFlowInner: React.FC<VoteFlowProps> = ({ open, onClose, contest, slug, 
           ) : (
             <div className="space-y-3">
               <Input
-                label={mode === 'sms_otp' ? 'Your mobile number' : 'Your email'}
-                type={mode === 'sms_otp' ? 'tel' : 'email'}
-                inputMode={mode === 'sms_otp' ? 'tel' : 'email'}
-                autoComplete={mode === 'sms_otp' ? 'tel' : 'email'}
-                placeholder={mode === 'sms_otp' ? '98XXXXXXXX' : 'you@example.com'}
+                label={smsMode ? 'Your mobile number' : 'Your email'}
+                type={smsMode ? 'tel' : 'email'}
+                inputMode={smsMode ? 'tel' : 'email'}
+                autoComplete={smsMode ? 'tel' : 'email'}
+                placeholder={smsMode ? '98XXXXXXXX' : 'you@example.com'}
                 value={destination}
                 onChange={(e) => setDestination(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), sendCode())}
                 hint={`We send a one-time code to check it’s you. Your ${channelWord} is never shown to anyone.`}
               />
+              {smsDown && smsMode && (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-marigold-50 px-3.5 py-3 text-sm text-marigold-900">
+                  <span>SMS isn’t working right now.</span>
+                  <Button size="sm" variant="secondary" onClick={() => { setByEmail(true); setDestination(user?.email ?? ''); setError(undefined) }}>
+                    Get the code by email
+                  </Button>
+                </div>
+              )}
               {siteKey && <Turnstile siteKey={siteKey} onToken={setCaptcha} resetKey={captchaReset} />}
               <Button variant="dark" className="w-full" loading={busy === 'send'} disabled={resendIn > 0} onClick={sendCode}>
                 {resendIn > 0 ? `Send code (wait ${resendIn}s)` : 'Send code'}
@@ -508,12 +538,18 @@ const VoteFlowInner: React.FC<VoteFlowProps> = ({ open, onClose, contest, slug, 
               >
                 <Plus className="h-5 w-5" aria-hidden />
               </button>
-              {maxQ > 2 && (
-                <button type="button" onClick={() => setQuantity(maxQ)} className="ml-1 text-sm font-semibold text-brand-700 underline underline-offset-2">
-                  All {maxQ}
-                </button>
-              )}
             </div>
+            {maxQ > 2 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {[...new Set([1, 5, 10, 25, maxQ].filter((n) => n <= maxQ))].map((n) => (
+                  <button key={n} type="button" onClick={() => setQuantity(n)} aria-pressed={quantity === n}
+                    className={cn('h-8 rounded-full border px-3.5 text-xs font-semibold transition-colors',
+                      quantity === n ? 'border-brand-600 bg-brand-600 text-white' : 'border-ink-200 bg-white text-ink-700 hover:border-ink-400')}>
+                    {n === maxQ ? `All ${n}` : n}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -533,6 +569,32 @@ const VoteFlowInner: React.FC<VoteFlowProps> = ({ open, onClose, contest, slug, 
 
         {/* Robot check for the vote itself (OTP voters already passed one to get the code, but each request needs a fresh token) */}
         {siteKey && !needsIdentity && <Turnstile siteKey={siteKey} onToken={setCaptcha} resetKey={captchaReset} />}
+
+        {onBuy && contest.paid.enabled && contest.paid.payments_available && !needsIdentity && (contest.paid.packs.length > 0 || contest.paid.custom_votes) && (
+          <div className="rounded-2xl border border-ink-200 p-3">
+            <p className="text-sm font-semibold text-ink-900">{outOfVotes ? 'Want to give more?' : 'Buy more votes'}</p>
+            <p className="text-xs text-ink-500">
+              {contest.paid.buy_and_vote ? `Paid votes go to ${contestant.name} once the payment is confirmed.` : 'Paid votes are added to your balance.'}
+              {contest.paid.providers.length > 0 && ` Pay with ${contest.paid.providers.map((x) => x.name).join(', ')}.`}
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {contest.paid.packs.map((pk) => (
+                <button key={pk.id} type="button" onClick={() => onBuy({ pack: pk.id })}
+                  className="rounded-xl border border-ink-200 px-3 py-2 text-left hover:border-brand-400 hover:bg-brand-50">
+                  <span className="block text-sm font-bold text-ink-900">{pk.total_votes} votes</span>
+                  <span className="block text-xs text-ink-500">{contest.paid.currency === 'NPR' ? 'Rs.' : contest.paid.currency} {Number(pk.price).toLocaleString()}</span>
+                </button>
+              ))}
+              {contest.paid.custom_votes && contest.paid.price_per_vote && (
+                <button type="button" onClick={() => onBuy({ votes: 10 })}
+                  className="rounded-xl border border-dashed border-ink-300 px-3 py-2 text-left hover:border-brand-400 hover:bg-brand-50">
+                  <span className="block text-sm font-bold text-ink-900">Any amount</span>
+                  <span className="block text-xs text-ink-500">{contest.paid.currency === 'NPR' ? 'Rs.' : contest.paid.currency} {Number(contest.paid.price_per_vote).toLocaleString()} / vote</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {error && (
           <p role="alert" className="rounded-xl bg-red-50 px-3.5 py-2.5 text-sm font-medium text-red-700">

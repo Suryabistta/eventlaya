@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { formatDate } from '@/lib/dates'
+import { formatDate, formatDateTime } from '@/lib/dates'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Line } from 'react-chartjs-2'
@@ -31,6 +31,8 @@ import { TicketPassModal } from '@/components/TicketPassModal'
 import { RegistrationQrModal } from '@/components/RegistrationQrModal'
 import { AnswerValue, type Answer } from '@/components/ApplicationsCard'
 import { ApplicationsSummary, PageChecklist } from '@/components/EventNextSteps'
+import { EventControls } from '@/components/EventControls'
+import { EventJourney } from '@/components/EventJourney'
 import { ArrivalsCard, GuestEditModal, MessageGuestsModal, type GuestTicket } from '@/components/GuestTools'
 import { SeatsModal } from '@/components/SeatsModal'
 import { useModuleEnabled } from '@/lib/modules'
@@ -66,6 +68,8 @@ function greeting() {
 function eventTiming(e: Event) {
   const phase = eventPhase(e)
   if (phase === 'live') return { label: 'Happening now', tone: 'success' as const }
+  // Date to be announced: no countdown (start_date only holds the applications deadline then)
+  if (phase === 'upcoming' && e.date_tba) return { label: 'Date to be announced', tone: 'neutral' as const }
   if (phase === 'upcoming') return { label: startsInText(e), tone: 'brand' as const }
   if (phase === 'cancelled') return { label: 'Cancelled', tone: 'danger' as const }
   if (phase === 'draft') return { label: 'Draft', tone: 'neutral' as const }
@@ -199,13 +203,16 @@ export const DashboardPage: React.FC = () => {
           <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-600">
             <span className="inline-flex items-center gap-1.5">
               <CalendarDays className="h-4 w-4 text-ink-400" aria-hidden />
-              {formatDate(new Date(currentEvent.start_date), 'weekday')}
-              {currentEvent.start_time && `, ${currentEvent.start_time.slice(0, 5)}`}
+              {currentEvent.date_tba
+                ? currentEvent.applications_close ? `Applications close ${formatDateTime(currentEvent.applications_close, 'weekday')}` : 'Date to be announced'
+                : <>{formatDate(new Date(currentEvent.start_date), 'weekday')}{currentEvent.start_time && `, ${currentEvent.start_time.slice(0, 5)}`}</>}
             </span>
-            <span className="inline-flex min-w-0 items-center gap-1.5">
-              <MapPin className="h-4 w-4 shrink-0 text-ink-400" aria-hidden />
-              <span className="truncate">{currentEvent.location}</span>
-            </span>
+            {!currentEvent.date_tba && (
+              <span className="inline-flex min-w-0 items-center gap-1.5">
+                <MapPin className="h-4 w-4 shrink-0 text-ink-400" aria-hidden />
+                <span className="truncate">{currentEvent.location}</span>
+              </span>
+            )}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -215,7 +222,15 @@ export const DashboardPage: React.FC = () => {
           <Button variant="secondary" icon={<QrCode className="h-4 w-4" />} onClick={() => setQrOpen(true)}>
             Event QR
           </Button>
-          <RegistrationQrModal open={qrOpen} onClose={() => setQrOpen(false)} url={publicUrl} title={currentEvent.title} />
+          <RegistrationQrModal
+            open={qrOpen}
+            onClose={() => setQrOpen(false)}
+            path={`/e/${currentEvent.slug}`}
+            title={currentEvent.title}
+            heading="Share your event"
+            description="Copy the link or download the QR for posters, flyers and social media."
+            scanText={currentEvent.applications_enabled && currentEvent.tickets_enabled === false ? 'Scan to apply' : currentEvent.registration_mode === 'form' ? 'Scan to sign up' : 'Scan to get tickets'}
+          />
           {!formOnly && !appsOnly && (
             <ButtonLink to="/app/scanner" icon={<ScanLine className="h-4 w-4" />}>
               Open gate scanner
@@ -297,10 +312,14 @@ export const DashboardPage: React.FC = () => {
       </Card>
       )}
 
-      {/* Applications: a short summary here; reviewing happens on the Applications page */}
-      {currentEvent.applications_enabled && <ApplicationsSummary eventId={currentEvent.id} />}
+      {isOrganizer && <EventJourney event={currentEvent} onShare={() => setQrOpen(true)} />}
 
       {isOrganizer && <PageChecklist event={currentEvent} />}
+
+      {isOrganizer && <EventControls event={currentEvent} />}
+
+      {/* Applications: a short summary here; reviewing happens on the Applications page */}
+      {currentEvent.applications_enabled && <ApplicationsSummary eventId={currentEvent.id} />}
 
       {/* Guests + gate activity (an applications-only event has no guests yet) */}
       {!appsOnly && (

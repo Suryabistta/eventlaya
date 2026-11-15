@@ -236,7 +236,7 @@ export const VendorQuoteForm: React.FC<{
         <div className="space-y-4 border-t border-ink-100 pt-4">
           <Input label="Your name or organization" required autoComplete="name" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Koshi Tech Festival" />
           <Input label="Email" type="email" required autoComplete="email" value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="you@example.com" />
-          <Input label="Phone" type="tel" required autoComplete="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="98XXXXXXXX" />
+          <Input label="Mobile number" type="tel" required autoComplete="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="98XXXXXXXX" />
         </div>
         <Button type="submit" loading={sending} className="w-full">
           {slot ? 'Request this slot' : 'Send request'}

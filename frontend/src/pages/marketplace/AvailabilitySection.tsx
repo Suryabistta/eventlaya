@@ -10,7 +10,6 @@ import { Card, CardHeader, Skeleton } from '@/components/ui'
 import { cn } from '@/lib/utils'
 
 export const DAYS_AHEAD = 60
-const DATES_PER_PAGE = 5
 
 export const availabilityKey = (kind: ListingKind, id: string) => ['availability', kind, id] as const
 
@@ -52,7 +51,14 @@ export const AvailabilitySection: React.FC<{
   const { data, isLoading } = usePublicAvailability(kind, listingId)
   const [day, setDay] = useState<string | null>(null)
   const [system] = useCalendarSystem()
-  const [pages, setPages] = useState(1)
+  // Landscape strip by default; viewers can switch to a month box (remembered on this device)
+  const [view, setView] = useState<'strip' | 'box'>(() => {
+    try { return localStorage.getItem('availability-view') === 'box' ? 'box' : 'strip' } catch { return 'strip' }
+  })
+  const pickView = (v: 'strip' | 'box') => {
+    setView(v)
+    try { localStorage.setItem('availability-view', v) } catch { /* private mode */ }
+  }
 
   // A space filter keeps that space's slots plus whole-venue slots.
   const slots = useMemo(
@@ -83,8 +89,56 @@ export const AvailabilitySection: React.FC<{
 
   const start = todayIso()
   const strip = Array.from({ length: DAYS_AHEAD + 1 }, (_, i) => addDays(start, i))
-  const shownDates = day ? [day] : openDates.slice(0, pages * DATES_PER_PAGE)
   const unit = kind === 'venue' ? 'venue' : 'vendor'
+
+  const dayButton = (d: string, size: string) => {
+    const list = byDate.get(d) ?? []
+    const open = list.filter((s) => s.available).length
+    const taken = list.length > 0 && open === 0
+    // A full day is amber while a request is pending on it, red once booked, grey when only closed
+    const takenTone = list.some((s) => s.status === 'booked') ? 'booked' : list.some((s) => s.status === 'held') ? 'held' : 'blocked'
+    const date = parseIso(d)
+    const bs = system === 'bs' ? toBs(date) : null
+    const dayNum = bs ? bs.day : date.getDate()
+    const monthMark = view === 'strip' && (dayNum === 1 || d === start) && (bs ? BS_MONTHS[bs.month].slice(0, 3) : date.toLocaleDateString('en-GB', { month: 'short' }))
+    const selected = day === d
+    return (
+      <button
+        key={d}
+        type="button"
+        disabled={list.length === 0}
+        aria-pressed={selected}
+        aria-label={`${fmtDay(d, true)}: ${open ? `${open} open slot${open === 1 ? '' : 's'}` : taken ? 'fully booked' : 'no slots'}`}
+        onClick={() => setDay(selected ? null : d)}
+        className={cn(
+          'relative flex flex-col items-center rounded-lg border py-1.5 text-center transition-colors',
+          size,
+          selected
+            ? 'border-brand-600 bg-brand-600 text-white'
+            : open
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-900 hover:border-emerald-400'
+              : taken
+                ? TAKEN_DAY[takenTone]
+                : 'border-transparent text-ink-300',
+        )}
+      >
+        {view === 'strip' && <span className="text-[10px] font-semibold uppercase">{date.toLocaleDateString('en-GB', { weekday: 'short' }).slice(0, 2)}</span>}
+        <span className={cn('text-sm font-bold tabular', taken && !selected && 'line-through')}>{dayNum}</span>
+        {view === 'strip' && <span className="text-[9px] font-medium uppercase leading-none opacity-70">{monthMark || ' '}</span>}
+      </button>
+    )
+  }
+  // Box view: the same days grouped by month (Gregorian or BS, following the calendar toggle)
+  const months: { key: string; label: string; days: string[] }[] = []
+  for (const d of strip) {
+    const date = parseIso(d)
+    const bs = system === 'bs' ? toBs(date) : null
+    const key = bs ? `${bs.year}-${bs.month}` : `${date.getFullYear()}-${date.getMonth()}`
+    const label = bs ? `${BS_MONTHS[bs.month]} ${bs.year}` : date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+    const last = months[months.length - 1]
+    if (last?.key === key) last.days.push(d)
+    else months.push({ key, label, days: [d] })
+  }
 
   const choose = (s: PublicSlot) => {
     onSelect(s)
@@ -96,7 +150,7 @@ export const AvailabilitySection: React.FC<{
     <Card id="availability" className="scroll-mt-24">
       <CardHeader
         title="Availability"
-        description={`Open slots for the next ${DAYS_AHEAD} days. Pick one to request it; the ${unit} confirms with you.`}
+        description={`The next ${DAYS_AHEAD} days. Pick a green day, then a slot to request it; the ${unit} confirms with you.`}
         actions={<CalendarToggle />}
       />
       <div className="space-y-4 p-5">
@@ -120,44 +174,34 @@ export const AvailabilitySection: React.FC<{
         )}
 
         <div>
-          <div role="group" aria-label="Pick a day" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-2">
-            {strip.map((d) => {
-              const list = byDate.get(d) ?? []
-              const open = list.filter((s) => s.available).length
-              const taken = list.length > 0 && open === 0
-              // A full day is amber while a request is pending on it, red once booked, grey when only closed
-              const takenTone = list.some((s) => s.status === 'booked') ? 'booked' : list.some((s) => s.status === 'held') ? 'held' : 'blocked'
-              const date = parseIso(d)
-              const bs = system === 'bs' ? toBs(date) : null
-              const dayNum = bs ? bs.day : date.getDate()
-              const monthMark = (dayNum === 1 || d === start) && (bs ? BS_MONTHS[bs.month].slice(0, 3) : date.toLocaleDateString('en-GB', { month: 'short' }))
-              const selected = day === d
-              return (
-                <button
-                  key={d}
-                  type="button"
-                  disabled={list.length === 0}
-                  aria-pressed={selected}
-                  aria-label={`${fmtDay(d, true)}: ${open ? `${open} open slot${open === 1 ? '' : 's'}` : taken ? 'fully booked' : 'no slots'}`}
-                  onClick={() => setDay(selected ? null : d)}
-                  className={cn(
-                    'relative flex w-11 shrink-0 flex-col items-center rounded-lg border py-1.5 text-center transition-colors',
-                    selected
-                      ? 'border-brand-600 bg-brand-600 text-white'
-                      : open
-                        ? 'border-emerald-200 bg-emerald-50 text-emerald-900 hover:border-emerald-400'
-                        : taken
-                          ? TAKEN_DAY[takenTone]
-                          : 'border-transparent text-ink-300',
-                  )}
-                >
-                  <span className="text-[10px] font-semibold uppercase">{date.toLocaleDateString('en-GB', { weekday: 'short' }).slice(0, 2)}</span>
-                  <span className={cn('text-sm font-bold tabular', taken && !selected && 'line-through')}>{dayNum}</span>
-                  <span className="text-[9px] font-medium uppercase leading-none opacity-70">{monthMark || ' '}</span>
-                </button>
-              )
-            })}
+          <div role="radiogroup" aria-label="Calendar view" className="mb-3 inline-flex rounded-lg bg-ink-100 p-0.5">
+            {(['strip', 'box'] as const).map((v) => (
+              <button key={v} type="button" role="radio" aria-checked={view === v} onClick={() => pickView(v)}
+                className={cn('h-7 rounded-md px-3 text-xs font-semibold', view === v ? 'bg-white text-ink-900 shadow-xs' : 'text-ink-500 hover:text-ink-900')}>
+                {v === 'strip' ? 'Landscape' : 'Box'}
+              </button>
+            ))}
           </div>
+          {view === 'strip' ? (
+            <div role="group" aria-label="Pick a day" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-2">
+              {strip.map((d) => dayButton(d, 'w-11 shrink-0'))}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {months.map((m) => (
+                <div key={m.key}>
+                  <p className="mb-1.5 text-sm font-semibold text-ink-900">{m.label}</p>
+                  <div role="group" aria-label={m.label} className="grid grid-cols-7 gap-1">
+                    {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((w) => (
+                      <span key={w} className="text-center text-[10px] font-semibold uppercase text-ink-400">{w}</span>
+                    ))}
+                    {Array.from({ length: parseIso(m.days[0]).getDay() }, (_, i) => <span key={`pad-${i}`} />)}
+                    {m.days.map((d) => dayButton(d, 'w-full'))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-500">
             <span className="inline-flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-sm border border-emerald-300 bg-emerald-100" aria-hidden />
@@ -178,35 +222,23 @@ export const AvailabilitySection: React.FC<{
           </div>
         </div>
 
-        {openDates.length === 0 && !day ? (
+        {openDates.length === 0 ? (
           <p className="rounded-xl bg-ink-50 px-4 py-3 text-sm text-ink-600">
             Every listed slot is taken right now. Send an inquiry with your date and the {unit} will tell you what’s possible.
           </p>
+        ) : day ? (
+          <section aria-label={fmtDay(day, true)}>
+            <h3 className="mb-2 text-sm font-semibold text-ink-900">{fmtDay(day, true)}</h3>
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {(byDate.get(day) ?? []).map((s) => (
+                <li key={s.id}>
+                  <SlotChoice slot={s} selected={selectedId === s.id} onChoose={() => choose(s)} />
+                </li>
+              ))}
+            </ul>
+          </section>
         ) : (
-          <div className="space-y-4">
-            {day && (
-              <button type="button" onClick={() => setDay(null)} className="text-sm font-medium text-brand-700 hover:underline">
-                Show all open dates
-              </button>
-            )}
-            {shownDates.map((d) => (
-              <section key={d} aria-label={fmtDay(d, true)}>
-                <h3 className="mb-2 text-sm font-semibold text-ink-900">{fmtDay(d, true)}</h3>
-                <ul className="grid gap-2 sm:grid-cols-2">
-                  {(byDate.get(d) ?? []).filter((s) => day || s.available).map((s) => (
-                    <li key={s.id}>
-                      <SlotChoice slot={s} selected={selectedId === s.id} onChoose={() => choose(s)} />
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
-            {!day && openDates.length > shownDates.length && (
-              <button type="button" onClick={() => setPages((p) => p + 1)} className="text-sm font-medium text-brand-700 hover:underline">
-                Show more dates ({openDates.length - shownDates.length} more)
-              </button>
-            )}
-          </div>
+          <p className="text-sm text-ink-500">Pick a green day to see its open slots.</p>
         )}
       </div>
     </Card>

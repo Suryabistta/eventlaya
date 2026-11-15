@@ -3,18 +3,19 @@ import { formatDateTime } from '@/lib/dates'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  AlertTriangle, BarChart3, ChevronDown, ChevronRight, Copy, Download, ExternalLink, Flag, Gift, Lock, MonitorPlay, Pencil, Play,
-  RotateCcw, ShieldAlert, Square, Trophy, Undo2, Unlock, Users, Vote as VoteIcon,
+  AlertTriangle, BarChart3, ChevronDown, ChevronRight, Download, ExternalLink, Flag, Gift, Lock, MonitorPlay, Pencil, Play,
+  Check, RotateCcw, Share2, ShieldAlert, Square, Trophy, Undo2, Unlock, Users, Vote as VoteIcon,
 } from 'lucide-react'
 import { Badge, Button, ButtonLink, Card, CardHeader, EmptyState, ErrorState, Input, Modal, PageHeader, Skeleton, StatTile, Textarea, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { PollStatusBadge } from '../shared'
 import {
-  contestApi, contestPath, contestRef, downloadContestExport, shareUrl, type Contest, type ContestRound, type Dashboard, type Standings,
+  contestApi, contestPath, contestRef, downloadContestExport, type Contest, type ContestRound, type Dashboard, type Standings,
   type StandingRow, type VoteRow,
 } from './api'
 import { ModuleOff, Note, isModuleOff } from './kit'
 import { useModuleEnabled } from '@/lib/modules'
+import { RegistrationQrModal } from '@/components/RegistrationQrModal'
 import { ContestantPhoto, ContestantStatusBadge, NumberTag, fmtScore, visibilityInfo, voteModeInfo } from './shared'
 
 const wrapClass = 'w-full space-y-6 px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pb-10 lg:pt-8 2xl:px-10'
@@ -38,6 +39,7 @@ export const ContestDashboardPage: React.FC = () => {
     queryKey: ['contest', id], queryFn: () => contestApi.get(id!), refetchInterval: 15000, retry: (n, e) => !isModuleOff(e) && n < 1,
   })
   const judgingOn = useModuleEnabled('judging')
+  const [sharing, setSharing] = useState(false)
 
   const setStatus = useMutation({
     mutationFn: (action: 'open' | 'close') => contestApi.setStatus(id!, action),
@@ -52,22 +54,17 @@ export const ContestDashboardPage: React.FC = () => {
   if (isError) return <div className={wrapClass}><ErrorState message={error?.message} onRetry={refetch} /></div>
   if (isLoading || !contest) return <div className={wrapClass}><Skeleton className="h-10 w-72" /><div className="grid grid-cols-1 gap-4 sm:grid-cols-4">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}</div><Skeleton className="h-80 rounded-2xl" /></div>
 
+  // Simple contests (no rounds, judges or awards) don't show the round / judge parts of the dashboard
+  const hasRounds = contest.rounds.length > 0
+  const hasJudges = contest.judges.length > 0 || contest.rounds.some((r) => r.judging_enabled)
   const publicPath = contestPath(contest.event_slug, contestRef(contest))
-  const copyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl(contest.event_slug, contestRef(contest)))
-      toast.success('Share link copied', 'It shows a preview with your cover image on Facebook, Messenger and Viber.')
-    } catch {
-      toast.error('Couldn’t copy the link')
-    }
-  }
 
   return (
     <div className={wrapClass}>
       <div className="space-y-2">
         <nav aria-label="Breadcrumb">
           <ol className="flex flex-wrap items-center gap-1 text-sm text-ink-500">
-            <li><Link to="/app/voting" className="font-medium hover:text-ink-900 hover:underline">Live voting</Link></li>
+            <li><Link to="/app/voting" className="font-medium hover:text-ink-900 hover:underline">Voting</Link></li>
             <ChevronRight className="h-4 w-4 text-ink-400" aria-hidden />
             <li aria-current="page" className="truncate text-ink-700">{contest.title}</li>
           </ol>
@@ -86,15 +83,19 @@ export const ContestDashboardPage: React.FC = () => {
               )}
               <ButtonLink variant="secondary" to={`/app/voting/contests/${contest.id}/edit`} icon={<Pencil className="h-4 w-4" />}>Set up</ButtonLink>
               <ButtonLink variant="secondary" to={`/app/voting/contests/${contest.id}/present`} icon={<MonitorPlay className="h-4 w-4" />}>Present</ButtonLink>
-              <Button variant="ghost" icon={<Copy className="h-4 w-4" />} onClick={copyLink}>Share link</Button>
-              <a href={publicPath} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center gap-2 rounded-[10px] px-3 text-sm font-semibold text-ink-600 hover:bg-ink-100"><ExternalLink className="h-4 w-4" aria-hidden />Public page</a>
+              <Button variant="ghost" icon={<Share2 className="h-4 w-4" />} onClick={() => setSharing(true)}>Share</Button>
+              <a href={publicPath} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center gap-2 rounded-[10px] px-3 text-sm font-semibold text-ink-600 hover:bg-ink-100">
+                <ExternalLink className="h-4 w-4" aria-hidden />{contest.status === 'open' ? 'Public page' : 'Preview page'}
+              </a>
             </>
           }
         />
       </div>
 
+      <ContestSteps contest={contest} opening={setStatus.isPending} onOpen={() => setStatus.mutate('open')} onShare={() => setSharing(true)} />
+
       <div role="tablist" aria-label="Contest dashboard" className="-mx-4 flex gap-1 overflow-x-auto border-b border-ink-200 px-4">
-        {TABS.filter((t) => (t.id !== 'scores' || judgingOn) && (t.id !== 'paid' || contest.paid_votes_enabled || Number(contest.stats.revenue) > 0)).map((t) => (
+        {TABS.filter((t) => (t.id !== 'scores' || (judgingOn && hasJudges)) && (t.id !== 'paid' || contest.paid_votes_enabled || Number(contest.stats.revenue) > 0)).map((t) => (
           <button
             key={t.id}
             role="tab"
@@ -102,15 +103,30 @@ export const ContestDashboardPage: React.FC = () => {
             onClick={() => setParams((p) => { p.set('tab', t.id); return p }, { replace: true })}
             className={cn('-mb-px whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-semibold', tab === t.id ? 'border-brand-600 text-brand-700' : 'border-transparent text-ink-500 hover:text-ink-900')}
           >
-            {t.label}
+            {t.id === 'results' && !hasRounds ? 'Results' : t.label}
             {t.id === 'fraud' && contest.stats.flagged > 0 && <Badge tone="warning" className="ml-1.5">{contest.stats.flagged}</Badge>}
           </button>
         ))}
       </div>
 
+      <RegistrationQrModal
+        open={sharing}
+        onClose={() => setSharing(false)}
+        path={publicPath}
+        title={contest.title}
+        heading="Share this contest"
+        description="Copy the link or download the QR for posters. Facebook, WhatsApp and Viber show your cover image."
+        scanText="Scan to vote"
+        notice={contest.status === 'draft' || contest.status === 'closed' ? (
+          <p className="mb-4 rounded-xl bg-marigold-50 px-3.5 py-2.5 text-sm text-marigold-900">
+            {contest.status === 'draft' ? 'Voting isn’t open yet. People who open this link now see “not found” until you open voting.' : 'Voting has closed. The link still shows the contestants and results.'}
+          </p>
+        ) : undefined}
+      />
+
       {tab === 'overview' && <OverviewTab contest={contest} />}
       {tab === 'results' && <ResultsTab contest={contest} />}
-      {tab === 'scores' && <ScoresTab contest={contest} />}
+      {tab === 'scores' && hasJudges && <ScoresTab contest={contest} />}
       {tab === 'fraud' && <FraudTab contest={contest} />}
       {tab === 'exports' && <ExportsTab contest={contest} />}
       {tab === 'paid' && <PaidTab contest={contest} />}
@@ -139,10 +155,11 @@ const OverviewTab: React.FC<{ contest: Contest }> = ({ contest }) => {
           <div className="p-5"><HourlyBars points={data.hourly} /></div>
         </Card>
         <Card>
-          <CardHeader title="Votes by contestant" description="Main contest, all rounds" />
+          <CardHeader title="Votes by contestant" description={contest.rounds.length ? 'Main contest, all rounds' : 'All votes so far'} />
           <div className="p-5"><ContestantBars rows={data.per_contestant} /></div>
         </Card>
       </div>
+      {(contest.rounds.length > 0 || contest.categories.length > 0 || contest.judges.length > 0) && (
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader title="By round and category" />
@@ -155,6 +172,7 @@ const OverviewTab: React.FC<{ contest: Contest }> = ({ contest }) => {
         </Card>
         <JudgesProgress data={data} />
       </div>
+      )}
     </div>
   )
 }
@@ -859,6 +877,63 @@ const AnnouncePanel: React.FC<{ contest: Contest }> = ({ contest }) => {
           Announce winners
         </Button>
       </div>
+    </Card>
+  )
+}
+
+/* ---------- Getting started: the four steps to a live contest ---------- */
+
+const ContestSteps: React.FC<{ contest: Contest; opening: boolean; onOpen: () => void; onShare: () => void }> = ({ contest, opening, onOpen, onShare }) => {
+  const edit = (step: string) => `/app/voting/contests/${contest.id}/edit#${step}`
+  const people = contest.stats.contestants
+  const opened = contest.status !== 'draft'
+  const steps = [
+    {
+      title: 'Add contestants',
+      detail: people ? `${people} ${people === 1 ? 'contestant' : 'contestants'} added` : 'Add them yourself, import a list, or bring in accepted applicants.',
+      done: people > 0,
+      action: <ButtonLink size="sm" variant={people ? 'ghost' : 'primary'} to={edit('contestants')}>{people ? 'Manage' : 'Add contestants'}</ButtonLink>,
+    },
+    {
+      title: 'Choose how people vote',
+      detail: voteModeInfo[contest.vote_mode].label,
+      done: true,
+      action: <ButtonLink size="sm" variant="ghost" to={edit('rules')}>Change</ButtonLink>,
+    },
+    {
+      title: 'Open voting',
+      detail: contest.status === 'open' ? 'Voting is open' : contest.status === 'scheduled' ? 'Opens on its own at the set time' : contest.status === 'closed' ? 'Voting has closed' : 'The contest goes public when you open it.',
+      done: opened,
+      action: opened ? null : <Button size="sm" disabled={!people} loading={opening} onClick={onOpen}>Open voting</Button>,
+    },
+    {
+      title: 'Share it',
+      detail: contest.stats.votes ? `${contest.stats.votes.toLocaleString()} votes so far` : 'Post the link or put the QR on posters.',
+      done: contest.stats.votes > 0,
+      action: <Button size="sm" variant={opened && !contest.stats.votes ? 'primary' : 'ghost'} onClick={onShare}>Share</Button>,
+    },
+  ]
+  // Once it's live and people are voting, the checklist has done its job
+  if (opened && contest.stats.votes > 0) return null
+  const next = steps.findIndex((x) => !x.done)
+  return (
+    <Card className="p-5">
+      <p className="text-sm font-semibold text-ink-900">Get your contest live</p>
+      <ol className="mt-4 grid gap-3 md:grid-cols-4">
+        {steps.map((x, i) => (
+          <li key={x.title} className={cn('flex flex-col gap-2 rounded-xl border p-4', i === next ? 'border-brand-300 bg-brand-50/50' : 'border-ink-200')}>
+            <div className="flex items-center gap-2">
+              <span className={cn('flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold', x.done ? 'bg-emerald-600 text-white' : i === next ? 'bg-brand-600 text-white' : 'bg-ink-100 text-ink-600')}>
+                {x.done ? <Check className="h-3.5 w-3.5" aria-hidden /> : i + 1}
+              </span>
+              <span className="font-semibold text-ink-900">{x.title}</span>
+              {x.done && <span className="sr-only">(done)</span>}
+            </div>
+            <p className="flex-1 text-sm text-ink-600">{x.detail}</p>
+            {x.action && <div>{x.action}</div>}
+          </li>
+        ))}
+      </ol>
     </Card>
   )
 }

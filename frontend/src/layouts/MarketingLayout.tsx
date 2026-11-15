@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { CalendarDays, House, LayoutDashboard, LogIn, Menu, Store, Ticket, UserRound, X, type LucideIcon } from 'lucide-react'
+import { Vote, CalendarDays, House, LayoutDashboard, LogIn, Menu, Store, Ticket, UserRound, X, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth'
 import { Logo } from '@/components/ui/Logo'
@@ -9,6 +9,7 @@ import { LEGAL_PATHS } from '@/lib/legal'
 import { useBlogEnabled } from '@/lib/seo'
 import { useHomeContent } from '@/lib/home-content'
 import { SocialLinks } from '@/components/SocialLinks'
+import { useModuleEnabled } from '@/lib/modules'
 
 const links = [
   { label: 'Explore events', to: '/events' },
@@ -37,6 +38,9 @@ export const MarketingLayout: React.FC = () => {
   // Blog link only in the footer and the phone menu (module `blog`; hidden when the superadmin switches it off)
   const blog = useBlogEnabled()
   const home = useHomeContent()
+  // Voting (/voting) only while the superadmin has the contests module on
+  const voting = useModuleEnabled('contests')
+  const navLinks = voting ? [links[0], { label: 'Voting', to: '/voting' }, ...links.slice(1)] : links
 
   return (
     // Bottom padding keeps the footer clear of the phone tab bar
@@ -53,7 +57,7 @@ export const MarketingLayout: React.FC = () => {
             <Logo />
           </Link>
           <nav className="hidden items-center gap-1 md:flex" aria-label="Main">
-            {links.map((l) => (
+            {navLinks.map((l) => (
               <NavLink
                 key={l.to}
                 to={l.to}
@@ -96,7 +100,7 @@ export const MarketingLayout: React.FC = () => {
         {open && (
           <div className="animate-fade-in border-t border-ink-100 bg-white px-4 pb-5 pt-2 md:hidden">
             <nav className="flex flex-col" aria-label="Mobile">
-              {links.map((l) => (
+              {navLinks.map((l) => (
                 <Link key={l.to} to={l.to} className="rounded-lg px-2 py-3 text-base font-medium text-ink-800 hover:bg-ink-50">
                   {l.label}
                 </Link>
@@ -150,6 +154,7 @@ export const MarketingLayout: React.FC = () => {
             title="Quick links"
             links={[
               ['Explore events', '/events'],
+              ...(voting ? ([['Voting', '/voting']] as [string, string][]) : []),
               ['Find vendors', '/marketplace'],
               ['Features', '/#features'],
               ...(blog ? ([['Blog', '/blog']] as [string, string][]) : []),
@@ -200,9 +205,11 @@ type Tab = { label: string; to: string; icon: LucideIcon; end?: boolean }
 const PublicTabBar: React.FC = () => {
   const { status, user } = useAuth()
   const signedIn = status === 'authenticated'
+  const voting = useModuleEnabled('contests')
   const tabs: Tab[] = [
     { label: 'Home', to: '/', icon: House, end: true },
     { label: 'Events', to: '/events', icon: CalendarDays },
+    ...(voting ? [{ label: 'Voting', to: '/voting', icon: Vote }] : []),
     { label: 'Vendors', to: '/marketplace', icon: Store },
     // Guests are sent to sign in and come back here
     { label: 'Tickets', to: '/app/my/tickets', icon: Ticket },
@@ -221,12 +228,14 @@ const PublicTabBar: React.FC = () => {
       <ul className="mx-auto flex h-[60px] max-w-xl items-stretch">
         {tabs.map((t) => (
           <li key={t.label} className="flex-1">
-            <NavLink to={t.to} end={t.end} className="group flex h-full flex-col items-center justify-center gap-1">
+            <NavLink to={t.to} end={t.end} className="group relative flex h-full flex-col items-center justify-center gap-1">
               {({ isActive }) => (
                 <>
+                  {/* Active tab: a short brand line on top */}
+                  {isActive && <span className="absolute left-1/2 top-0 h-0.5 w-8 -translate-x-1/2 rounded-full bg-brand-600" aria-hidden />}
                   <span
                     className={cn(
-                      'flex h-8 w-14 items-center justify-center rounded-full transition-colors duration-200',
+                      'flex h-8 w-12 items-center justify-center rounded-full transition-colors duration-200',
                       isActive ? 'bg-brand-50 text-brand-600' : 'text-ink-500 group-active:bg-ink-100',
                     )}
                   >

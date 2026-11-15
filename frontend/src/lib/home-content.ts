@@ -46,6 +46,7 @@ export interface HomeContent {
   hero: { badge: string; title_before: string; title_highlight: string; title_after: string; subtitle: string; show_categories: boolean; show_vendor_links: boolean }
   flow: Section & { body: string; cta_label: string; points: string[] }
   events: Section
+  voting: Section
   vendors: Section
   features: Section & { items: FeatureItem[] }
   dashboard: Section & { subtitle: string }
@@ -81,6 +82,7 @@ export const HOME_DEFAULTS: HomeContent = {
     points: ['Online registration', 'Digital QR passes', 'Online / offline check-in', 'Live voting'],
   },
   events: { show: true, eyebrow: 'Event marketplace', title: 'Featured & upcoming events' },
+  voting: { show: true, eyebrow: 'Live voting', title: 'Vote for your favourites' },
   vendors: { show: true, eyebrow: 'Vendor marketplace', title: 'Featured vendors' },
   features: {
     show: true,

@@ -306,7 +306,7 @@ export const VenueInquiryForm: React.FC<{
         <div className="space-y-4 border-t border-ink-100 pt-4">
           <Input label="Your name" required value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Ramesh Shrestha" autoComplete="name" />
           <Input label="Email" type="email" required value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="you@example.com" autoComplete="email" />
-          <Input label="Phone" type="tel" required value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="98XXXXXXXX" autoComplete="tel" />
+          <Input label="Mobile number" type="tel" required value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="98XXXXXXXX" autoComplete="tel" />
         </div>
         <Button type="submit" loading={sending} className="w-full">
           {slot ? 'Request this slot' : 'Send inquiry'}

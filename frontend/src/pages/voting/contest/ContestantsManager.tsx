@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, FileUp, GripVertical, ListOrdered, Pencil, Plus, Trash2, UserCheck, Users } from 'lucide-react'
-import { Button, EmptyState, ErrorState, IconButton, ImageGalleryUpload, ImageUpload, Input, Modal, Select, Skeleton, Textarea, useToast } from '@/components/ui'
+import { useNavigate, useParams } from 'react-router-dom'
+import { Images, ArrowLeft, ArrowDown, ArrowUp, FileUp, GripVertical, ListOrdered, Pencil, Plus, Trash2, UserCheck, Users } from 'lucide-react'
+import { Button, Card, EmptyState, ErrorState, IconButton, ImageGalleryUpload, ImageUpload, Input, Modal, Select, Skeleton, Textarea, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
+import { uploadImage } from '@/components/ui/ImageUpload'
 import { contestApi, type Contest, type Contestant, type ContestantInput, type ContestantStatus, type SocialKey } from './api'
 import { ContestantPhoto, ContestantStatusBadge, NumberTag } from './shared'
 
@@ -22,8 +24,10 @@ export const ContestantsManager: React.FC<{ contest: Contest }> = ({ contest }) 
   const toast = useToast()
   const qc = useQueryClient()
   const { data, isLoading, isError, error, refetch } = useQuery({ queryKey: contestantsKey(contest.id), queryFn: () => contestApi.contestants(contest.id) })
-  const [editing, setEditing] = useState<Contestant | 'new' | null>(null)
+  const navigate = useNavigate()
+  const editPath = (cid: string) => `/app/voting/contests/${contest.id}/contestants/${cid}`
   const [bulk, setBulk] = useState<'names' | 'csv' | null>(null)
+  const [photos, setPhotos] = useState(false)
   const [order, setOrder] = useState<string[] | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
   const fromApps = useMutation({
@@ -96,9 +100,10 @@ export const ContestantsManager: React.FC<{ contest: Contest }> = ({ contest }) 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
-        <Button icon={<Plus className="h-4 w-4" />} onClick={() => setEditing('new')}>Add contestant</Button>
+        <Button icon={<Plus className="h-4 w-4" />} onClick={() => navigate(editPath('new'))}>Add contestant</Button>
         <Button variant="secondary" icon={<Users className="h-4 w-4" />} onClick={() => setBulk('names')}>Add many</Button>
         <Button variant="secondary" icon={<FileUp className="h-4 w-4" />} onClick={() => setBulk('csv')}>Import CSV</Button>
+        {list.length > 0 && <Button variant="secondary" icon={<Images className="h-4 w-4" />} onClick={() => setPhotos(true)}>Upload photos</Button>}
         <Button variant="secondary" icon={<UserCheck className="h-4 w-4" />} loading={fromApps.isPending} onClick={() => fromApps.mutate()}>
           Add accepted applicants
         </Button>
@@ -153,7 +158,7 @@ export const ContestantsManager: React.FC<{ contest: Contest }> = ({ contest }) 
                 <IconButton label={`Move ${c.name} down`} disabled={i === list.length - 1} onClick={() => move(i, 1)} className="disabled:opacity-30">
                   <ArrowDown className="h-4 w-4" aria-hidden />
                 </IconButton>
-                <IconButton label={`Edit ${c.name}`} onClick={() => setEditing(c)}>
+                <IconButton label={`Edit ${c.name}`} onClick={() => navigate(editPath(c.id))}>
                   <Pencil className="h-4 w-4" aria-hidden />
                 </IconButton>
                 <IconButton label={`Remove ${c.name}`} onClick={() => remove(c)} className="hover:bg-red-50 hover:text-red-600">
@@ -165,8 +170,8 @@ export const ContestantsManager: React.FC<{ contest: Contest }> = ({ contest }) 
         </ol>
       )}
 
-      {editing && <ContestantEditor contest={contest} contestant={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={refresh} />}
       {bulk && <BulkAdd contest={contest} mode={bulk} onClose={() => setBulk(null)} onSaved={refresh} />}
+      {photos && <BulkPhotos contest={contest} contestants={list} onClose={() => setPhotos(false)} onSaved={refresh} />}
     </div>
   )
 }
@@ -211,25 +216,27 @@ const ContestantEditor: React.FC<{ contest: Contest; contestant: Contestant | nu
 
   const pad = contest.number_padding || 1
   return (
-    <Modal
-      open
-      onClose={onClose}
-      size="lg"
-      title={contestant ? `Edit ${contestant.name}` : 'Add contestant'}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit" form="contestant-form" loading={save.isPending}>{contestant ? 'Save' : 'Add contestant'}</Button>
-        </>
-      }
-    >
-      <form id="contestant-form" noValidate onSubmit={(e) => { e.preventDefault(); if (!form.name?.trim()) { setErrors({ name: 'Give the contestant a name.' }); return } save.mutate() }} className="space-y-5">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[160px_minmax(0,1fr)]">
-          <ImageUpload label="Main photo" kind="contestant" shape="square" value={form.photo_url || null} onChange={(url) => set('photo_url', url ?? '')} hint="Portrait works best" />
-          <div className="space-y-3">
+    <div className="mx-auto w-full max-w-5xl space-y-6 px-4 pb-28 pt-6 sm:px-6 lg:pt-8">
+      <div className="space-y-2">
+        <button type="button" onClick={onClose} className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-ink-900">
+          <ArrowLeft className="h-4 w-4" aria-hidden /> {contest.title} · Contestants
+        </button>
+        <h1 className="font-display text-2xl font-bold text-ink-900 sm:text-3xl">{contestant ? `Edit ${contestant.name}` : 'Add contestant'}</h1>
+      </div>
+      <form id="contestant-form" noValidate onSubmit={(e) => { e.preventDefault(); if (!form.name?.trim()) { setErrors({ name: 'Give the contestant a name.' }); return } save.mutate() }} className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)] lg:items-start">
+        {/* Photos: what voters see first */}
+        <aside className="space-y-4 lg:sticky lg:top-20">
+          {contestant?.edit_url && <EditLinkCard url={contestant.edit_url} invitedAt={contestant.invited_at ?? null} />}
+          <Card className="space-y-4 p-4">
+            <ImageUpload label="Main photo" kind="contestant" shape="portrait" value={form.photo_url || null} onChange={(url) => set('photo_url', url ?? '')} hint="A clear portrait. Shown on the voting card." />
+          </Card>
+        </aside>
+
+        <div className="min-w-0 space-y-5">
+          <FormCard title="Basics">
             <Input label="Name" required value={form.name} onChange={(e) => set('name', e.target.value)} error={errors.name} autoFocus />
-            <Input label="Tagline" placeholder="Purwanchal Campus · Dharan" value={form.subtitle} onChange={(e) => set('subtitle', e.target.value)} />
-            <div className="grid grid-cols-2 gap-3">
+            <Input label="Tagline" placeholder="Purwanchal Campus · Dharan" hint="One short line under the name: college, city or team." value={form.subtitle} onChange={(e) => set('subtitle', e.target.value)} />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Input
                 label="Number"
                 type="number"
@@ -239,7 +246,7 @@ const ContestantEditor: React.FC<{ contest: Contest; contestant: Contestant | nu
                 value={form.number ?? ''}
                 onChange={(e) => set('number', e.target.value === '' ? null : Number(e.target.value))}
                 error={errors.number}
-                hint={form.number != null ? `Shown as ${contest.number_prefix}${String(form.number).padStart(pad, '0')}` : 'Next free number'}
+                hint={form.number != null ? `Shown as ${contest.number_prefix}${String(form.number).padStart(pad, '0')}` : 'Leave empty for the next free number'}
               />
               <Select label="Status" value={form.status} onChange={(e) => set('status', e.target.value as ContestantStatus)}>
                 <option value="active">Active</option>
@@ -248,43 +255,83 @@ const ContestantEditor: React.FC<{ contest: Contest; contestant: Contestant | nu
                 <option value="winner">Winner</option>
               </Select>
             </div>
-          </div>
-        </div>
-        <Textarea label="Bio" rows={4} placeholder="A few lines voters will read on the profile page" value={form.description} onChange={(e) => set('description', e.target.value)} />
-        <ImageGalleryUpload label="More photos" kind="contestant" max={12} value={form.gallery ?? []} onChange={(v) => set('gallery', v)} hint="Shown as a gallery on the profile page" />
-        {contest.profile_fields.length > 0 && (
-          <fieldset className="space-y-3">
-            <legend className="text-sm font-semibold text-ink-900">Profile</legend>
-            {errors.profile && <p className="text-xs font-medium text-red-600">{errors.profile}</p>}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {contest.profile_fields.map((f) => {
-                const v = form.profile?.[f.key!] ?? ''
-                const onChange = (val: string) => set('profile', { ...(form.profile ?? {}), [f.key!]: val })
-                const label = `${f.label}${f.is_public ? '' : ' (private)'}`
-                return f.field_type === 'select' ? (
-                  <Select key={f.key} label={label} required={f.required} value={v} onChange={(e) => onChange(e.target.value)}>
-                    <option value="">—</option>
-                    {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
-                  </Select>
-                ) : (
-                  <Input key={f.key} label={label} required={f.required} type={f.field_type === 'number' ? 'number' : f.field_type === 'date' ? 'date' : 'text'} value={v} onChange={(e) => onChange(e.target.value)} />
-                )
-              })}
+          </FormCard>
+
+          <FormCard title="About">
+            <Textarea label="Bio" rows={5} placeholder="A few lines voters will read on the profile page" value={form.description} onChange={(e) => set('description', e.target.value)} />
+          </FormCard>
+
+          <FormCard title="More photos" description="Shown as a gallery on the profile page.">
+            <ImageGalleryUpload label="Gallery" kind="contestant" max={12} value={form.gallery ?? []} onChange={(v) => set('gallery', v)} />
+          </FormCard>
+
+          {contest.profile_fields.length > 0 && (
+            <FormCard title="Profile" description="Private fields are only shown to you.">
+              {errors.profile && <p className="text-xs font-medium text-red-600">{errors.profile}</p>}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {contest.profile_fields.map((f) => {
+                  const v = form.profile?.[f.key!] ?? ''
+                  const onChange = (val: string) => set('profile', { ...(form.profile ?? {}), [f.key!]: val })
+                  const label = `${f.label}${f.is_public ? '' : ' (private)'}`
+                  return f.field_type === 'select' ? (
+                    <Select key={f.key} label={label} required={f.required} value={v} onChange={(e) => onChange(e.target.value)}>
+                      <option value="">—</option>
+                      {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                    </Select>
+                  ) : (
+                    <Input key={f.key} label={label} required={f.required} type={f.field_type === 'number' ? 'number' : f.field_type === 'date' ? 'date' : 'text'} value={v} onChange={(e) => onChange(e.target.value)} />
+                  )
+                })}
+              </div>
+            </FormCard>
+          )}
+
+          <FormCard title="Social links" description="Optional. Shown as buttons on the profile page.">
+            {errors.social_links && <p className="text-xs font-medium text-red-600">{errors.social_links}</p>}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {SOCIALS.map((s) => (
+                <Input key={s.key} label={s.label} placeholder={s.placeholder} value={form.social_links?.[s.key] ?? ''} onChange={(e) => set('social_links', { ...(form.social_links ?? {}), [s.key]: e.target.value })} />
+              ))}
             </div>
-          </fieldset>
-        )}
-        <fieldset className="space-y-3">
-          <legend className="text-sm font-semibold text-ink-900">Social links</legend>
-          {errors.social_links && <p className="text-xs font-medium text-red-600">{errors.social_links}</p>}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {SOCIALS.map((s) => (
-              <Input key={s.key} label={s.label} placeholder={s.placeholder} value={form.social_links?.[s.key] ?? ''} onChange={(e) => set('social_links', { ...(form.social_links ?? {}), [s.key]: e.target.value })} />
-            ))}
-          </div>
-        </fieldset>
-        <Input label="Link name" placeholder="Made from the name" value={form.slug} onChange={(e) => set('slug', e.target.value)} error={errors.slug} hint="Profile links also work with the number, e.g. …/c/7" />
+          </FormCard>
+
+          <FormCard title="Profile link">
+            <Input label="Link name" placeholder="Made from the name" value={form.slug} onChange={(e) => set('slug', e.target.value)} error={errors.slug} hint="The end of the profile address. Leave empty to use the name." />
+          </FormCard>
+        </div>
       </form>
-    </Modal>
+      {/* Save bar stays in reach on long forms */}
+      <div className="sticky bottom-0 -mx-4 flex justify-end gap-2 border-t border-ink-200 bg-white/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-2xl sm:border">
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button type="submit" form="contestant-form" loading={save.isPending}>{contestant ? 'Save' : 'Add contestant'}</Button>
+      </div>
+    </div>
+  )
+}
+
+/** /app/voting/contests/:id/contestants/:cid ('new' to add): the contestant form as its own page. */
+export const ContestantEditPage: React.FC = () => {
+  const { id, cid } = useParams<{ id: string; cid: string }>()
+  const navigate = useNavigate()
+  const qc = useQueryClient()
+  const back = () => navigate(`/app/voting/contests/${id}/edit?step=contestants`)
+  const contest = useQuery({ queryKey: ['contest', id], queryFn: () => contestApi.get(id!) })
+  const list = useQuery({ queryKey: contestantsKey(id!), queryFn: () => contestApi.contestants(id!), enabled: cid !== 'new' })
+  if (contest.isError || list.isError) return <div className="p-6"><ErrorState message={(contest.error ?? list.error)?.message} onRetry={() => { void contest.refetch(); void list.refetch() }} /></div>
+  if (!contest.data || (cid !== 'new' && !list.data)) return <div className="mx-auto max-w-3xl space-y-4 p-6"><Skeleton className="h-8 w-64" /><Skeleton className="h-96 rounded-2xl" /></div>
+  const existing = cid === 'new' ? null : list.data?.find((c) => c.id === cid) ?? null
+  if (cid !== 'new' && !existing) return <div className="p-6"><ErrorState message="This contestant was removed." onRetry={back} /></div>
+  return (
+    <ContestantEditor
+      key={cid}
+      contest={contest.data}
+      contestant={existing}
+      onClose={back}
+      onSaved={() => {
+        qc.invalidateQueries({ queryKey: contestantsKey(id!) })
+        qc.invalidateQueries({ queryKey: ['contest', id] })
+      }}
+    />
   )
 }
 
@@ -354,6 +401,138 @@ const BulkAdd: React.FC<{ contest: Contest; mode: 'names' | 'csv'; onClose: () =
         {rowErrors.length > 0 && (
           <ul className="max-h-40 space-y-1 overflow-y-auto rounded-xl bg-red-50 p-3 text-xs text-red-800" role="alert">
             {rowErrors.map((r) => <li key={r}>{r}</li>)}
+          </ul>
+        )}
+      </div>
+    </Modal>
+  )
+}
+
+const FormCard: React.FC<{ title: string; description?: string; children: React.ReactNode }> = ({ title, description, children }) => (
+  <Card className="space-y-4 p-5">
+    <div>
+      <h2 className="text-base font-bold text-ink-900">{title}</h2>
+      {description && <p className="mt-0.5 text-sm text-ink-500">{description}</p>}
+    </div>
+    {children}
+  </Card>
+)
+
+/** The contestant's private profile-edit link, for the organizer to pass on by hand (it's also in their message). */
+const EditLinkCard: React.FC<{ url: string; invitedAt: string | null }> = ({ url, invitedAt }) => {
+  const toast = useToast()
+  return (
+    <Card className="space-y-2 p-4">
+      <p className="text-sm font-semibold text-ink-900">Their private edit link</p>
+      <p className="text-xs text-ink-500">
+        {invitedAt ? 'Sent with their voting link when voting opened.' : 'Sent automatically when voting opens.'} They can change their photos, tagline, bio and social links.
+      </p>
+      <Button size="sm" variant="secondary" className="w-full" onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(url)
+          toast.success('Link copied', 'Send it only to this contestant.')
+        } catch {
+          toast.error('Couldn’t copy the link', url)
+        }
+      }}>Copy edit link</Button>
+    </Card>
+  )
+}
+
+/* ---------- Bulk photos: many files at once, matched to contestants by file name ---------- */
+
+const slugish = (v: string) => v.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+
+/** "asha-rai.jpg", "Asha Rai.png", "07.jpg", "#7 asha.jpg" → the contestant, or undefined. */
+function matchContestant(fileName: string, list: Contestant[]): Contestant | undefined {
+  const base = slugish(fileName.replace(/\.[a-z0-9]+$/i, ''))
+  if (!base) return undefined
+  const exact = list.find((c) => slugish(c.name) === base || (c.slug && c.slug === base))
+  if (exact) return exact
+  const num = base.match(/^0*(\d+)(?:-|$)/)?.[1]
+  if (num) {
+    const byNumber = list.find((c) => c.number === Number(num))
+    if (byNumber) return byNumber
+  }
+  // "asha-rai-portrait", "01-asha-rai": the name somewhere in the file name
+  return list.find((c) => slugish(c.name).length > 2 && base.includes(slugish(c.name)))
+}
+
+const BulkPhotos: React.FC<{ contest: Contest; contestants: Contestant[]; onClose: () => void; onSaved: () => void }> = ({ contest, contestants, onClose, onSaved }) => {
+  const toast = useToast()
+  const [rows, setRows] = useState<{ file: File; preview: string; to: string; status: 'ready' | 'uploading' | 'done' | 'failed'; error?: string }[]>([])
+  const [busy, setBusy] = useState(false)
+  const pick = (files: FileList | null) => {
+    if (!files) return
+    setRows((r) => [...r, ...Array.from(files).filter((f) => f.type.startsWith('image/')).map((file) => ({ file, preview: URL.createObjectURL(file), to: matchContestant(file.name, contestants)?.id ?? '', status: 'ready' as const }))])
+  }
+  const matched = rows.filter((r) => r.to && r.status !== 'done')
+  const run = async () => {
+    setBusy(true)
+    let ok = 0
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i]
+      if (!r.to || r.status === 'done') continue
+      setRows((all) => all.map((x, j) => (j === i ? { ...x, status: 'uploading' } : x)))
+      try {
+        const url = await uploadImage(r.file, 'contestant')
+        await contestApi.updateContestant(contest.id, r.to, { photo_url: url })
+        ok += 1
+        setRows((all) => all.map((x, j) => (j === i ? { ...x, status: 'done' } : x)))
+      } catch (e) {
+        setRows((all) => all.map((x, j) => (j === i ? { ...x, status: 'failed', error: e instanceof Error ? e.message : 'Failed' } : x)))
+      }
+    }
+    setBusy(false)
+    onSaved()
+    if (ok) toast.success(`${ok} ${ok === 1 ? 'photo' : 'photos'} added`, 'Each one is now that contestant’s main photo.')
+  }
+  const name = (c: Contestant) => `${c.display_number ? `${c.display_number} ` : ''}${c.name}`
+  return (
+    <Modal
+      open
+      onClose={busy ? () => {} : onClose}
+      size="lg"
+      title="Upload contestant photos"
+      description="Pick many photos at once. Name the files after the contestant (asha-rai.jpg) or their number (07.jpg) and we match them for you."
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={busy}>{rows.some((r) => r.status === 'done') ? 'Done' : 'Cancel'}</Button>
+          <Button onClick={run} loading={busy} disabled={!matched.length}>Upload {matched.length || ''} {matched.length === 1 ? 'photo' : 'photos'}</Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <label className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-ink-200 bg-ink-50 p-6 text-center hover:border-brand-300 hover:bg-brand-50/40">
+          <Images className="h-7 w-7 text-brand-600" aria-hidden />
+          <span className="text-sm"><span className="font-semibold text-brand-700">Choose photos</span> (JPG, PNG, WebP; up to 5 MB each)</span>
+          <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => { pick(e.target.files); e.target.value = '' }} disabled={busy} />
+        </label>
+        {rows.length > 0 && (
+          <ul className="max-h-[50vh] divide-y divide-ink-100 overflow-y-auto rounded-xl border border-ink-200">
+            {rows.map((r, i) => (
+              <li key={`${r.file.name}-${i}`} className="flex items-center gap-3 px-3 py-2">
+                <img src={r.preview} alt="" className="h-12 w-10 shrink-0 rounded object-cover" />
+                <span className="min-w-0 flex-1 truncate text-sm text-ink-700" title={r.file.name}>{r.file.name}</span>
+                {r.status === 'done' ? (
+                  <span className="text-sm font-semibold text-emerald-700">Added</span>
+                ) : r.status === 'uploading' ? (
+                  <span className="text-sm text-ink-500">Uploading…</span>
+                ) : (
+                  <select
+                    aria-label={`Contestant for ${r.file.name}`}
+                    value={r.to}
+                    disabled={busy}
+                    onChange={(e) => setRows((all) => all.map((x, j) => (j === i ? { ...x, to: e.target.value, status: 'ready', error: undefined } : x)))}
+                    className={cn('h-9 w-52 rounded-lg border px-2 text-sm', r.to ? 'border-ink-200' : 'border-marigold-400 bg-marigold-50')}
+                  >
+                    <option value="">Skip (no match)</option>
+                    {contestants.map((c) => <option key={c.id} value={c.id}>{name(c)}{c.photo_url ? ' (has a photo)' : ''}</option>)}
+                  </select>
+                )}
+                {r.status === 'failed' && <span className="text-xs text-red-600" title={r.error}>Failed</span>}
+              </li>
+            ))}
           </ul>
         )}
       </div>

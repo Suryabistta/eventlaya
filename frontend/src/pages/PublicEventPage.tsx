@@ -1,4 +1,7 @@
 import React, { useEffect, useId, useMemo, useState } from 'react'
+import { CountdownBoxes, StageArt } from './voting/stage'
+import { FavouriteButton } from '@/lib/favourites'
+import { useCountdown as useMsLeft } from './voting/shared'
 import { formatDate } from '@/lib/dates'
 import { track } from '@/lib/analytics'
 import { useTenant } from '@/lib/tenant'
@@ -156,9 +159,11 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
       {/* Hero */}
       <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6 sm:pt-8">
         <PhaseBanner event={event} state={state} hasPass={Boolean(storedPass)} />
-        <div className={cn(over && 'opacity-80 grayscale-[70%]')}>
+        <div className={cn('relative', over && 'opacity-80 grayscale-[70%]')}>
           <Banner event={event} />
+          <FavouriteButton eventId={event.id} eventSlug={event.slug} size="md" className="absolute right-3 top-3" />
         </div>
+        <LiveVotingBand event={event} />
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -951,6 +956,8 @@ const RegistrationCard: React.FC<{ event: PublicEvent; state: ReturnType<typeof 
       )}
     </Card>
   )
+  // A pageant / open call without tickets: just the applications card (no "Tickets go on sale later")
+  if (event.tickets_enabled === false && appsCard) return <div className="space-y-4">{appsCard}</div>
   if (event.tickets_enabled === false) {
     return (
       <div className="space-y-4">
@@ -1015,6 +1022,37 @@ const timelineStages = (event: PublicEvent) => {
   const all = event.stages ?? []
   const others = all.filter((s) => s.kind !== 'tickets' || event.tickets_enabled !== false)
   return others.length > 1 ? all : others // a pageant keeps its finale card; a plain open call shows none
+}
+
+/** Pageants: a live contest gets the voting look (stage band, countdown, Vote now) right under the banner. */
+const LiveVotingBand: React.FC<{ event: PublicEvent }> = ({ event }) => {
+  const live = (event.stages ?? []).find((s) => s.kind === 'voting' && s.state !== 'closed')
+  const open = live?.state === 'open'
+  const left = useMsLeft(live ? (open ? live.closes_at : live.opens_at) : null)
+  if (!live) return null
+  return (
+    <div className="relative mt-4 overflow-hidden rounded-2xl bg-[#3b0a1f] text-white">
+      <div className="absolute inset-0 opacity-70" aria-hidden><StageArt seed={event.slug} /></div>
+      <div className="relative flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-6">
+        <div>
+          <p className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-bold">
+            {open && <span className="h-1.5 w-1.5 rounded-full bg-brand-400" aria-hidden />}
+            {open ? 'LIVE VOTING' : 'VOTING OPENS SOON'}
+          </p>
+          <p className="mt-2 font-display text-xl font-bold sm:text-2xl">{live.title}</p>
+          {left != null && left > 0 && (
+            <>
+              <p className="mt-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-white/75">{open ? 'Voting closes in' : 'Voting opens in'}</p>
+              <CountdownBoxes ms={left} dark className="w-64 sm:w-72" />
+            </>
+          )}
+        </div>
+        <Link to={live.href} className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-6 text-sm font-bold text-brand-700 hover:bg-brand-50">
+          {open ? 'Vote now' : 'See contestants'}
+        </Link>
+      </div>
+    </div>
+  )
 }
 
 const StageTimeline: React.FC<{ event: PublicEvent }> = ({ event }) => {

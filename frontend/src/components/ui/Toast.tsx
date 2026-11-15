@@ -17,6 +17,8 @@ interface ConfirmOptions {
   title: string
   description?: string
   confirmLabel?: string
+  /** Label of the other button (default Cancel) */
+  cancelLabel?: string
   danger?: boolean
 }
 
@@ -104,7 +106,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         size="sm"
         footer={
           <>
-            <Button variant="secondary" onClick={() => closeConfirm(false)}>Cancel</Button>
+            <Button variant="secondary" onClick={() => closeConfirm(false)}>{confirmState?.cancelLabel ?? 'Cancel'}</Button>
             <Button variant={confirmState?.danger ? 'danger' : 'primary'} onClick={() => closeConfirm(true)} autoFocus>
               {confirmState?.confirmLabel || 'Confirm'}
             </Button>

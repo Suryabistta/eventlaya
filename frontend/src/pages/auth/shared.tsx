@@ -69,7 +69,7 @@ const TenantAuthShell: React.FC<AuthShellProps & { tenant: ResolvedTenant }> = (
     <main id="main" className="flex flex-1 items-start justify-center px-4 py-12 sm:items-center">
       <div className={cn('w-full rounded-2xl border border-ink-200 bg-white p-6 sm:p-8', wide ? 'max-w-[520px]' : 'max-w-[440px]')}>
         <h1 className="font-display text-[28px] font-bold leading-tight text-ink-900">{title}</h1>
-        <p className="mt-2 text-ink-600">{subtitle}</p>
+        {subtitle && <p className="mt-2 text-ink-600">{subtitle}</p>}
         <div className="mt-8">{children}</div>
       </div>
     </main>

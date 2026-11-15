@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { FORM_TEMPLATES, createFormFromTemplate } from '@/lib/form-templates'
+import { gapsText, pageGaps } from '@/lib/publish-check'
+import { FormChoicePicker, LinkedFormsSummary, applyFormChoice } from '@/components/EventFormStep'
 import { formatDate } from '@/lib/dates'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -66,8 +67,10 @@ interface EventDraft {
   phone_required: boolean
   bib_numbers: boolean
   bib_start: string
-  /** New events: start the registration form from this template ('' = none) */
+  /** New events: the main form ('' = name/email/phone only, 'tpl:<id>' template, 'copy:<form id>'); the application form for pageants */
   form_template: string
+  /** New pageants that also sell finale tickets: the buyer questions */
+  buyer_form_template: string
   arrival_alerts: 'tagged' | 'all' | 'off'
   reminders_enabled: boolean
   reminders_sms: boolean
@@ -152,6 +155,7 @@ const emptyDraft: EventDraft = {
   bib_numbers: false,
   bib_start: '1',
   form_template: '',
+  buyer_form_template: '',
   arrival_alerts: 'tagged',
   reminders_enabled: true,
   reminders_sms: false,
@@ -229,6 +233,7 @@ function fromEvent(ev: Event, page?: EventPageContent): EventDraft {
     bib_numbers: ev.bib_numbers ?? false,
     bib_start: String(ev.bib_start ?? 1),
     form_template: '',
+    buyer_form_template: '',
     arrival_alerts: ev.arrival_alerts ?? 'tagged',
     reminders_enabled: ev.reminders_enabled ?? true,
     reminders_sms: ev.reminders_sms ?? false,
@@ -276,12 +281,13 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 /* ---------- steps ---------- */
 
-type StepId = 'basics' | 'stages' | 'when' | 'registration' | 'page' | 'schedule' | 'speakers' | 'faqs' | 'review'
+type StepId = 'basics' | 'stages' | 'when' | 'registration' | 'form' | 'page' | 'schedule' | 'speakers' | 'faqs' | 'review'
 const STEPS: { id: StepId; label: string; description: string; required?: boolean }[] = [
   { id: 'basics', label: 'Basics', description: 'What people see first on the event page.', required: true },
   { id: 'stages', label: 'Stages', description: 'What this event opens for: tickets or registration for the audience, applications from participants, or both.' },
   { id: 'when', label: 'Date & venue', description: 'Leave the end date empty for a one-day event.', required: true },
   { id: 'registration', label: 'Registration', description: 'Who can sign up, how many, and until when.', required: true },
+  { id: 'form', label: 'Form', description: 'The questions people answer. Name, email and phone are always asked.' },
   { id: 'page', label: 'Event page', description: 'Highlights and contact details for attendees. Optional.' },
   { id: 'schedule', label: 'Schedule', description: 'The running order. Shown as a timeline, by day. Optional.' },
   { id: 'speakers', label: 'Speakers', description: 'Speakers, performers or guests. Optional.' },
@@ -304,6 +310,8 @@ function stepsFor(kind: EventKind, isEdit: boolean, ticketsOn: boolean): Step[] 
       { ...stepOf('stages', 'Applications', 'When applications close and what the button says. The application form is ready to edit after you create the event.'), required: true },
       stepOf('when', 'Finale', 'The date and venue of the final show. Leave it “to be announced” for now if you like.'),
       ...(ticketsOn ? [stepOf('registration', 'Finale tickets', 'Tickets for the audience of the final show.')] : []),
+      // Required: applications only open with an application form
+      { ...stepOf('form', 'Application form', 'The questions applicants answer. Name, email and phone are always asked.'), required: true },
       ...page,
       review,
     ]
@@ -314,6 +322,9 @@ function stepsFor(kind: EventKind, isEdit: boolean, ticketsOn: boolean): Step[] 
     kind === 'registration'
       ? stepOf('registration', 'Sign-up', 'The sign-up form, how many people can register and until when.')
       : stepOf('registration', 'Tickets', 'Ticket price, how many people can come and until when.'),
+    kind === 'registration'
+      ? stepOf('form', 'Sign-up form', 'The questions people answer when they sign up. Name, email and phone are always asked.')
+      : stepOf('form', 'Buyer questions', 'Extra questions buyers answer. Name, email and phone are always asked.'),
     ...page,
     review,
   ]
@@ -328,7 +339,7 @@ const localToday = () => {
 const FIELD_STEP: Record<string, StepId> = {
   title: 'basics', tagline: 'basics', parent: 'basics', category: 'basics', description: 'basics', banner: 'basics', banner_url: 'basics',
   start_date: 'when', start_time: 'when', end_date: 'when', end_time: 'when', location: 'when', map_query: 'when',
-  capacity: 'registration', limit_spots: 'registration', show_spots_left: 'registration', status: 'registration', registration_deadline: 'registration', ticket_price: 'registration', is_paid: 'registration', allow_registration: 'registration', ticket_layout: 'registration', show_seat_number: 'registration', registration_mode: 'registration', cta_label: 'registration', tickets_enabled: 'stages', applications_enabled: 'stages', applications_close: 'stages', application_cta: 'stages', date_tba: 'when', phone_required: 'registration', bib_numbers: 'registration', bib_start: 'registration', form_template: 'registration', arrival_alerts: 'registration', reminders_enabled: 'registration', reminders_sms: 'registration',
+  capacity: 'registration', limit_spots: 'registration', show_spots_left: 'registration', status: 'registration', registration_deadline: 'registration', ticket_price: 'registration', is_paid: 'registration', allow_registration: 'registration', ticket_layout: 'registration', show_seat_number: 'registration', registration_mode: 'registration', cta_label: 'registration', tickets_enabled: 'stages', applications_enabled: 'stages', applications_close: 'stages', application_cta: 'stages', date_tba: 'when', phone_required: 'registration', bib_numbers: 'registration', bib_start: 'registration', form_template: 'form', buyer_form_template: 'form', arrival_alerts: 'registration', reminders_enabled: 'registration', reminders_sms: 'registration',
   managed_by: 'page', managed_by_label: 'page', managed_by_logo: 'page', show_managed_by: 'page',
 }
 
@@ -467,9 +478,9 @@ export const EventFormPage: React.FC = () => {
 }
 
 const KIND_CARDS: { kind: EventKind; icon: React.ElementType; title: string; text: string; examples: string }[] = [
-  { kind: 'ticketing', icon: TicketIcon, title: 'Sell tickets', text: 'Paid or free tickets with a QR pass for the gate.', examples: 'Concerts, shows, festivals, sports' },
-  { kind: 'registration', icon: ClipboardList, title: 'Free registration', text: 'People sign up with a short form. No tickets or payments.', examples: 'Seminars, workshops, college events, meetups' },
-  { kind: 'pageant', icon: Crown, title: 'Pageant or applications', text: 'People apply, you pick contestants, the public votes, you announce winners.', examples: 'Beauty pageants, talent hunts, auditions, film submissions' },
+  { kind: 'ticketing', icon: TicketIcon, title: 'Ticketing', text: 'Paid or free tickets with a QR pass for the gate.', examples: 'Concerts, shows, festivals, sports' },
+  { kind: 'registration', icon: ClipboardList, title: 'Registration', text: 'People sign up with a short form. No tickets or payments.', examples: 'Seminars, workshops, college events, meetups' },
+  { kind: 'pageant', icon: Crown, title: 'Pageant (applications & voting)', text: 'People apply, you pick contestants, the public votes, you announce winners.', examples: 'Beauty pageants, talent hunts, auditions, film submissions' },
 ]
 
 /** First screen of "Create event": what kind of event it is. */
@@ -504,9 +515,7 @@ async function setUpKind(saved: Event, kind: EventKind, draft: EventDraft) {
       await ticketsApi.create(saved.id, { name: 'VIP', price: (Number(draft.ticket_price) * 2).toFixed(2), description: 'Front seating and early entry', order: 2 })
     }
     if (kind === 'pageant') {
-      const t = FORM_TEMPLATES.find((x) => x.id === 'pageant')
-      if (t) await createFormFromTemplate(saved, t, 'application')
-      await contestApi.create({ event: saved.id, title: saved.title, preset: 'pageant' })
+      await contestApi.create({ event: saved.id, title: saved.title, preset: 'simple' })
     }
   } catch {
     /* the organizer can add these from Tickets, Forms and Live voting */
@@ -515,9 +524,9 @@ async function setUpKind(saved: Event, kind: EventKind, draft: EventDraft) {
 
 /** Starting settings for "New event" from the Events sub-menus (?kind=ticketing|registration|pageant) */
 const KIND_PRESETS: Record<EventKind, { title: string; draft: Partial<EventDraft> }> = {
-  ticketing: { title: 'Create a ticketed event', draft: { is_paid: true, registration_mode: 'pass' } },
-  registration: { title: 'Create a registration event', draft: { registration_mode: 'form', is_paid: false, form_template: 'registration' } },
-  pageant: { title: 'Create a pageant', draft: { tickets_enabled: false, date_tba: true, applications_enabled: true, applications_close: inDays(30), application_cta: 'Apply now', limit_spots: false } },
+  ticketing: { title: 'New ticketing event', draft: { is_paid: true, registration_mode: 'pass' } },
+  registration: { title: 'New registration event', draft: { registration_mode: 'form', is_paid: false, form_template: 'tpl:registration' } },
+  pageant: { title: 'New pageant', draft: { tickets_enabled: false, date_tba: true, applications_enabled: true, applications_close: inDays(30), application_cta: 'Apply now', limit_spots: false, form_template: 'tpl:pageant' } },
 }
 
 function inDays(n: number) {
@@ -686,10 +695,10 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
       }
       const saved = event ? await api.updateEvent(event.id, body as unknown as Partial<Event>) : await api.createEvent(body as unknown as Partial<Event>)
       // New event with a chosen template: its registration form is ready to edit in Forms
-      const template = !event && draft.form_template ? FORM_TEMPLATES.find((t) => t.id === draft.form_template) : undefined
-      if (template) {
+      if (!event) {
         try {
-          await createFormFromTemplate(saved, template)
+          await applyFormChoice(saved, draft.form_template, kind === 'pageant' ? 'application' : 'registration')
+          if (kind === 'pageant' && draft.tickets_enabled) await applyFormChoice(saved, draft.buyer_form_template, 'registration')
         } catch {
           toast.error('Event saved, but the form wasn’t created', 'Add it from Forms.')
         }
@@ -735,7 +744,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
         toast.success('Changes saved', `${saved.title} is up to date on its event page.`)
         navigate('/app/events')
       } else {
-        toast.success('Event created', `${saved.title} is now your current event.`)
+        toast.success('Event created', `${saved.title} is now your current event. Edit its questions any time in Dynamic forms.`)
         navigate('/app')
       }
     },
@@ -796,12 +805,6 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
 
   const phoneAndGuestSettings = (
     <>
-      <Checkbox
-        label="Phone number required"
-        hint="Guests and applicants must give a mobile number so you can call or message them."
-        checked={draft.phone_required}
-        onChange={(v) => set('phone_required', v)}
-      />
       {guestsOn && (
         <>
           <Select
@@ -864,7 +867,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
         </nav>
         <PageHeader
           title={isEdit ? 'Edit event' : (preset?.title ?? 'Create event')}
-          description={isEdit ? 'Changes show on the public event page as soon as you save.' : 'Fill in the first three steps to create it. The rest can wait.'}
+          description={isEdit ? 'Changes show on the public event page as soon as you save.' : 'Steps marked “Optional” can wait. You can change everything after creating it.'}
           actions={
             isEdit ? (
               <a
@@ -989,7 +992,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
               <div className="space-y-5 px-5 py-6 sm:px-6">
                 {step.id === 'basics' && (
                   <>
-                    <Input label="Event name" required placeholder="Koshi Coding Championship 2026" autoFocus={!isEdit} {...bind('title')} />
+                    <Input label="Event name" required placeholder={kind === 'pageant' ? 'Miss Koshi 2026' : kind === 'registration' ? 'Startup Workshop Dharan 2026' : 'Koshi Music Night 2026'} autoFocus={!isEdit} {...bind('title')} />
                     <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_220px] lg:grid-cols-1 xl:grid-cols-[minmax(0,1fr)_220px]">
                       <Input label="Tagline" placeholder="One line that sells the event" hint="Optional. Shown under the title." maxLength={160} {...bind('tagline')} />
                       <Select label="Category" {...bind('category')}>
@@ -1088,21 +1091,6 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
 
                 {step.id === 'registration' && (
                   <>
-                    {!isEdit && kind === 'registration' && (
-                      <Select
-                        label="Sign-up form"
-                        hint="The questions people answer. Name, email and phone are always asked. Edit the questions in Forms after saving."
-                        value={draft.form_template}
-                        onChange={(e) => set('form_template', e.target.value)}
-                      >
-                        <option value="">Name, email and phone only</option>
-                        {FORM_TEMPLATES.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.name}
-                          </option>
-                        ))}
-                      </Select>
-                    )}
                     {kind !== 'registration' &&
                       (isEdit ? (
                         <TicketsNote eventId={event!.id} />
@@ -1386,6 +1374,27 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                   />
                 )}
 
+                {step.id === 'form' && (isEdit ? (
+                  <LinkedFormsSummary event={event!} />
+                ) : (
+                  <div className="space-y-6">
+                    <FormChoicePicker kind={kind} role={kind === 'pageant' ? 'application' : 'registration'} label={step.label}
+                      value={draft.form_template} onChange={(v) => set('form_template', v)} />
+                    {kind === 'pageant' && draft.tickets_enabled && (
+                      <div className="space-y-3 border-t border-ink-100 pt-5">
+                        <p className="font-semibold text-ink-900">Buyer questions for finale tickets <span className="font-normal text-ink-500">(optional)</span></p>
+                        <FormChoicePicker kind="ticketing" role="registration" label="Buyer questions"
+                          value={draft.buyer_form_template} onChange={(v) => set('buyer_form_template', v)} />
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {step.id === 'review' && !isEdit && draft.status === 'published' && pageGaps({ banner: draft.banner || undefined, description: draft.description }).length > 0 && (
+                  <p className="mb-4 rounded-xl border border-marigold-300 bg-marigold-50 px-4 py-3 text-sm text-marigold-900">
+                    Your page has {gapsText(pageGaps({ banner: draft.banner || undefined, description: draft.description }))} yet. Pages with them get noticeably more sign-ups.{' '}
+                    <button type="button" className="font-semibold underline" onClick={() => goTo(steps.findIndex((x) => x.id === 'basics'))}>Add them in Basics</button>, or create it now and add them later.
+                  </p>
+                )}
                 {step.id === 'review' && <Review draft={draft} content={content} event={event} steps={steps} onEdit={(id) => goTo(steps.findIndex((x) => x.id === id))} />}
               </div>
 
@@ -1413,7 +1422,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
         </div>
 
         <aside className="hidden xl:sticky xl:top-20 xl:block">
-          <Summary draft={draft} content={content} event={event} />
+          <Summary draft={draft} content={content} event={event} kind={kind} />
         </aside>
       </form>
 
@@ -1643,7 +1652,8 @@ const Review: React.FC<{ draft: EventDraft; content: PageDraft; event?: Event; s
   )
 }
 
-const Summary: React.FC<{ draft: EventDraft; content: PageDraft; event?: Event }> = ({ draft, content, event }) => {
+const Summary: React.FC<{ draft: EventDraft; content: PageDraft; event?: Event; kind: EventKind }> = ({ draft, content, event, kind }) => {
+  const appsOnly = kind === 'pageant' && !draft.tickets_enabled
   const cap = Number(draft.capacity)
   const ticketSummary = useTicketSummary(event?.id)
   return (
@@ -1660,6 +1670,13 @@ const Summary: React.FC<{ draft: EventDraft; content: PageDraft; event?: Event }
           <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" aria-hidden />
           <span className="break-words">{draft.location.trim() || 'Venue not set'}</span>
         </li>
+        {appsOnly ? (
+          <li className="flex gap-2">
+            <Users className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" aria-hidden />
+            {draft.applications_close ? `Applications close ${new Date(draft.applications_close).toLocaleString()}` : 'Applications closing date not set'}
+          </li>
+        ) : (
+        <>
         <li className="flex gap-2">
           <Users className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" aria-hidden />
           {!draft.limit_spots ? 'No spot limit' : cap > 0 ? `Up to ${cap} people` : 'Capacity not set'}
@@ -1675,6 +1692,8 @@ const Summary: React.FC<{ draft: EventDraft; content: PageDraft; event?: Event }
               : 'Free'}
           {!draft.allow_registration && ', registration closed'}
         </li>
+        </>
+        )}
         {event && (
           <li className="flex gap-2">
             <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" aria-hidden />

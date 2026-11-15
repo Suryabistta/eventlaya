@@ -69,6 +69,7 @@ export const FormBuilderPage: React.FC = () => {
   const appsOnly = Boolean(currentEvent?.applications_enabled) && currentEvent?.tickets_enabled === false
   const [which, setWhich] = useState<FormKind>('registration')
   const kind: FormKind = appsOnly || (which === 'application' && currentEvent?.applications_enabled) ? 'application' : 'registration'
+  const KIND_NAME = { ticketing: 'Ticketing', registration: 'Registration', pageant: 'Pageant' } as const
   const audienceTitle = currentEvent?.registration_mode === 'form' ? 'Sign-up form' : 'Buyer questions'
   const form = useMemo(() => {
     if (!currentEvent) return undefined
@@ -110,12 +111,12 @@ export const FormBuilderPage: React.FC = () => {
         />
       )}
       <PageHeader
-        title={kind === 'application' ? 'Application form' : audienceTitle}
+        title="Dynamic forms"
         description={
           currentEvent
-            ? kind === 'application'
+            ? `${KIND_NAME[currentEvent.event_kind ?? 'ticketing']} event · ${kind === 'application' ? 'Application form' : audienceTitle}. ` + (kind === 'application'
               ? `Questions participants answer when they apply to ${currentEvent.title} (film details, photos, bio…). Name, email and phone are always asked.`
-              : `Extra questions people answer when they ${currentEvent.registration_mode === 'form' ? 'sign up for' : 'get tickets for'} ${currentEvent.title}. Name, email and phone are always asked.`
+              : `Extra questions people answer when they ${currentEvent.registration_mode === 'form' ? 'sign up for' : 'get tickets for'} ${currentEvent.title}. Name, email and phone are always asked.`)
             : 'Questions attendees answer when they register.'
         }
       />

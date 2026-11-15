@@ -9,7 +9,7 @@ export type Visibility = 'live' | 'after_close' | 'hidden_to_public' | 'ranks_on
 export type ContestantStatus = 'active' | 'eliminated' | 'withdrawn' | 'winner'
 export type RoundStatus = 'upcoming' | 'open' | 'closed'
 export type CategorySelection = 'public_vote' | 'judges' | 'manual'
-export type PresetKey = 'pageant' | 'talent' | 'awards' | 'quick'
+export type PresetKey = 'simple' | 'pageant' | 'talent' | 'awards' | 'quick'
 
 export interface Preset {
   key: PresetKey
@@ -139,6 +139,18 @@ export interface Contest {
   flag_device_voters: number
   transparency_note: string
   show_transparency: boolean
+  /** Show the Standings list on the public contest page */
+  show_standings: boolean
+  /** Contestant numbers (#01…) shown to the public */
+  show_numbers: boolean
+  /** Rank badges (Rank 3, Leading) on public contestant cards */
+  show_ranks: boolean
+  /** Vote counts on public contestant cards and the contest list */
+  show_vote_counts: boolean
+  /** Contestants may edit their own photo, bio and links through a private link */
+  contestants_can_edit: boolean
+  /** SMS-code contests: let voters get the code by email when SMS fails */
+  sms_email_fallback: boolean
   judges_see_others: boolean
   show_judge_breakdown: boolean
   placement_titles: string[]
@@ -185,9 +197,13 @@ export interface Contestant {
   votes: number
   categories: string[]
   rounds: { round_id: string; status: string; rank: number | null }[]
+  /** Private link for the contestant to edit their own profile (null when the organizer turned that off) */
+  edit_url?: string | null
+  /** When their "voting is open" message with links was sent */
+  invited_at?: string | null
 }
 
-export type ContestantInput = Partial<Omit<Contestant, 'id' | 'poll' | 'display_number' | 'votes' | 'categories' | 'rounds'>>
+export type ContestantInput = Partial<Omit<Contestant, 'id' | 'poll' | 'display_number' | 'votes' | 'categories' | 'rounds' | 'edit_url' | 'invited_at'>>
 
 export interface StandingRow {
   contestant_id: string
@@ -506,10 +522,10 @@ export interface PublicContest {
   status: PollStatus
   opens_at: string | null
   closes_at: string | null
-  event: { title: string; slug: string }
+  event: { title: string; slug: string; location?: string; terms?: string; organizer_name?: string; category_label?: string }
   vote_mode: ContestVoteMode
   require_checked_in: boolean
-  verification: { method: ContestVoteMode; channel: 'sms' | 'email' | null; captcha_site_key: string | null }
+  verification: { method: ContestVoteMode; channel: 'sms' | 'email' | null; captcha_site_key: string | null; email_fallback?: boolean }
   rules: {
     free_votes_enabled: boolean
     votes_per_voter: number | null
@@ -544,6 +560,10 @@ export interface PublicContest {
     winner: string | null
   }[]
   standings: PublicStandings | null
+  show_standings?: boolean
+  show_numbers?: boolean
+  show_ranks?: boolean
+  show_vote_counts?: boolean
   placement_titles: string[]
   transparency_note: string
   contestants?: PublicContestant[]
@@ -630,6 +650,26 @@ export interface JudgeSheetData {
   }[]
 }
 
+export interface PublicContestCard {
+  id: string
+  slug: string
+  title: string
+  status: PollStatus
+  cover_url: string
+  opens_at: string | null
+  closes_at: string | null
+  contestants: number
+  total_votes: number | null
+  organizer_name: string
+  event: { slug: string; title: string; location: string; category: string; category_label: string; banner: string | null }
+}
+
+export interface PublicContestList {
+  results: PublicContestCard[]
+  counts: Partial<Record<'live' | 'upcoming' | 'past', number>>
+  cities: string[]
+}
+
 const C = '/voting/contests/'
 const json = (method: string, body?: unknown): RequestInit => ({ method, body: body === undefined ? undefined : JSON.stringify(body) })
 
@@ -649,6 +689,7 @@ export const contestApi = {
   removeContestant: (id: string, cid: string) => request<null>(`${C}${id}/contestants/${cid}/`, json('DELETE')),
   bulkAdd: (id: string, contestants: ContestantInput[]) => request<Contestant[]>(`${C}${id}/contestants/bulk/`, json('POST', { contestants })),
   /** Accepted applications of the event (applications stage) become contestants; already added ones are skipped */
+  pendingApplicants: (id: string) => request<{ pending: number }>(`${C}${id}/contestants/from-applications/`),
   fromApplications: (id: string) => request<Contestant[]>(`${C}${id}/contestants/from-applications/`, json('POST', {})),
   importCsv: (id: string, csv: string) => request<Contestant[]>(`${C}${id}/contestants/import/`, json('POST', { csv })),
   reorder: (id: string, ids: string[], renumber = false) => request<Contestant[]>(`${C}${id}/contestants/reorder/`, json('POST', { ids, renumber })),
@@ -681,6 +722,12 @@ export const contestApi = {
     request<{ message: string }>(`${C}${id}/credits/grant/`, json('POST', body)),
 
   // Public
+  publicContests: (q: { when?: string; search?: string; city?: string; category?: string }) => {
+    const qs = new URLSearchParams(Object.entries(q).filter(([, v]) => v) as [string, string][]).toString()
+    return request<PublicContestList>(`/voting/public-contests/${qs ? `?${qs}` : ''}`)
+  },
+  remind: (slug: string, ref: string, destination: string) =>
+    request<{ ok: true; channel: 'sms' | 'email' }>(`/voting/public/${slug}/contests/${encodeURIComponent(ref)}/remind/`, json('POST', { destination })),
   publicContest: (slug: string, ref: string) => request<PublicContest>(`/voting/public/${slug}/contests/${encodeURIComponent(ref)}/`),
   publicContestant: (slug: string, ref: string, cref: string) =>
     request<PublicContestantDetail>(`/voting/public/${slug}/contests/${encodeURIComponent(ref)}/c/${encodeURIComponent(cref)}/`),

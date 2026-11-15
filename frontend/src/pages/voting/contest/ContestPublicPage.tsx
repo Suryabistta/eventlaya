@@ -3,11 +3,11 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   ArrowLeft, Award, ChevronLeft, ChevronRight, Clock, Crown, Facebook, Globe, HelpCircle, Info, Instagram, Lock, Search,
-  ShieldCheck, Sparkles, Trophy, Vote as VoteIcon, X, Youtube,
+  Bell, ShieldCheck, Sparkles, Share2, ChevronDown, Users, CalendarClock, Tag, BookOpen, SquareCheckBig, Trophy, Vote as VoteIcon, X, Youtube,
 } from 'lucide-react'
 import { Badge, Button, Card, EmptyState, Modal, Skeleton } from '@/components/ui'
 import { cn } from '@/lib/utils'
-import { PollStatusBadge, fmtCountdown, fmtDateTime, useCountdown } from '../shared'
+import { PollStatusBadge, fmtDateTime, useCountdown } from '../shared'
 import {
   contestApi, contestantPath, contestPath, type PublicContest, type PublicContestant, type PublicStandings, type SocialKey,
 } from './api'
@@ -15,9 +15,11 @@ import { ContestantPhoto, ContestantStatusBadge, NumberTag, allowanceText } from
 import { SharePanel } from './SharePanel'
 import { isModuleOff } from './kit'
 import { VoteFlow, type VoteCategory, type VoteTarget } from './VoteFlow'
+import { ContestCover, CountdownBoxes } from '../stage'
+import { NotifyMeModal } from '../NotifyMe'
 import { BuyVotesFlow, PacksSection, PurchaseReturn, usePaymentReturn, type BuyChoice } from './BuyVotes'
 
-const wrap = 'mx-auto w-full max-w-5xl space-y-6 px-4 pb-32 pt-6 sm:px-6 sm:pt-8'
+const wrap = 'mx-auto w-full max-w-6xl space-y-6 px-4 pb-32 pt-6 sm:px-6 sm:pt-8'
 
 type StatusFilter = 'all' | 'in' | 'out'
 
@@ -57,6 +59,8 @@ export const ContestPublicPage: React.FC<{ slug: string; contestRef: string }> =
   const [categoryFilter, setCategoryFilter] = useState<string>('')
   const vote = useVoteTarget()
   const [buy, setBuy] = useState<BuyChoice | null>(null)
+  const [buyFor, setBuyFor] = useState<VoteTarget | null>(null)
+  const [sort, setSort] = useState<'number' | 'votes'>('number')
   const payment = usePaymentReturn()
 
   const contestants = useMemo(() => contest?.contestants ?? [], [contest])
@@ -108,6 +112,11 @@ export const ContestPublicPage: React.FC<{ slug: string; contestRef: string }> =
   }
 
   const rankOf = new Map((contest.standings?.rows ?? []).map((r) => [r.contestant_id, r]))
+  const votesVisible = contest.standings?.level === 'full'
+  const sorted = sort === 'votes' && contest.standings && contest.show_ranks
+    ? [...filtered].sort((a, b) => (rankOf.get(a.id)?.rank ?? 1e9) - (rankOf.get(b.id)?.rank ?? 1e9))
+    : filtered
+  const leader = contest.status === 'open' && contest.show_ranks ? (contest.standings?.rows ?? []).find((r) => r.rank === 1 && !r.tied)?.contestant_id : undefined
   const showOutChip = contestants.some((c) => c.status === 'eliminated' || c.status === 'withdrawn' || c.in_current_round === false)
 
   return (
@@ -132,27 +141,39 @@ export const ContestPublicPage: React.FC<{ slug: string; contestRef: string }> =
       {/* Find a contestant */}
       {contestants.length > 0 && (
         <section id="contestants" aria-label="Contestants" className="scroll-mt-20 space-y-4">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <h2 className="text-xl font-bold text-ink-900">Contestants</h2>
-            <p className="text-sm text-ink-500" aria-live="polite">
-              {filtered.length === contestants.length ? `${contestants.length} contestants` : `${filtered.length} of ${contestants.length}`}
-            </p>
-          </div>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-400" aria-hidden />
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by name or number"
-              aria-label="Search contestants by name or number"
-              className="block h-12 w-full rounded-xl border border-ink-200 bg-white pl-11 pr-10 text-base text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-            />
-            {query && (
-              <button type="button" onClick={() => setQuery('')} aria-label="Clear search" className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100">
-                <X className="h-4 w-4" aria-hidden />
-              </button>
-            )}
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h2 className="font-display text-2xl font-bold text-ink-900">Contestants</h2>
+              <p className="mt-1 text-sm text-ink-500" aria-live="polite">
+                {contest.voting_open ? (contest.paid.enabled && contest.paid.payments_available ? 'Pick your favourite and vote, or buy extra votes. ' : 'Pick your favourite and vote. ') : ''}
+                {filtered.length === contestants.length ? `${contestants.length} contestants` : `${filtered.length} of ${contestants.length}`}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Sorting by votes reveals the ranking, so only when the organizer shows ranks */}
+              {contest.standings && contest.show_ranks && (
+                <>
+                  <Chip active={sort === 'number'} onClick={() => setSort('number')}>{contest.show_numbers ? 'By number' : 'Default'}</Chip>
+                  <Chip active={sort === 'votes'} onClick={() => setSort('votes')}>{votesVisible ? 'Most votes' : 'By rank'}</Chip>
+                </>
+              )}
+              <div className="relative min-w-0 flex-1 sm:w-64 sm:flex-none">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" aria-hidden />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={contest.show_numbers ? "Search name or number" : "Search contestant"}
+                  aria-label="Search contestants by name or number"
+                  className="block h-9 w-full rounded-full border border-ink-200 bg-white pl-9 pr-8 text-sm text-ink-900 placeholder:text-ink-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                />
+                {query && (
+                  <button type="button" onClick={() => setQuery('')} aria-label="Clear search" className="absolute right-1.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-ink-500 hover:bg-ink-100">
+                    <X className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
           {(showOutChip || contest.categories.length > 0) && (
             <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0" role="group" aria-label="Filter contestants">
@@ -175,13 +196,17 @@ export const ContestPublicPage: React.FC<{ slug: string; contestRef: string }> =
               <EmptyState icon={<Search className="h-6 w-6" />} title="No one matches" description="Try another name or number, or clear the filters." />
             </Card>
           ) : (
-            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
-              {filtered.map((c) => (
+            <ul className="grid grid-cols-2 items-start gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4">
+              {sorted.map((c) => (
                 <li key={c.id}>
                   <ContestantCard
                     contestant={c}
+                    contest={contest}
                     href={contestantPath(slug, contestRef, c)}
-                    rank={rankOf.get(c.id)?.rank ?? null}
+                    rank={!contest.show_ranks || contest.standings?.total_votes === 0 || rankOf.get(c.id)?.tied ? null : rankOf.get(c.id)?.rank ?? null}
+                    votes={votesVisible && contest.show_vote_counts ? rankOf.get(c.id)?.votes ?? 0 : null}
+                    leading={leader === c.id}
+                    onBuy={(choice) => { setBuyFor(toTarget(c)); setBuy(choice) }}
                     canVote={canReceiveVotes(contest, c) && contest.rules.main_vote_enabled}
                     onVote={() => vote.open(toTarget(c))}
                   />
@@ -192,7 +217,7 @@ export const ContestPublicPage: React.FC<{ slug: string; contestRef: string }> =
         </section>
       )}
 
-      {contest.standings && <StandingsCard standings={contest.standings} title={contest.display_round ? `${contest.display_round.name} standings` : 'Standings'} slug={slug} contestRef={contestRef} />}
+      {contest.standings && contest.show_standings !== false && <StandingsCard standings={contest.standings} title={contest.display_round ? `${contest.display_round.name} standings` : 'Standings'} slug={slug} contestRef={contestRef} />}
 
       {contest.categories.length > 0 && (
         <section aria-label="Awards" className="space-y-4">
@@ -206,7 +231,7 @@ export const ContestPublicPage: React.FC<{ slug: string; contestRef: string }> =
         </section>
       )}
 
-      <PacksSection contest={contest} onBuy={setBuy} />
+      <PacksSection contest={contest} onBuy={(c) => { setBuyFor(null); setBuy(c) }} />
       <HowVotingWorks contest={contest} />
 
       <Card className="p-5">
@@ -214,8 +239,9 @@ export const ContestPublicPage: React.FC<{ slug: string; contestRef: string }> =
       </Card>
 
       <VoteFlow open={Boolean(vote.target)} onClose={vote.close} contest={contest} slug={slug} contestRef={contestRef}
-        contestant={vote.target?.contestant ?? null} category={vote.target?.category ?? null} />
-      <BuyVotesFlow open={Boolean(buy)} onClose={() => setBuy(null)} contest={contest} slug={slug} contestRef={contestRef} choice={buy} />
+        contestant={vote.target?.contestant ?? null} category={vote.target?.category ?? null}
+        onBuy={(choice) => { const t = vote.target?.contestant ?? null; vote.close(); setBuyFor(t); setBuy(choice) }} />
+      <BuyVotesFlow open={Boolean(buy)} onClose={() => setBuy(null)} contest={contest} slug={slug} contestRef={contestRef} contestant={buyFor} choice={buy} />
     </div>
   )
 }
@@ -238,48 +264,139 @@ const ContestHeader: React.FC<{ contest: PublicContest; slug: string }> = ({ con
   const round = contest.current_round
   const target = contest.status === 'scheduled' ? contest.opens_at : contest.status === 'open' ? round?.closes_at ?? contest.closes_at : null
   const countdown = useCountdown(target)
+  const [terms, setTerms] = useState(false)
+  const closing = round?.closes_at ?? contest.closes_at
+  const price = contest.paid.enabled ? contest.paid.price_per_vote ?? null : null
+  const live = contest.status === 'open'
+  const share = () => {
+    const url = window.location.href
+    if (navigator.share) navigator.share({ title: contest.title, url }).catch(() => {})
+    else void navigator.clipboard?.writeText(url)
+  }
   return (
-    <header className="space-y-4">
-      <Link to={`/e/${slug}`} className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-ink-900">
-        <ArrowLeft className="h-4 w-4" aria-hidden />
-        {contest.event.title}
-      </Link>
-      {contest.cover_url && (
-        <img src={contest.cover_url} alt="" className="aspect-[21/9] w-full rounded-3xl bg-ink-100 object-cover" />
+    <header className="space-y-5">
+      {contest.status === 'draft' && (
+        <p className="rounded-xl border border-marigold-300 bg-marigold-50 px-4 py-3 text-sm text-marigold-900">
+          <b>Preview.</b> Only you can see this page. Open voting from the contest dashboard to make it public.
+        </p>
       )}
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <PollStatusBadge status={contest.status} />
-          {round && <Badge tone="brand">{round.name}</Badge>}
-          {countdown !== null && countdown > 0 && (
-            <span className="inline-flex items-center gap-1 text-sm text-ink-600 tabular">
-              <Clock className="h-4 w-4" aria-hidden />
-              {contest.status === 'scheduled' ? 'Opens in' : round?.closes_at ? `${round.name} closes in` : 'Closes in'} {fmtCountdown(countdown)}
+      <nav aria-label="Breadcrumb" className="text-xs text-ink-500">
+        <Link to="/" className="hover:text-ink-800">Home</Link> <span aria-hidden>/</span>{' '}
+        <Link to="/voting" className="hover:text-ink-800">Voting</Link> <span aria-hidden>/</span>{' '}
+        <Link to={`/e/${slug}`} className="hover:text-ink-800">{contest.event.title}</Link> <span aria-hidden>/</span>{' '}
+        <span className="font-medium text-brand-700">{contest.title}</span>
+      </nav>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="font-display text-3xl font-bold text-ink-900 sm:text-4xl">{contest.title}</h1>
+        <div className="flex items-center gap-2">
+          {contest.event.category_label && (
+            <span className="rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">{contest.event.category_label}</span>
+          )}
+          {live ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-600 px-3 py-1 text-xs font-bold text-white">
+              <span className="h-1.5 w-1.5 rounded-full bg-white" aria-hidden /> LIVE
             </span>
+          ) : (
+            <PollStatusBadge status={contest.status} />
+          )}
+          {round && <Badge tone="brand">{round.name}</Badge>}
+          <button type="button" onClick={share} aria-label="Share this contest" className="flex h-9 w-9 items-center justify-center rounded-full border border-ink-200 text-ink-700 hover:bg-ink-50">
+            <Share2 className="h-4 w-4" aria-hidden />
+          </button>
+        </div>
+      </div>
+
+      {/* Stage banner */}
+      <div className="relative overflow-hidden rounded-3xl bg-ink-900">
+        <div className="aspect-[16/9] sm:aspect-[21/7]">
+          <ContestCover src={contest.cover_url} seed={contest.id} />
+        </div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" aria-hidden />
+        <div className="absolute inset-x-0 bottom-0 flex flex-wrap items-end justify-between gap-3 p-4 sm:p-6">
+          {countdown !== null && countdown > 0 ? (
+            <div>
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-white/80">
+                {contest.status === 'scheduled' ? 'Voting opens in' : round?.closes_at ? `${round.name} closes in` : 'Voting closes in'}
+              </p>
+              <CountdownBoxes ms={countdown} dark className="w-64 sm:w-72" />
+            </div>
+          ) : <span />}
+          <div className="flex gap-2">
+            <BannerStat label="Contestants" value={String(contest.contestants?.length ?? 0)} />
+          </div>
+        </div>
+      </div>
+
+      {/* Info strip */}
+      <div className="grid gap-3 rounded-2xl border border-ink-100 bg-white p-4 shadow-sm sm:grid-cols-3 sm:items-center sm:divide-x sm:divide-ink-100">
+        {contest.event.organizer_name && <InfoItem icon={<Users className="h-4 w-4" />} label="Organizer" value={contest.event.organizer_name} />}
+        {closing && (
+          <InfoItem icon={<CalendarClock className="h-4 w-4" />} label={contest.status === 'scheduled' && contest.opens_at ? 'Opens' : 'Closing'}
+            value={fmtDateTime(contest.status === 'scheduled' && contest.opens_at ? contest.opens_at : closing)} />
+        )}
+        <div className="flex items-center justify-between gap-3 sm:pl-4">
+          <InfoItem icon={<Tag className="h-4 w-4" />} label="Vote cost"
+            value={price ? <>{contest.paid.currency === 'NPR' ? 'Rs.' : contest.paid.currency} {Number(price).toLocaleString()} <span className="font-normal text-ink-500">/ vote</span></>
+              : contest.rules.free_votes_enabled ? 'Free' : contest.paid.enabled ? 'Vote packs' : 'Free'} bare />
+          {contest.event.terms && (
+            <button type="button" onClick={() => setTerms(true)} className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 text-xs font-semibold text-brand-700 hover:bg-brand-100">
+              <BookOpen className="h-3.5 w-3.5" aria-hidden /> T&amp;C
+            </button>
           )}
         </div>
-        <h1 className="font-display text-3xl font-bold text-ink-900 sm:text-4xl">{contest.title}</h1>
-        {contest.winners_announced_at && (
-          <div className="rounded-2xl border border-marigold-300 bg-marigold-50 px-5 py-4 text-marigold-950">
-            <p className="font-display text-lg font-bold">🏆 Winners announced</p>
-            {contest.announcement && <p className="mt-1 whitespace-pre-line">{contest.announcement}</p>}
-          </div>
-        )}
-        {contest.description && <p className="max-w-3xl whitespace-pre-line text-ink-600">{contest.description}</p>}
       </div>
+      {contest.event.terms && (
+        <Modal open={terms} onClose={() => setTerms(false)} title="Terms & conditions">
+          <p className="whitespace-pre-line text-sm text-ink-700">{contest.event.terms}</p>
+        </Modal>
+      )}
+
+      {contest.winners_announced_at && (
+        <div className="rounded-2xl border border-marigold-300 bg-marigold-50 px-5 py-4 text-marigold-950">
+          <p className="font-display text-lg font-bold">🏆 Winners announced</p>
+          {contest.announcement && <p className="mt-1 whitespace-pre-line">{contest.announcement}</p>}
+        </div>
+      )}
+      {contest.description && <p className="max-w-3xl whitespace-pre-line text-ink-600">{contest.description}</p>}
       <VotingStatusLine contest={contest} />
     </header>
   )
 }
 
+const BannerStat: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div className="rounded-xl border border-white/25 bg-white/10 px-3 py-2 text-white backdrop-blur-sm">
+    <p className="text-[10px] text-white/75">{label}</p>
+    <p className="font-display text-xl font-bold tabular-nums sm:text-2xl">{value}</p>
+  </div>
+)
+
+const InfoItem: React.FC<{ icon: React.ReactNode; label: string; value: React.ReactNode; bare?: boolean }> = ({ icon, label, value, bare }) => (
+  <div className={cn('flex min-w-0 items-center gap-3', !bare && 'sm:px-4 sm:first:pl-0')}>
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-600" aria-hidden>{icon}</span>
+    <div className="min-w-0">
+      <p className="text-[11px] text-ink-500">{label}</p>
+      <p className="truncate text-sm font-semibold text-ink-900">{value}</p>
+    </div>
+  </div>
+)
+
 /** One line telling voters whether and how they can vote right now. */
 const VotingStatusLine: React.FC<{ contest: PublicContest }> = ({ contest }) => {
+  const [notify, setNotify] = useState(false)
   const anyCategoryOpen = contest.categories.some((c) => c.voting_open)
   if (contest.status === 'scheduled') {
     return (
-      <Notice icon={<Clock className="h-5 w-5 text-marigold-600" aria-hidden />} title="Voting hasn’t opened yet">
-        {contest.opens_at ? `It opens ${fmtDateTime(contest.opens_at)}. This page updates on its own.` : 'Check back soon.'}
-      </Notice>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ink-200 bg-white p-4">
+        <div className="flex items-start gap-3">
+          <Clock className="mt-0.5 h-5 w-5 shrink-0 text-marigold-600" aria-hidden />
+          <div>
+            <p className="font-semibold text-ink-900">Voting hasn’t opened yet</p>
+            <p className="mt-0.5 text-sm text-ink-600">{contest.opens_at ? `It opens ${fmtDateTime(contest.opens_at)}.` : 'Check back soon.'}</p>
+          </div>
+        </div>
+        <Button variant="secondary" icon={<Bell className="h-4 w-4" />} onClick={() => setNotify(true)}>Notify me</Button>
+        {notify && <NotifyMeModal open onClose={() => setNotify(false)} slug={contest.event.slug} contestRef={contest.slug || contest.id} title={contest.title} />}
+      </div>
     )
   }
   if (contest.status === 'closed') {
@@ -316,39 +433,91 @@ const Notice: React.FC<{ icon: React.ReactNode; title: string; children: React.R
   </div>
 )
 
-const ContestantCard: React.FC<{ contestant: PublicContestant; href: string; rank: number | null; canVote: boolean; onVote: () => void }> = ({ contestant: c, href, rank, canVote, onVote }) => {
+const ContestantCard: React.FC<{
+  contestant: PublicContestant
+  contest: PublicContest
+  href: string
+  rank: number | null
+  votes: number | null
+  leading: boolean
+  canVote: boolean
+  onVote: () => void
+  onBuy: (choice: BuyChoice) => void
+}> = ({ contestant: c, contest, href, rank, votes, leading, canVote, onVote, onBuy }) => {
   const out = c.status === 'eliminated' || c.status === 'withdrawn' || c.in_current_round === false
+  const [more, setMore] = useState(false)
+  const paid = contest.paid
+  const canBuy = canVote && paid.enabled && paid.payments_available && paid.buy_and_vote && (paid.packs.length > 0 || paid.custom_votes)
+  const money = (v: string) => `${paid.currency === 'NPR' ? 'Rs.' : paid.currency} ${Number(v).toLocaleString()}`
   return (
-    <article className={cn('flex h-full flex-col overflow-hidden rounded-2xl border border-ink-200 bg-white', out && 'opacity-70')}>
+    <article className={cn('flex h-full flex-col overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-sm', out && 'opacity-70')}>
       <Link to={href} className="group relative block" aria-label={`${c.display_number} ${c.name}: open profile`}>
         <ContestantPhoto name={c.name} photo={c.photo_url} rounded="rounded-none" className="aspect-[4/5] w-full text-4xl transition-transform duration-300 group-hover:scale-[1.02]" />
         <NumberTag value={c.display_number} className="absolute left-2 top-2 shadow" />
-        {c.status === 'winner' && (
+        {c.status === 'winner' ? (
           <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-marigold-400 px-2 py-0.5 text-xs font-bold text-ink-900">
-            <Crown className="h-3 w-3" aria-hidden />
-            Winner
+            <Crown className="h-3 w-3" aria-hidden /> Winner
           </span>
-        )}
-        {rank !== null && c.status !== 'winner' && (
+        ) : leading ? (
+          <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-brand-600 px-2 py-0.5 text-[11px] font-bold text-white">
+            <Crown className="h-3 w-3" aria-hidden /> Leading
+          </span>
+        ) : rank !== null ? (
           <span className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-xs font-bold text-ink-900 tabular">Rank {rank}</span>
-        )}
+        ) : null}
       </Link>
-      <div className="flex flex-1 flex-col gap-2 p-3">
+      <div className="flex flex-1 flex-col gap-2 p-3 sm:p-4">
         <Link to={href} className="min-w-0">
-          <p className="line-clamp-2 font-semibold leading-snug text-ink-900 hover:underline">{c.name}</p>
-          {c.subtitle && <p className="truncate text-xs text-ink-500">{c.subtitle}</p>}
+          <p className="line-clamp-2 font-bold leading-snug text-ink-900 hover:underline">{c.name}</p>
+          {votes != null ? (
+            <p className="mt-0.5 flex items-center gap-1 text-xs text-ink-500">
+              <SquareCheckBig className="h-3.5 w-3.5 text-brand-500" aria-hidden />
+              <b className="text-ink-800 tabular-nums">{votes.toLocaleString()}</b> {votes === 1 ? 'vote' : 'votes'}
+            </p>
+          ) : c.subtitle ? <p className="truncate text-xs text-ink-500">{c.subtitle}</p> : null}
         </Link>
         {out && <ContestantStatusBadge status={c.status === 'active' ? 'eliminated' : c.status} className="self-start" />}
-        <div className="mt-auto">
+        <div className="mt-auto space-y-2 pt-1">
           {canVote ? (
             <Button className="w-full" onClick={onVote} aria-label={`Vote for ${c.display_number} ${c.name}`}>
-              <VoteIcon className="h-4 w-4" aria-hidden />
-              Vote
+              <VoteIcon className="h-4 w-4" aria-hidden /> Vote
             </Button>
           ) : (
             <Link to={href} className="flex h-10 w-full items-center justify-center rounded-[10px] border border-ink-200 text-sm font-semibold text-ink-700 hover:bg-ink-50">
               View profile
             </Link>
+          )}
+          {canBuy && (
+            <div className={cn('rounded-[10px] border', more ? 'border-brand-300' : 'border-ink-200')}>
+              <button type="button" onClick={() => setMore((v) => !v)} aria-expanded={more}
+                className="flex h-9 w-full items-center justify-between px-3 text-xs font-medium text-ink-700">
+                Buy votes
+                <ChevronDown className={cn('h-4 w-4 transition-transform', more && 'rotate-180')} aria-hidden />
+              </button>
+              {more && (
+                <ul className="space-y-1 border-t border-ink-100 p-1.5">
+                  {paid.packs.map((p) => (
+                    <li key={p.id}>
+                      <button type="button" onClick={() => onBuy({ pack: p.id })} className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs hover:bg-ink-50">
+                        <span className="font-semibold text-ink-800">{p.total_votes} votes</span>
+                        <span className="text-ink-500">{money(String(p.price))}</span>
+                      </button>
+                    </li>
+                  ))}
+                  {paid.custom_votes && paid.price_per_vote && (
+                    <li>
+                      <button type="button" onClick={() => onBuy({ votes: 10 })} className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs hover:bg-ink-50">
+                        <span className="font-semibold text-ink-800">Choose how many</span>
+                        <span className="text-ink-500">{money(paid.price_per_vote)} / vote</span>
+                      </button>
+                    </li>
+                  )}
+                  {paid.providers.length > 0 && (
+                    <li className="px-2 pt-1 text-[10px] text-ink-400">Pay with {paid.providers.map((p) => p.name).join(', ')}</li>
+                  )}
+                </ul>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -655,13 +824,13 @@ export const ContestantPage: React.FC<{ slug: string; contestRef: string; contes
 
           {s && (
             <div className="flex flex-wrap gap-3" aria-live="polite">
-              {s.rank !== null && (
+              {s.rank !== null && contest.show_ranks && (
                 <div className="rounded-2xl bg-ink-900 px-4 py-3 text-white">
                   <p className="text-xs uppercase tracking-wide text-white/70">Rank</p>
                   <p className="font-display text-3xl font-bold tabular">{s.rank}{s.tied ? '=' : ''}</p>
                 </div>
               )}
-              {c.standing_level === 'full' && s.votes !== undefined && (
+              {c.standing_level === 'full' && s.votes !== undefined && contest.show_vote_counts && (
                 <div className="rounded-2xl border border-ink-200 bg-white px-4 py-3">
                   <p className="text-xs uppercase tracking-wide text-ink-500">Votes</p>
                   <p className="font-display text-3xl font-bold text-ink-900 tabular">{s.votes.toLocaleString()}</p>

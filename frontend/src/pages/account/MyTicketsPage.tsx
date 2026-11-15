@@ -11,6 +11,8 @@ import { useModuleEnabled } from '@/lib/modules'
 import { reviewsApi, type Review } from '@/lib/reviews'
 import { PrintablePasses, TicketPassModal } from '@/components/TicketPassModal'
 import { ReviewFormModal } from '@/components/reviews'
+import { useAuth } from '@/lib/auth'
+import { platformUrl } from '@/lib/tenant-host'
 import { Badge, Button, ButtonLink, Card, EmptyState, ErrorState, PageHeader, Skeleton, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
 
@@ -48,6 +50,7 @@ const passRole = (t: Pick<Ticket, 'guest_number'>) => (t.guest_number ? `Guest $
 export const MyTicketsPage: React.FC = () => {
   const [params, setParams] = useSearchParams()
   const when: When = params.get('when') === 'past' ? 'past' : 'upcoming'
+  const { user } = useAuth()
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['my-tickets', when],
     queryFn: () => accountApi.myTickets(when),
@@ -79,6 +82,22 @@ export const MyTicketsPage: React.FC = () => {
           </ButtonLink>
         }
       />
+
+      {user && ['organizer', 'superadmin', 'staff'].includes(user.role) && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-brand-200 bg-brand-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-semibold text-ink-900">Signed in as organizer ({user.email})</p>
+            <p className="text-sm text-ink-600">Managing events, reviewing applications, gate scanning and analytics happen in your Eventlaya Dashboard.</p>
+          </div>
+          <a
+            href={platformUrl('/app')}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-brand-700"
+          >
+            <span>Open Dashboard</span>
+            <ExternalLink className="h-4 w-4" aria-hidden />
+          </a>
+        </div>
+      )}
 
       <div role="tablist" aria-label="Which events" className="inline-flex rounded-xl bg-ink-100 p-1">
         {(['upcoming', 'past'] as const).map((w) => (

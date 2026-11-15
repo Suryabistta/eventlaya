@@ -15,6 +15,7 @@ export type ModuleSlug =
   | 'white_label'
   | 'payments'
   | 'blog'
+  | 'favourites'
   // Voting sub-modules (each requires its parent: contests → voting; judging → contests; paid_votes → contests + payments)
   | 'contests'
   | 'judging'

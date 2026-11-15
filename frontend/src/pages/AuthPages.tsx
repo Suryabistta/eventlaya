@@ -68,9 +68,7 @@ export const LoginPage: React.FC = () => {
     <AuthShell
       title="Welcome back"
       subtitle={
-        tenant ? (
-          'Sign in to see your tickets. You don’t need an account to register: your pass is emailed to you.'
-        ) : (
+        tenant ? null : (
           <>
             New to Eventlaya?{' '}
             <Link to="/signup" className="font-semibold text-brand-700 hover:underline">
