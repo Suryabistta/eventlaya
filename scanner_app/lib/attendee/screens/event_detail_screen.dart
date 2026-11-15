@@ -12,6 +12,7 @@ import '../../reviews/review_widgets.dart';
 import '../../screens/common/event_phase.dart';
 import '../../screens/common/format.dart';
 import '../../ui/ui.dart';
+import '../data/favourites.dart';
 import '../models/contest.dart';
 import '../models/poll.dart';
 import '../models/public_event.dart';
@@ -282,6 +283,12 @@ class _BannerHeader extends StatelessWidget {
           ),
         ),
       ),
+      actions: [
+        Padding(
+          padding: const EdgeInsets.all(6),
+          child: _GlassCircle(child: FavouriteButton(eventId: event.base.id, eventSlug: event.slug)),
+        ),
+      ],
       flexibleSpace: FlexibleSpaceBar(
         stretchModes: const [StretchMode.zoomBackground],
         background: Stack(

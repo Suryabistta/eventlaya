@@ -7,8 +7,9 @@ import 'screens/my_pass_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/tickets_screen.dart';
 import 'screens/vendors_screen.dart';
+import 'screens/voting_screen.dart';
 
-/// Attendee app: Explore · Tickets · [My Pass] · Vendors · Profile.
+/// Attendee app: Explore · Tickets · [My Pass] · Voting · Vendors · Profile.
 ///
 /// Opens for signed-out users (browsing needs no account), attendees, and
 /// organizers / staff who chose "Switch to attendee view". Vendors hides
@@ -25,9 +26,10 @@ class AttendeeShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final marketplace = ref.watch(moduleEnabledProvider(AppModule.marketplace));
+    final voting = ref.watch(moduleEnabledProvider(AppModule.contests));
     return AdaptiveShell(
       // Rebuild the shell when the tab set changes so indexes stay right.
-      key: ValueKey('attendee-shell-$marketplace'),
+      key: ValueKey('attendee-shell-$marketplace-$voting'),
       initialIndex: initialIndex,
       tabs: [
         ShellTab(
@@ -51,6 +53,12 @@ class AttendeeShell extends ConsumerWidget {
           ),
           builder: (_, active) => MyPassScreen(active: active),
         ),
+        // Voting after My Pass so the Explore / Tickets / My Pass indexes stay the same
+        if (voting)
+          ShellTab(
+            item: const TabItem(label: 'Voting', icon: Icons.how_to_vote_outlined, activeIcon: Icons.how_to_vote_rounded),
+            builder: (_, __) => const VotingScreen(),
+          ),
         if (marketplace)
           ShellTab(
             item: const TabItem(label: 'Vendors', icon: Icons.storefront_outlined, activeIcon: Icons.storefront_rounded),

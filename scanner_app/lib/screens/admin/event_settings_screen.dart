@@ -6,6 +6,7 @@ import '../../core/api_client.dart';
 import '../../providers/event_provider.dart';
 import '../../providers/modules_provider.dart';
 import '../../ui/ui.dart';
+import 'event_controls.dart';
 
 /// Organizer: the newer settings of the current event (stages, registration, guests), PATCHed to /api/events/<id>/.
 /// Everything else (dates, venue, tickets, forms) is edited on the website.
@@ -103,15 +104,16 @@ class _EventSettingsScreenState extends ConsumerState<EventSettingsScreen> {
             return [
               SliverToBoxAdapter(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  EventControlsSection(event: e, onChanged: () => ref.invalidate(_settingsProvider)),
                   GroupedSection(header: 'Stages', separatorInset: 16, children: [
-                    _toggle(e, 'tickets_enabled', 'Tickets & registration', 'People can get tickets or register'),
-                    _toggle(e, 'applications_enabled', 'Applications', 'People can apply (film submissions, contestants…)'),
+                    _toggle(e, 'tickets_enabled', mode == 'form' ? 'Registration' : 'Ticketing', mode == 'form' ? 'People can register' : 'People can get tickets'),
+                    _toggle(e, 'applications_enabled', 'Pageant (applications & voting)', 'People can apply (contestants, film submissions…)'),
                     if (applications) FieldRow(controller: _applyCta, label: 'Apply button text', hint: 'Apply'),
                   ]),
                   if (tickets)
                     GroupedSection(header: 'Registration', separatorInset: 16, children: [
                       ListRow(
-                        title: 'Registration only',
+                        title: 'Registration (no tickets)',
                         subtitle: 'Free sign-up with no pass or ticket types',
                         trailing: Switch.adaptive(
                           value: mode == 'form',
@@ -119,7 +121,6 @@ class _EventSettingsScreenState extends ConsumerState<EventSettingsScreen> {
                         ),
                       ),
                       FieldRow(controller: _cta, label: 'Button text', hint: 'Get tickets, Register…'),
-                      _toggle(e, 'phone_required', 'Phone number required', 'Ask every guest for a mobile number'),
                       _toggle(e, 'bib_numbers', 'Bib numbers', 'Number each guest (races, marathons)'),
                       if (bibs) FieldRow(controller: _bibStart, label: 'First bib number', keyboardType: TextInputType.number),
                     ]),

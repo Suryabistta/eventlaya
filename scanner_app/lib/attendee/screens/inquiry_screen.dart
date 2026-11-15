@@ -228,7 +228,7 @@ class _InquiryScreenState extends ConsumerState<InquiryScreen> {
                   ),
                   FieldRow(
                     controller: _phone,
-                    label: 'Phone',
+                    label: 'Mobile number',
                     icon: Icons.phone_outlined,
                     keyboardType: TextInputType.phone,
                     validator: (s) =>

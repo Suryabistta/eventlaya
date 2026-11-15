@@ -16,6 +16,9 @@ class AppModule {
   static const applications = 'applications';
   static const sms = 'sms';
 
+  /// Saved events (hearts) for signed-in people.
+  static const favourites = 'favourites';
+
   /// Contests / pageants (needs [voting]).
   static const contests = 'contests';
 

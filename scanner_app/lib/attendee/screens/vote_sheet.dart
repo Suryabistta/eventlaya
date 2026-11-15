@@ -64,7 +64,10 @@ class _VoteSheetState extends ConsumerState<VoteSheet> {
   Contest get c => widget.contest;
   String get _mode => c.voteMode;
   bool get _otp => c.usesOtp;
-  bool get _sms => _mode == 'sms_otp';
+  // SMS-code contests fall back to an email code when SMS isn't working (organizer setting)
+  bool _byEmail = false;
+  bool _smsDown = false;
+  bool get _sms => _mode == 'sms_otp' && !_byEmail;
   String get _channelWord => _sms ? 'mobile number' : 'email';
 
   final _dest = TextEditingController();
@@ -258,6 +261,7 @@ class _VoteSheetState extends ConsumerState<VoteSheet> {
       _listenForSms();
     } on ContestFailure catch (e) {
       if (!mounted) return;
+      if (e.code == 'sms_unavailable') setState(() => _smsDown = true);
       if (e.retryAfter != null) {
         _resendAt = clock.now().add(Duration(seconds: e.retryAfter!));
         _startTicker();
@@ -598,6 +602,24 @@ class _VoteSheetState extends ConsumerState<VoteSheet> {
           ),
         ],
       ),
+      if (_smsDown && _sms) ...[
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: AppColors.marigoldTint, borderRadius: BorderRadius.circular(12)),
+          child: Row(children: [
+            const Expanded(child: Text('SMS isn’t working right now.', style: TextStyle(color: AppColors.marigoldDark))),
+            TextButton(
+              onPressed: () => setState(() {
+                _byEmail = true;
+                _dest.clear();
+                _error = null;
+              }),
+              child: const Text('Get the code by email'),
+            ),
+          ]),
+        ),
+      ],
       const SizedBox(height: 12),
       PrimaryButton(
         label: wait > 0 ? 'Send code (wait ${wait}s)' : 'Send code',
