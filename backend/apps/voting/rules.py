@@ -420,7 +420,7 @@ def cast_contest_vote(poll, data, request):
             created.append(v)
 
     summary = allowance_summary(poll, voter_hash, category, vote_round, now, contestant=contestant)
-    label = f'{poll.format_number(contestant.number)} {contestant.name}'.strip()
+    label = f'{poll.public_number(contestant.number)} {contestant.name}'.strip()
     return {
         'message': f'Your {quantity} {"vote" if quantity == 1 else "votes"} for {label} {"is" if quantity == 1 else "are"} in.',
         'contestant_id': str(contestant.id),

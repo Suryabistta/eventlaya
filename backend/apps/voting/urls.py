@@ -4,8 +4,9 @@ from rest_framework.routers import DefaultRouter
 from . import contest_views as cv
 from .judge_views import JudgeSheetView, MyJudgingView
 from .public_contest_views import (
-    ContestOGView, PublicBuyVotesView, PublicContestAllowanceView, PublicContestantView, PublicContestView, PublicContestVoteView, PublicOTPView,
+    ContestOGView, PublicBuyVotesView, PublicContestListView, PublicContestReminderView, PublicContestAllowanceView, PublicContestantView, PublicContestView, PublicContestVoteView, PublicOTPView,
 )
+from .self_edit_views import ContestantSelfUploadView, ContestantSelfView
 from .views import CandidateViewSet, CastVoteView, PollViewSet, PublicEventPollsView, PublicPollView, PublicVoteView
 
 router = DefaultRouter()
@@ -47,6 +48,10 @@ urlpatterns = [
     path('judge/', MyJudgingView.as_view(), name='my_judging'),
     path('judge/<uuid:jid>/', JudgeSheetView.as_view(), name='judge_sheet'),
     # Public
+    path('self/<str:token>/', ContestantSelfView.as_view(), name='contestant_self'),
+    path('self/<str:token>/upload/', ContestantSelfUploadView.as_view(), name='contestant_self_upload'),
+    path(P + 'remind/', PublicContestReminderView.as_view(), name='public_contest_remind'),
+    path('public-contests/', PublicContestListView.as_view(), name='public_contests'),
     path('public/<slug:slug>/', PublicEventPollsView.as_view(), name='public_event_polls'),
     path(P, PublicContestView.as_view(), name='public_contest'),
     path(P + 'c/<str:cref>/', PublicContestantView.as_view(), name='public_contestant'),

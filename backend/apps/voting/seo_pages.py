@@ -27,9 +27,9 @@ def contest_page(ctx, slug, ref, cref=None):
         c = find_contestant(poll, cref)
         if c is None:
             return None
-        num = poll.format_number(c.number)
+        num = poll.public_number(c.number)
         name = f'{num} {c.name}'.strip()
-        path = f'{base}/c/{c.number if c.number is not None else c.slug}'
+        path = f'{base}/c/{poll.public_ref(c)}'
         return PageMeta(
             title=f'Vote for {name} · {poll.title}',
             og_title=f'Vote for {name}',

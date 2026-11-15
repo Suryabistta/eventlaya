@@ -68,7 +68,12 @@ class SetupTests(ContestBase):
     def test_presets_listed(self):
         self.as_(self.org)
         keys = [p['key'] for p in self.client.get(API + 'presets/').data]
-        self.assertEqual(keys, ['pageant', 'talent', 'awards', 'quick'])
+        self.assertEqual(keys, ['simple', 'pageant', 'talent', 'awards', 'quick'])
+
+    def test_simple_preset_has_no_rounds_judges_or_awards(self):
+        poll = self.create_contest(preset='simple')
+        self.assertEqual((poll.rounds.count(), poll.categories.count(), poll.profile_fields.count()), (0, 0, 0))
+        self.assertTrue(poll.main_vote_enabled)
 
     def test_pageant_preset_fills_everything(self):
         poll = self.create_contest()
@@ -221,6 +226,9 @@ class PublicPageTests(ContestBase):
         Poll.objects.filter(pk=poll.pk).update(status='open')
         data = self.client.get(url).data
         self.assertEqual(data['kind'], 'contest')
+        self.assertEqual(data['contestants'][0]['display_number'], '')  # numbers hidden unless the organizer shows them
+        Poll.objects.filter(pk=poll.pk).update(show_numbers=True)
+        data = self.client.get(url).data
         self.assertEqual(data['contestants'][0]['display_number'], '#01')
         self.assertEqual([p['key'] for p in data['contestants'][0]['profile']], ['age'])  # private phone not shown
         self.assertFalse(data['voting_open'])  # no round open yet
@@ -236,17 +244,22 @@ class PublicPageTests(ContestBase):
         self.assertEqual(self.client.get(f'/api/voting/public/{self.event.slug}/{poll.id}/').data['kind'], 'contest')
 
     def test_og_page(self):
-        poll = self.simple_contest()
+        poll = self.simple_contest(show_numbers=True)
         res = self.client.get(f'/api/voting/og/{self.event.slug}/{poll.slug}/c/2/')
         self.assertEqual(res.status_code, 200)
         html = res.content.decode()
         self.assertIn('og:title" content="Vote for #02 Contestant 2', html)
         self.assertIn('/e/miss-dharan/vote/contest/c/2', html)
         self.assertIn('http-equiv="refresh"', html)
+        # Numbers hidden (the default): no "#02" in the preview, and the link uses the name
+        Poll.objects.filter(pk=poll.pk).update(show_numbers=False)
+        html = self.client.get(f'/api/voting/og/{self.event.slug}/{poll.slug}/c/2/').content.decode()
+        self.assertIn('og:title" content="Vote for Contestant 2', html)
+        self.assertIn('/e/miss-dharan/vote/contest/c/c2', html)
 
     def test_shared_links_carry_their_own_preview(self):
         # The plain /e/… links people share are answered by apps.seo with the contest's own tags
-        poll = self.simple_contest()
+        poll = self.simple_contest(show_numbers=True)
         html = self.client.get(f'/e/{self.event.slug}/vote/{poll.slug}/c/2', HTTP_HOST='eventlaya.com').content.decode()
         self.assertIn('Vote for #02 Contestant 2', html)
         self.assertIn('/e/miss-dharan/vote/contest/c/2', html)
@@ -470,3 +483,163 @@ class ContestantAllowanceTests(ContestBase):
         self.assertEqual((res.data['allowance']['contestant_free_remaining'], res.data['allowance']['credits']), (0, 1))
         self.assertEqual(self.vote(poll, self.c(poll, 1), quantity=2).status_code, 409)  # 0 free + 1 credit
         self.assertEqual(self.vote(poll, self.c(poll, 1), quantity=1).status_code, 201)
+
+
+class PublicContestListTests(ContestBase):
+    URL = '/api/voting/public-contests/'
+
+    def test_lists_by_status_and_hides_drafts(self):
+        live = self.simple_contest(n=2, results_visibility=Poll.ResultsVisibility.LIVE, show_vote_counts=True)
+        Poll.objects.create(event=self.event, kind=Poll.Kind.CONTEST, title='Draft', slug='draft')
+        Poll.objects.create(event=self.event, kind=Poll.Kind.CONTEST, title='Soon', slug='soon', status=Poll.Status.SCHEDULED,
+                            opens_at=timezone.now() + timezone.timedelta(days=2))
+        res = self.client.get(self.URL)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual([r['id'] for r in res.data['results']], [str(live.id)])
+        self.assertEqual(res.data['results'][0]['contestants'], 2)
+        self.assertEqual(res.data['results'][0]['total_votes'], 0)
+        self.assertEqual(res.data['counts'], {'live': 1, 'upcoming': 1, 'past': 0})
+        self.assertEqual([r['title'] for r in self.client.get(self.URL + '?when=upcoming').data['results']], ['Soon'])
+
+    def test_vote_total_hidden_when_results_hidden(self):
+        self.simple_contest(results_visibility=Poll.ResultsVisibility.RANKS_ONLY)
+        self.assertIsNone(self.client.get(self.URL).data['results'][0]['total_votes'])
+
+    def test_search_finds_contestant(self):
+        self.simple_contest()
+        self.assertEqual(len(self.client.get(self.URL + '?search=Contestant 2').data['results']), 1)
+        self.assertEqual(len(self.client.get(self.URL + '?search=nobody').data['results']), 0)
+
+
+class ScheduleFromControlsTests(ContestBase):
+    def test_schedule_then_auto_open(self):
+        poll = self.simple_contest()
+        poll.status = Poll.Status.DRAFT
+        poll.save()
+        self.as_(self.org)
+        soon = timezone.now() + timezone.timedelta(hours=1)
+        res = self.client.patch(f'{API}{poll.id}/', {'status': 'scheduled', 'opens_at': soon.isoformat(), 'closes_at': None}, format='json')
+        self.assertEqual(res.status_code, 200, res.data)
+        poll.refresh_from_db()
+        self.assertEqual(poll.status, Poll.Status.SCHEDULED)
+
+
+class PublicContestListTotalsTests(ContestBase):
+    def test_vote_total_is_not_multiplied_by_contestants(self):
+        poll = self.simple_contest(n=4, results_visibility=Poll.ResultsVisibility.LIVE, show_vote_counts=True)
+        from .models import hash_voter
+        for i in range(3):
+            Vote.objects.create(poll=poll, candidate=self.c(poll, 1), voter_identifier=hash_voter(f'v{i}'), quantity=1)
+        row = self.client.get('/api/voting/public-contests/').data['results'][0]
+        self.assertEqual((row['contestants'], row['total_votes']), (4, 3))
+
+
+class OrganizerPreviewTests(ContestBase):
+    def test_organizer_previews_a_draft_contest_public_cannot(self):
+        poll = self.simple_contest()
+        Poll.objects.filter(pk=poll.pk).update(status=Poll.Status.DRAFT)
+        url = f'/api/voting/public/{self.event.slug}/contests/{poll.slug}/'
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.as_(self.org)
+        self.assertEqual(self.client.get(url).status_code, 200)
+        self.as_(self.other)
+        self.assertEqual(self.client.get(url).status_code, 404)
+
+
+class ContestantSelfEditTests(ContestBase):
+    def setUp(self):
+        super().setUp()
+        self.poll = self.simple_contest(n=2)
+        self.c1 = self.c(self.poll, 1)
+        self.url = f'/api/voting/self/{self.c1.ensure_edit_token()}/'
+
+    def test_contestant_updates_own_profile_but_not_name(self):
+        r = self.client.patch(self.url, {'description': 'New bio', 'subtitle': 'Dharan', 'name': 'Hacked'}, format='json')
+        self.assertEqual(r.status_code, 200, r.data)
+        self.c1.refresh_from_db()
+        self.assertEqual((self.c1.description, self.c1.subtitle, self.c1.name), ('New bio', 'Dharan', 'Contestant 1'))
+        self.assertEqual(self.client.get('/api/voting/self/not-a-token/').status_code, 404)
+
+    def test_organizer_can_turn_it_off(self):
+        Poll.objects.filter(pk=self.poll.pk).update(contestants_can_edit=False)
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.assertEqual(self.client.patch(self.url, {'description': 'x'}, format='json').status_code, 403)
+
+    def test_opening_voting_invites_each_contestant_once(self):
+        from unittest import mock
+        Poll.objects.filter(pk=self.poll.pk).update(status=Poll.Status.DRAFT, contestant_notify=Poll.Notify.EMAIL)
+        Candidate.objects.filter(poll=self.poll).update(contact_email='c@x.com')
+        self.as_(self.org)
+        with mock.patch('apps.core.email.send_simple_event_email') as send, self.captureOnCommitCallbacks(execute=True):
+            self.client.post(f'{API}{self.poll.id}/status/open/')
+        self.assertEqual(send.call_count, 2)
+        self.assertIn('/contestant/', send.call_args[0][4])  # the private edit link is in the message
+        self.assertEqual(Candidate.objects.filter(poll=self.poll, invited_at__isnull=False).count(), 2)
+        with mock.patch('apps.core.email.send_simple_event_email') as send, self.captureOnCommitCallbacks(execute=True):
+            self.client.post(f'{API}{self.poll.id}/status/close/')
+            self.client.post(f'{API}{self.poll.id}/status/open/')
+        self.assertEqual(send.call_count, 0)  # not twice
+
+
+class NotifyMeTests(ContestBase):
+    def test_reminder_sent_once_when_voting_opens(self):
+        from django.core import mail
+        from .models import ContestReminder
+        poll = self.simple_contest()
+        Poll.objects.filter(pk=poll.pk).update(status=Poll.Status.SCHEDULED, opens_at=timezone.now() + timezone.timedelta(days=1))
+        url = f'/api/voting/public/{self.event.slug}/contests/{poll.slug}/remind/'
+        self.assertEqual(self.client.post(url, {'destination': 'Fan@X.com'}, format='json').status_code, 201)
+        self.assertEqual(self.client.post(url, {'destination': 'fan@x.com'}, format='json').status_code, 201)  # no duplicate
+        self.assertEqual(self.client.post(url, {'destination': 'nope'}, format='json').status_code, 400)
+        self.assertEqual(ContestReminder.objects.count(), 1)
+        self.as_(self.org)
+        mail.outbox.clear()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(f'{API}{poll.id}/status/open/')
+        self.assertEqual([m.to for m in mail.outbox if 'Voting is open' in m.subject], [['fan@x.com']])
+        self.assertEqual(ContestReminder.objects.count(), 0)  # contact deleted after sending
+        self.client.force_authenticate(user=None)
+        self.assertEqual(self.client.post(url, {'destination': 'late@x.com'}, format='json').status_code, 400)  # already open
+
+
+class DeleteContestTests(ContestBase):
+    def test_open_contest_with_votes_must_be_closed_first(self):
+        from .models import hash_voter
+        poll = self.simple_contest()
+        Vote.objects.create(poll=poll, candidate=self.c(poll, 1), voter_identifier=hash_voter('v'), quantity=1)
+        self.as_(self.org)
+        self.assertEqual(self.client.delete(f'{API}{poll.id}/').status_code, 409)
+        self.client.post(f'{API}{poll.id}/status/close/')
+        self.assertEqual(self.client.delete(f'{API}{poll.id}/').status_code, 204)
+        self.assertFalse(Poll.objects.filter(pk=poll.pk).exists())
+        self.as_(self.other)
+        other = self.simple_contest()
+        self.assertEqual(self.client.delete(f'{API}{other.id}/').status_code, 404)  # not theirs
+
+
+class SmsEmailFallbackTests(ContestBase):
+    def test_sms_down_voter_uses_email_and_votes(self):
+        import re
+        from unittest import mock
+        from django.core import mail
+        from .sms import SMSError
+        poll = self.simple_contest()
+        Poll.objects.filter(pk=poll.pk).update(vote_mode=Poll.VoteMode.SMS_OTP)
+        base = f'/api/voting/public/{self.event.slug}/contests/{poll.slug}/'
+        with mock.patch('apps.voting.otp.send_sms', side_effect=SMSError('no balance')):
+            r = self.client.post(base + 'otp/send/', {'destination': '9812345678'}, format='json')
+        self.assertEqual((r.status_code, r.data.get('code')), (503, 'sms_unavailable'))
+        self.assertTrue(self.client.get(base).data['verification']['email_fallback'])
+        mail.outbox.clear()
+        r = self.client.post(base + 'otp/send/', {'destination': 'fan@x.com'}, format='json')
+        self.assertEqual(r.status_code, 200, r.data)
+        code = re.search(r'\b(\d{6})\b', mail.outbox[-1].subject + mail.outbox[-1].body).group(1)
+        token = self.client.post(base + 'otp/verify/', {'destination': 'fan@x.com', 'code': code}, format='json').data['voter_token']
+        r = self.vote(poll, self.c(poll, 1), voter_token=token)
+        self.assertEqual(r.status_code, 201, r.data)
+
+    def test_fallback_off_keeps_sms_only(self):
+        poll = self.simple_contest(sms_email_fallback=False)
+        Poll.objects.filter(pk=poll.pk).update(vote_mode=Poll.VoteMode.SMS_OTP)
+        r = self.client.post(f'/api/voting/public/{self.event.slug}/contests/{poll.slug}/otp/send/', {'destination': 'fan@x.com'}, format='json')
+        self.assertEqual(r.status_code, 400)  # not a phone number

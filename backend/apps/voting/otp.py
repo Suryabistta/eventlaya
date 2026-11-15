@@ -30,13 +30,17 @@ TOKEN_SALT = 'eventlaya.voting.voter-token'
 
 
 class OTPError(Exception):
-    def __init__(self, message, code=400, retry_after=None):
+    def __init__(self, message, code=400, retry_after=None, reason=None):
         super().__init__(message)
-        self.message, self.code, self.retry_after = message, code, retry_after
+        self.message, self.code, self.retry_after, self.reason = message, code, retry_after, reason
 
 
-def channel_for(poll):
-    return {Poll.VoteMode.SMS_OTP: VoteOTP.Channel.SMS, Poll.VoteMode.EMAIL_OTP: VoteOTP.Channel.EMAIL}.get(poll.vote_mode)
+def channel_for(poll, destination_raw=None):
+    """SMS or email. An SMS-code contest takes an email address too when its email fallback is on (SMS can fail)."""
+    channel = {Poll.VoteMode.SMS_OTP: VoteOTP.Channel.SMS, Poll.VoteMode.EMAIL_OTP: VoteOTP.Channel.EMAIL}.get(poll.vote_mode)
+    if channel == VoteOTP.Channel.SMS and poll.sms_email_fallback and '@' in str(destination_raw or ''):
+        return VoteOTP.Channel.EMAIL
+    return channel
 
 
 def normalize_destination(channel, value):
@@ -63,7 +67,7 @@ def _code_hash(otp_poll_id, destination, code):
 
 def send_code(poll, destination_raw, ip_hash=''):
     """Send a fresh code. Returns {'expires_in', 'resend_in', 'destination'} or raises OTPError."""
-    channel = channel_for(poll)
+    channel = channel_for(poll, destination_raw)
     if not channel:
         raise OTPError('This contest doesn’t use verification codes.')
     destination = normalize_destination(channel, destination_raw)
@@ -101,6 +105,8 @@ def send_code(poll, destination_raw, ip_hash=''):
     except (SMSError, Exception) as e:
         row.delete()
         logger.exception('Voting OTP delivery failed (%s)', channel)
+        if channel == VoteOTP.Channel.SMS and poll.sms_email_fallback:
+            raise OTPError('SMS isn’t working right now. Get your code by email instead.', 503, reason='sms_unavailable') from e
         raise OTPError('We couldn’t send the code right now. Try again in a minute.', 503) from e
     return {'expires_in': int(CODE_TTL.total_seconds()), 'resend_in': int(RESEND_COOLDOWN.total_seconds()),
             'channel': channel, 'destination': mask(channel, destination)}
@@ -115,7 +121,7 @@ def mask(channel, destination):
 
 def verify_code(poll, destination_raw, code):
     """Check a code. Returns {'voter_token', 'expires_in'} or raises OTPError."""
-    channel = channel_for(poll)
+    channel = channel_for(poll, destination_raw)
     if not channel:
         raise OTPError('This contest doesn’t use verification codes.')
     destination = normalize_destination(channel, destination_raw)

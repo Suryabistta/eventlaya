@@ -249,6 +249,8 @@ def public_standings(poll, rnd=None, category=None):
     out = []
     for r in rows:
         item = {k: r.get(k) for k in ('contestant_id', 'name', 'display_number', 'number', 'slug', 'photo_url', 'rank', 'tied', 'status')}
+        if not poll.show_numbers:
+            item['display_number'], item['number'] = '', None
         if level == 'full':
             item['votes'] = r.get('votes')
             item['percentage'] = round(r['votes'] * 100 / data['total_votes'], 1) if data.get('total_votes') else 0

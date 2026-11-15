@@ -122,6 +122,9 @@ class ContestDetailView(OrganizerView):
 
     def delete(self, request, pk):
         poll = get_contest(request, pk)
+        # People are voting right now: close it first, so a live contest can't vanish by one mis-click
+        if poll.status == Poll.Status.OPEN and poll.votes.exists():
+            return Response({'error': 'Voting is open and people have voted. Close voting first, then delete the contest.'}, status=409)
         poll.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -161,6 +164,9 @@ class ContestStatusView(OrganizerView):
             return Response({'error': 'Unknown action.'}, status=404)
         poll.save()
         audit(poll, request.user, f'contest_{action}', f'Contest {"opened" if action == "open" else "closed"}')
+        if action == 'open':
+            from . import notify
+            notify.voting_opened(poll)
         return contest_response(poll)
 
 
@@ -825,39 +831,69 @@ class ContestExportView(OrganizerView):
         return Response({'error': 'kind must be votes, scores, results or purchases.'}, status=400)
 
 
+def pending_applications(poll):
+    """Accepted applications of the contest's event that aren't contestants yet."""
+    from apps.dynamic_forms.models import FormResponse
+    done = set(poll.candidates.exclude(application_id=None).values_list('application_id', flat=True))
+    return (FormResponse.objects.filter(event=poll.event, ticket__isnull=True, review_status='accepted')
+            .exclude(pk__in=done).prefetch_related('answers__field').order_by('submitted_at'))
+
+
+def add_applicants(poll, user, apps, photo_field=None, send_notices=True):
+    """Turns accepted applications into contestants, all or nothing. Returns (created, errors)."""
+    apps = list(apps)
+    rows = [contestant_from_application(a, photo_field) for a in apps]
+    created, errors = [], {}
+    with transaction.atomic():
+        for i, (row, app) in enumerate(zip(rows, apps)):
+            ser = ContestantSerializer(data=row, context={'poll': poll})
+            if ser.is_valid():
+                created.append(ser.save(application_id=app.pk, contact_email=app.submitter_email or '',
+                                        contact_phone=(app.submitter_phone or '')[:30]))
+            else:
+                errors[row['name'] or i + 1] = ser.errors
+        if errors:
+            transaction.set_rollback(True)
+            return [], errors
+    if created:
+        audit(poll, user, 'contestants_added', f'{len(created)} contestants added from applications')
+        if send_notices:
+            from . import notify
+            for c in created:
+                notify.added(c)
+    return created, {}
+
+
+def auto_add_applicant(resp, user):
+    """On Accept: the applicant joins the event's contest right away when there is exactly one that isn't closed.
+    Returns the new contestant, or None (no contest, several, already a contestant, or the details didn't fit).
+    No separate "you're in" message: the acceptance email says it (see send_review_email)."""
+    if resp.event_id is None or Candidate.objects.filter(application_id=resp.pk).exists():
+        return None
+    contests = list(Poll.objects.filter(event_id=resp.event_id, kind=Poll.Kind.CONTEST).exclude(status=Poll.Status.CLOSED)[:2])
+    if len(contests) != 1:
+        return None
+    created, _ = add_applicants(contests[0], user, [resp], send_notices=False)
+    return created[0] if created else None
+
+
 class ContestantFromApplicationsView(OrganizerView):
-    """POST contests/<pk>/contestants/from-applications/: every accepted application of the contest's event becomes a
+    """GET: how many accepted applications aren't contestants yet ({pending}).
+    POST contests/<pk>/contestants/from-applications/: every accepted application of the contest's event becomes a
     contestant (name, photo, gallery, bio and city taken from the answers). Already imported ones are skipped."""
 
-    def post(self, request, pk):
-        from apps.dynamic_forms.models import FormResponse
+    def get(self, request, pk):
         poll = get_contest(request, pk)
-        done = set(poll.candidates.exclude(application_id=None).values_list('application_id', flat=True))
-        apps = (FormResponse.objects.filter(event=poll.event, ticket__isnull=True, review_status='accepted')
-                .exclude(pk__in=done).prefetch_related('answers__field').order_by('submitted_at'))
-        rows, ids = [], []
-        for a in apps:
-            rows.append(contestant_from_application(a, request.data.get('photo_field')))
-            ids.append(a.pk)
-        if not rows:
+        return Response({'pending': pending_applications(poll).count()})
+
+    def post(self, request, pk):
+        poll = get_contest(request, pk)
+        apps = pending_applications(poll)
+        if not apps.exists():
             return Response({'error': 'No new accepted applications to add.'}, status=400)
-        created, errors = [], {}
-        with transaction.atomic():
-            contacts = {a.pk: (a.submitter_email, a.submitter_phone) for a in apps}
-            for i, (row, app_id) in enumerate(zip(rows, ids)):
-                ser = ContestantSerializer(data=row, context={'poll': poll})
-                if ser.is_valid():
-                    email, phone = contacts.get(app_id, ('', ''))
-                    created.append(ser.save(application_id=app_id, contact_email=email or '', contact_phone=(phone or '')[:30]))
-                else:
-                    errors[row['name'] or i + 1] = ser.errors
-            if errors:
-                transaction.set_rollback(True)
-                return Response({'error': f'{len(errors)} applications could not be added. Nothing was added.', 'rows': errors}, status=400)
-        audit(poll, request.user, 'contestants_added', f'{len(created)} contestants added from applications')
-        from . import notify
-        for c in created:
-            notify.added(c)
+        created, errors = add_applicants(poll, request.user, apps, request.data.get('photo_field'))
+        if errors:
+            return Response({'error': f'{len(errors)} applications could not be added. Nothing was added.', 'rows': errors}, status=400)
         return Response(ContestantSerializer(contestants_qs(poll).filter(pk__in=[c.pk for c in created]), many=True,
                                              context={'poll': poll}).data, status=201)
 

@@ -39,9 +39,14 @@ PUBLIC_EVENT_STATUSES = [Event.Status.PUBLISHED, Event.Status.ONGOING, Event.Sta
 def sync_due_polls():
     """Apply schedules: open scheduled polls whose time has come, close polls past their closing time."""
     now = timezone.now()
-    Poll.objects.filter(status=Poll.Status.SCHEDULED, opens_at__lte=now).exclude(closes_at__lte=now).update(
-        status=Poll.Status.OPEN, updated_at=now
-    )
+    due = Poll.objects.filter(status=Poll.Status.SCHEDULED, opens_at__lte=now).exclude(closes_at__lte=now)
+    opening = list(due.filter(kind=Poll.Kind.CONTEST).values_list('pk', flat=True))
+    due.update(status=Poll.Status.OPEN, updated_at=now)
+    if opening:
+        # Contestants get their links when a scheduled contest opens on its own
+        from . import notify
+        for poll in Poll.objects.filter(pk__in=opening):
+            notify.voting_opened(poll)
     Poll.objects.filter(status__in=[Poll.Status.SCHEDULED, Poll.Status.OPEN], closes_at__lte=now).update(
         status=Poll.Status.CLOSED, updated_at=now
     )
