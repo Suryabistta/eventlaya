@@ -51,6 +51,8 @@ const VendorProfileForm: React.FC<{ existing?: OwnedVendorProfile }> = ({ existi
     business_name: existing?.business_name ?? user?.organization_name ?? '',
     category: existing?.category ?? '',
     city: existing?.city ?? 'Itahari',
+    service_areas: existing?.service_areas ?? [],
+    hide_price: existing?.hide_price ?? false,
     address: existing?.address ?? '',
     phone: existing?.phone ?? user?.phone ?? '',
     email: existing?.email ?? user?.email ?? '',
@@ -169,6 +171,13 @@ const VendorProfileForm: React.FC<{ existing?: OwnedVendorProfile }> = ({ existi
             onChange={(e) => set('starting_price', e.target.value)}
             containerClassName="sm:max-w-xs"
           />
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-ink-200 bg-white p-3 hover:bg-ink-50">
+                <input type="checkbox" checked={form.hide_price ?? false} onChange={(e) => set('hide_price', e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-ink-300 text-brand-600 focus:ring-brand-500/30" />
+                <span>
+                  <span className="block text-sm font-medium text-ink-900">Hide my price</span>
+                  <span className="block text-xs text-ink-500">Your card and page show “Price on request”. You still quote each request.</span>
+                </span>
+              </label>
         </Section>
 
         <Section title="Portfolio" description="Photos of your recent work. The first one is the cover photo.">
@@ -191,6 +200,7 @@ const VendorProfileForm: React.FC<{ existing?: OwnedVendorProfile }> = ({ existi
             </Select>
             <Input label="Address" hint="Optional" value={form.address} onChange={(e) => set('address', e.target.value)} placeholder="Koshi Highway, Itahari-6" />
           </div>
+          <ServiceAreasInput value={form.service_areas ?? []} onChange={(v) => set('service_areas', v)} suggestions={cities.filter((c) => c !== form.city)} />
           <div className="grid gap-4 sm:grid-cols-2">
             <Input label="Phone" type="tel" required value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="98XXXXXXXX" />
             <Input label="Email" type="email" hint="Quote requests are sent here" value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="bookings@business.com" />
@@ -262,4 +272,51 @@ export const EditVendorProfilePage: React.FC = () => {
     )
   }
   return <VendorProfileForm key={profile.id} existing={profile} />
+}
+
+/** Places the vendor also works in: tap a listed city or type any place (village, district) and press Enter. */
+const ServiceAreasInput: React.FC<{ value: string[]; onChange: (v: string[]) => void; suggestions: string[] }> = ({ value, onChange, suggestions }) => {
+  const [text, setText] = React.useState('')
+  const has = (p: string) => value.some((x) => x.toLowerCase() === p.toLowerCase())
+  const add = (raw: string) => {
+    const p = raw.replace(/\s+/g, ' ').trim().slice(0, 60)
+    if (p && !has(p) && value.length < 20) onChange([...value, p])
+    setText('')
+  }
+  const left = suggestions.filter((c) => !has(c))
+  return (
+    <div className="space-y-2">
+      <label htmlFor="service-area-input" className="block text-sm font-medium text-ink-800">Service areas <span className="font-normal text-ink-500">(optional)</span></label>
+      {value.length > 0 && (
+        <ul className="flex flex-wrap gap-2">
+          {value.map((p) => (
+            <li key={p}>
+              <button type="button" onClick={() => onChange(value.filter((x) => x !== p))} aria-label={`Remove ${p}`}
+                className="inline-flex h-8 items-center gap-1.5 rounded-full bg-brand-50 px-3 text-sm font-medium text-brand-800 hover:bg-brand-100">
+                {p} <span aria-hidden>×</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <input
+        id="service-area-input"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); add(text) } }}
+        onBlur={() => text.trim() && add(text)}
+        placeholder="Type a place and press Enter, e.g. Urlabari"
+        className="h-10 w-full rounded-[10px] border border-ink-200 bg-white px-3 text-sm placeholder:text-ink-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+      />
+      {left.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="text-ink-500">Add:</span>
+          {left.slice(0, 10).map((c) => (
+            <button key={c} type="button" onClick={() => add(c)} className="rounded-full border border-ink-200 px-2.5 py-1 font-medium text-ink-700 hover:border-brand-300 hover:text-brand-700">+ {c}</button>
+          ))}
+        </div>
+      )}
+      <p className="text-xs text-ink-500">People searching these places in Find vendors will see you too.</p>
+    </div>
+  )
 }

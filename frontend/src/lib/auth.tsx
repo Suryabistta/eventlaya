@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { AddPhoneGate } from '@/components/AddPhoneGate'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { api, tokenStore, AUTH_EXPIRED_EVENT, type AuthUser } from '@/services/api'
@@ -73,7 +74,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return u
   }, [])
 
-  return <AuthContext.Provider value={{ user, status, login, logout, refresh, startSession, updateUser }}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={{ user, status, login, logout, refresh, startSession, updateUser }}>
+      {children}
+      {/* Every account needs a mobile number (Google / Facebook sign-ins and older accounts add it here once) */}
+      {status === 'authenticated' && user && !user.phone?.trim() && <AddPhoneGate />}
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth() {

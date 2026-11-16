@@ -90,7 +90,7 @@ function validateStep(step: number, d: SignupData): Errors {
     if (vendor && !d.business_type) e.business_type = 'Choose what your business offers.'
     if (vendor && !d.city) e.city = 'Choose the city you work from.'
     if (d.city === OTHER_CITY && !d.city_other.trim()) e.city_other = 'Enter your city.'
-    if (vendor && !d.phone.trim()) e.phone = 'Add a phone number so organizers can reach you.'
+    if (!d.phone.trim()) e.phone = 'Enter your mobile number.'
     else if (d.phone.trim() && !/^[+\d][\d\s-]{6,}$/.test(d.phone.trim())) e.phone = 'Enter a phone number like 98XXXXXXXX.'
   }
   if (step === 3) {
@@ -253,7 +253,7 @@ const PersonStep: React.FC<StepProps> = ({ data, errors, set }) => (
         <CityOptions />
         <option value={OTHER_CITY}>Other…</option>
       </Select>
-      <Input name="phone" label="Phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="98XXXXXXXX" hint="Optional, fills in event forms for you" className="h-11" value={data.phone} error={errors.phone} onChange={(e) => set('phone', e.target.value)} />
+      <Input name="phone" label="Mobile number" type="tel" inputMode="tel" autoComplete="tel" required placeholder="98XXXXXXXX" hint="Fills in event forms for you. Not shown publicly." className="h-11" value={data.phone} error={errors.phone} onChange={(e) => set('phone', e.target.value)} />
     </div>
     {data.city === OTHER_CITY && (
       <Input name="city_other" label="City name" required autoComplete="address-level2" className="h-11" value={data.city_other} error={errors.city_other} onChange={(e) => set('city_other', e.target.value)} />
@@ -297,13 +297,13 @@ const OrganizationStep: React.FC<StepProps> = ({ data, errors, set }) => {
         </Select>
         <Input
           name="phone"
-          label="Phone"
+          label="Mobile number"
           type="tel"
           inputMode="tel"
           autoComplete="tel"
           placeholder="98XXXXXXXX"
-          required={vendor}
-          hint={vendor ? 'Shown to organizers who contact you' : 'Optional'}
+          required
+          hint={vendor ? 'Shown to organizers who contact you' : 'Fills in event forms for you. Not shown publicly.'}
           className="h-11"
           value={data.phone}
           error={errors.phone}

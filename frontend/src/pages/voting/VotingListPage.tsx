@@ -7,7 +7,7 @@ import { EmptyState, ErrorState, Skeleton } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { FilterSelect } from '../marketplace/shared'
 import { contestApi, type PublicContestCard } from './contest/api'
-import { publicVotePath, useCountdown } from './shared'
+import { fmtCountdown, publicVotePath, useCountdown } from './shared'
 import { ContestCover, CountdownBoxes } from './stage'
 import { NotifyMeModal } from './NotifyMe'
 
@@ -162,7 +162,8 @@ export const VotingListPage: React.FC = () => {
   )
 }
 
-export const ContestCard: React.FC<{ c: PublicContestCard }> = ({ c }) => {
+/** `compact` (home page): one-line "Ends in 2d 4h" instead of the countdown boxes. */
+export const ContestCard: React.FC<{ c: PublicContestCard; compact?: boolean }> = ({ c, compact }) => {
   const to = publicVotePath(c.event.slug, c.slug || c.id)
   const live = c.status === 'open'
   const upcoming = c.status === 'scheduled'
@@ -211,7 +212,13 @@ export const ContestCard: React.FC<{ c: PublicContestCard }> = ({ c }) => {
           )}
         </ul>
         <div className="mt-auto pt-4">
-          {left != null && (live || upcoming) && (
+          {left != null && (live || upcoming) && compact && (
+            <p className="mb-3 flex items-center gap-1.5 text-sm font-medium text-ink-700">
+              <Clock className="h-4 w-4 text-brand-500" aria-hidden />
+              {live ? 'Ends in' : 'Opens in'} {fmtCountdown(left)}
+            </p>
+          )}
+          {left != null && (live || upcoming) && !compact && (
             <>
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-ink-400">{live ? 'Voting ends in' : 'Voting opens in'}</p>
               <CountdownBoxes ms={left} className="mb-4" />

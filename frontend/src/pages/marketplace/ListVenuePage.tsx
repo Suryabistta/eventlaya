@@ -38,6 +38,7 @@ interface VenueForm {
   cover: string
   contactPerson: string
   showHost: boolean
+  hidePrice: boolean
   contactPhone: string
   contactEmail: string
 }
@@ -121,6 +122,7 @@ const formFromVenue = (v: VenueWithSpaces): VenueForm => {
     cover: v.featured_image ?? '',
     contactPerson: v.contact_person,
     showHost: v.show_host ?? true,
+    hidePrice: v.hide_price ?? false,
     contactPhone: v.contact_phone,
     contactEmail: v.contact_email || '',
   }
@@ -223,6 +225,7 @@ const VenueFormPage: React.FC<{ existing?: VenueWithSpaces; existingSpaces?: Ven
           cover: '',
           contactPerson: '',
           showHost: true,
+          hidePrice: false,
           contactPhone: user?.phone || '',
           contactEmail: user?.email || '',
         },
@@ -283,6 +286,7 @@ const VenueFormPage: React.FC<{ existing?: VenueWithSpaces; existingSpaces?: Ven
       featured_image: form.cover,
       contact_person: form.contactPerson,
       show_host: form.showHost,
+      hide_price: form.hidePrice,
       contact_phone: form.contactPhone,
       contact_email: form.contactEmail,
       description: form.description || 'Your description appears here.',
@@ -345,6 +349,7 @@ const VenueFormPage: React.FC<{ existing?: VenueWithSpaces; existingSpaces?: Ven
       featured_image: form.cover,
       contact_person: form.contactPerson.trim(),
       show_host: form.showHost,
+      hide_price: form.hidePrice,
       contact_phone: form.contactPhone.trim(),
       contact_email: form.contactEmail.trim(),
     }
@@ -478,6 +483,15 @@ const VenueFormPage: React.FC<{ existing?: VenueWithSpaces; existingSpaces?: Ven
                   onChange={(e) => set('price', Number(e.target.value))}
                   containerClassName="col-span-2 sm:col-span-1"
                 />
+              </div>
+              <div className="mt-4">
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-ink-200 bg-white p-3 hover:bg-ink-50">
+                <input type="checkbox" checked={form.hidePrice} onChange={(e) => set('hidePrice', e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-ink-300 text-brand-600 focus:ring-brand-500/30" />
+                <span>
+                  <span className="block text-sm font-medium text-ink-900">Hide my price</span>
+                  <span className="block text-xs text-ink-500">Your card and venue page show “Price on request”. Your space prices stay private too.</span>
+                </span>
+              </label>
               </div>
             </Section>
 

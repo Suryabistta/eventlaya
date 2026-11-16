@@ -312,6 +312,13 @@ export const DashboardPage: React.FC = () => {
       </Card>
       )}
 
+      {currentEvent.hidden_by_admin && (
+        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-red-900">
+          <p className="font-semibold">Eventlaya has hidden this event from the public</p>
+          <p className="mt-1 text-sm">{currentEvent.hidden_reason || 'Contact Eventlaya support for details.'} Nobody can see it or sign up until it’s shown again; contact support once it’s fixed.</p>
+        </div>
+      )}
+
       {isOrganizer && <EventJourney event={currentEvent} onShare={() => setQrOpen(true)} />}
 
       {isOrganizer && <PageChecklist event={currentEvent} />}
