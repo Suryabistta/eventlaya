@@ -177,7 +177,8 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
               {event.applications?.open && <Badge tone="success" dot>Applications open</Badge>}
               {state.phase === 'ended' && <Badge tone="neutral">Ended</Badge>}
               {state.phase === 'cancelled' && <Badge tone="danger">Cancelled</Badge>}
-              {!state.open && !over && event.tickets_enabled !== false && <Badge tone="warning">{state.label}</Badge>}
+              {/* While applying is the way in, a "Bookings closed" badge only confuses; a scheduled opening ("Opens 10 Mangsir") still shows */}
+              {!state.open && !over && event.tickets_enabled !== false && (!applyFirst || registrationOpensLater(event)) && <Badge tone="warning">{state.label}</Badge>}
             </div>
             {event.parent && (
               <p className="mt-3 text-sm font-medium text-ink-600">
