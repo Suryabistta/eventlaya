@@ -61,6 +61,10 @@ def create_organization(request):
             errors['email'] = ['An account with this email already exists.']
     if role not in ORG_ROLES:
         errors['role'] = ['Choose organizer or vendor.']
+    # A mobile number is required for every organization and vendor (platform rule)
+    phone = (d.get('phone') or '').strip()
+    if not 7 <= sum(c.isdigit() for c in phone) <= 15:
+        errors['phone'] = ['Enter a valid mobile number.']
     if errors:
         return Response({'error': next(iter(errors.values()))[0], **errors}, status=status.HTTP_400_BAD_REQUEST)
 

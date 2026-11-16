@@ -4,7 +4,7 @@ from . import billing_views as billing
 from . import sms_views as sms
 from . import contact_views as contact
 from . import segments
-from . import featured_events, org_admin, views
+from . import featured_events, featured_listings, org_admin, views
 from .catalog import BannerViewSet, CityViewSet, EventCategoryViewSet, HomePageContentView, SiteBrandingView
 
 router = DefaultRouter()
@@ -35,8 +35,11 @@ urlpatterns = [
     path('organizations/<uuid:pk>/verify/', org_admin.OrganizationVerifyView.as_view(), name='platform_organization_verify'),
     path('site-branding/', SiteBrandingView.as_view(), name='platform_site_branding'),
     path('home-content/', HomePageContentView.as_view(), name='platform_home_content'),
+    path('featured-listings/', featured_listings.FeaturedListingListView.as_view(), name='platform_listings'),
+    path('featured-listings/<str:kind>/<uuid:pk>/feature/', featured_listings.FeatureListingView.as_view(), name='platform_listing_feature'),
     path('events/', featured_events.FeaturedEventListView.as_view(), name='platform_events'),
     path('events/<uuid:pk>/feature/', featured_events.FeatureEventView.as_view(), name='platform_event_feature'),
+    path('events/<uuid:pk>/hide/', featured_events.HideEventView.as_view(), name='platform_event_hide'),
     path('activity/', views.ActivityView.as_view(), name='platform_activity'),
     path('segments/', segments.SegmentsView.as_view(), name='platform_segments'),
     # Billing

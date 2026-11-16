@@ -94,7 +94,7 @@ export const MarketplacePage: React.FC = () => {
   const items: Item[] = [
     ...(chip === 'all' || chip === 'venues' ? (venuesQuery.data ?? []).map((v) => ({ kind: 'venue' as const, v })) : []),
     ...(chip !== 'venues' ? vendors.map((v) => ({ kind: 'vendor' as const, v })) : []),
-  ]
+  ].sort((a, b) => Number(Boolean(b.v.is_featured)) - Number(Boolean(a.v.is_featured)))  // featured first, venues and vendors alike
   const combined = {
     data: venuesQuery.data && vendorsQuery.data ? items : undefined,
     isLoading: venuesQuery.isLoading || vendorsQuery.isLoading,

@@ -27,6 +27,9 @@ export interface Event {
   application_form?: string | null
   /** Why the public can't apply right now (null = open); same text the public page shows */
   applications_closed_reason?: string | null
+  /** Hidden from the public by Eventlaya (moderation), with the reason */
+  hidden_by_admin?: boolean
+  hidden_reason?: string
   applications_close?: string | null
   application_cta?: string
   /** Guests (docs/plan-2026-11-guest-management.md) */
@@ -226,6 +229,10 @@ export interface Poll {
 }
 
 export interface Vendor {
+  /** Shows “Price on request”; the public then gets no price */
+  hide_price?: boolean
+  /** Other places they work in (listed cities or typed) */
+  service_areas?: string[]
   /** Owner's saved time slots for opening dates (empty = whole day only) */
   slot_presets?: { name: string; start: string; end: string }[]
   id: string
@@ -309,6 +316,8 @@ export interface City {
 }
 
 export interface VenueListing {
+  /** Shows “Price on request”; the public then gets no prices */
+  hide_price?: boolean
   /** Owner's saved time slots for opening dates (empty = whole day only) */
   slot_presets?: { name: string; start: string; end: string }[]
   id: string
@@ -811,15 +820,17 @@ export const api = {
       body: JSON.stringify({ assignments }),
     }),
   getBanners: (placement: Banner['placement']) => request<Banner[]>(`/platform/banners/?placement=${placement}`),
-  getVendors: (params?: { category?: string; city?: string }) => {
+  getVendors: (params?: { category?: string; city?: string; featured?: boolean }) => {
     const q = new URLSearchParams()
+    if (params?.featured) q.append('featured', '1')
     if (params?.category) q.append('category', params.category)
     if (params?.city) q.append('city', params.city)
     const str = q.toString()
     return request<Vendor[]>(`/marketplace/vendors/${str ? `?${str}` : ''}`)
   },
-  getVenues: (params?: { city?: string; type?: string; min_capacity?: number; max_price?: number; search?: string }) => {
+  getVenues: (params?: { city?: string; type?: string; min_capacity?: number; max_price?: number; search?: string; featured?: boolean }) => {
     const q = new URLSearchParams()
+    if (params?.featured) q.append('featured', '1')
     if (params?.city) q.append('city', params.city)
     if (params?.type) q.append('type', params.type)
     if (params?.min_capacity) q.append('min_capacity', params.min_capacity.toString())

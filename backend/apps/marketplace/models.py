@@ -37,11 +37,14 @@ class VendorProfile(models.Model):
     logo = models.CharField(max_length=500, blank=True, help_text='Image URL from /api/uploads/')
     category = models.ForeignKey(VendorCategory, on_delete=models.PROTECT, related_name='vendors')
     city = models.CharField(max_length=100, default='Itahari')
+    # Places the vendor also works in: listed cities or anything typed ("Urlabari", "Jhapa district")
+    service_areas = models.JSONField(default=list, blank=True)
     address = models.CharField(max_length=255, blank=True)
     phone = models.CharField(max_length=30)
     email = models.EmailField(blank=True)
     description = models.TextField()
     starting_price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    hide_price = models.BooleanField(default=False, help_text='Show “Price on request” instead of the price to the public')
     portfolio_images = models.JSONField(default=list, blank=True)
     # Cover photo on marketplace cards and the top of the page; falls back to the first portfolio photo
     featured_image = models.CharField(max_length=500, blank=True)
@@ -89,6 +92,7 @@ class VenueListing(models.Model):
     capacity_min = models.PositiveIntegerField(default=50)
     capacity_max = models.PositiveIntegerField(default=500)
     price_per_day = models.DecimalField(max_digits=12, decimal_places=2, default=25000.00)
+    hide_price = models.BooleanField(default=False, help_text='Show “Price on request” instead of prices to the public')
     
     amenities = models.JSONField(default=list, blank=True)
     images = models.JSONField(default=list, blank=True)

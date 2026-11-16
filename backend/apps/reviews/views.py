@@ -110,7 +110,7 @@ class EventReviewsView(_TargetReviewsView):
     kind = Review.Kind.EVENT
 
     def get_target(self, request, key):
-        return get_object_or_404(Event, slug=key, status__in=PUBLIC_EVENT_STATUSES)
+        return get_object_or_404(Event, slug=key, status__in=PUBLIC_EVENT_STATUSES, hidden_by_admin=False)
 
 
 class VendorReviewsView(_TargetReviewsView):

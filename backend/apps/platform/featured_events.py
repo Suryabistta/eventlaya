@@ -22,6 +22,7 @@ def event_row(e):
     over = (e.end_date or e.start_date) < today if e.start_date else False
     return {
         'id': str(e.id), 'title': e.title, 'slug': e.slug, 'status': e.status, 'is_featured': e.is_featured,
+        'hidden_by_admin': e.hidden_by_admin, 'hidden_reason': e.hidden_reason,
         'start_date': e.start_date, 'location': e.location, 'over': over,
         'organizer': e.organizer.organization_name or e.organizer.get_full_name() or e.organizer.username,
     }
@@ -50,4 +51,25 @@ class FeatureEventView(APIView):
             event.is_featured = featured
             event.save(update_fields=['is_featured', 'updated_at'])
             log(request, event.organizer, AdminAction.Kind.FEATURED_EVENT if featured else AdminAction.Kind.UNFEATURED_EVENT, event.title)
+        return Response(event_row(event))
+
+
+class HideEventView(APIView):
+    """POST /api/platform/events/<id>/hide/ {hidden: bool, reason}: moderation. A hidden event disappears from every
+    public page and list and takes no sign-ups; its organizer sees the reason on their dashboard."""
+    permission_classes = [IsSuperadmin]
+
+    def post(self, request, pk):
+        event = get_object_or_404(Event.objects.select_related('organizer'), pk=pk)
+        hidden = bool(request.data.get('hidden'))
+        reason = (request.data.get('reason') or '').strip()[:300]
+        if hidden and not reason:
+            return Response({'error': 'Say why it’s hidden; the organizer sees this.', 'reason': ['Required.']}, status=400)
+        if event.hidden_by_admin != hidden or (hidden and reason != event.hidden_reason):
+            event.hidden_by_admin, event.hidden_reason = hidden, reason if hidden else ''
+            if hidden:
+                event.is_featured = False  # a hidden event can't stay featured
+            event.save(update_fields=['hidden_by_admin', 'hidden_reason', 'is_featured', 'updated_at'])
+            log(request, event.organizer, AdminAction.Kind.HID_EVENT if hidden else AdminAction.Kind.UNHID_EVENT,
+                f'{event.title}{": " + reason if hidden else ""}')
         return Response(event_row(event))

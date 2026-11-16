@@ -39,7 +39,11 @@ export const spaceCountLabel = (spaces: Pick<VenueSpace, 'space_type'>[]) => {
   return `${n} ${noun}${n === 1 ? '' : 's'}`
 }
 
-export const formatRs = (value: string | number) => `Rs ${Number(value).toLocaleString('en-IN')}`
+/** "Rs 25,000", or "Price on request" when the listing hides its price (the server then sends none) */
+export const formatRs = (value: string | number | null | undefined) =>
+  value === null || value === undefined ? 'Price on request' : `Rs ${Number(value).toLocaleString('en-IN')}`
+/** True when a listing shows "Price on request" instead of a number */
+export const priceHidden = (value: string | number | null | undefined) => value === null || value === undefined
 
 /* ---------------------------------------------------------------- API */
 

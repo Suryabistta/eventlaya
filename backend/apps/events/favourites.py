@@ -22,14 +22,14 @@ class MyFavouritesView(APIView):
         from .serializers import EventSerializer
         from .views import public_event_data
         events = list(scope_events(
-            Event.objects.filter(favourites__user=request.user, status__in=LISTED).select_related('organizer')
+            Event.objects.filter(favourites__user=request.user, status__in=LISTED, hidden_by_admin=False).select_related('organizer')
             .order_by('-favourites__created_at'), request))
         data = EventSerializer(events, many=True, context={'request': request}).data
         return Response({'ids': [str(e.id) for e in events], 'events': [public_event_data(e, d) for e, d in zip(events, data)]})
 
     def post(self, request):
         ref = str(request.data.get('event') or '').strip()
-        qs = Event.objects.filter(status__in=LISTED)
+        qs = Event.objects.filter(status__in=LISTED, hidden_by_admin=False)
         event = (qs.filter(pk=ref).first() if len(ref) == 36 else None) or get_object_or_404(qs, slug=ref)
         EventFavourite.objects.get_or_create(user=request.user, event=event)
         return Response({'id': str(event.id), 'saved': True}, status=status.HTTP_201_CREATED)

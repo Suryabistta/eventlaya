@@ -32,7 +32,7 @@ import {
   Star,
   Vote,
 } from 'lucide-react'
-import { api, request, type Event as PublicEvent } from '@/services/api'
+import { api, request, type Event as PublicEvent, type Vendor, type VenueWithSpaces } from '@/services/api'
 import { buttonClass } from '@/components/ui/Button'
 import { Input, Select, Textarea, useToast } from '@/components/ui'
 import { useEventCategories } from '@/lib/event-page'
@@ -41,7 +41,7 @@ import { useCities } from '@/lib/cities'
 import { cn } from '@/lib/utils'
 import { useModuleEnabled } from '@/lib/modules'
 import { EventCard } from '../ExploreEventsPage'
-import { VendorCard } from '../marketplace/Cards'
+import { VendorCard, VenueCard } from '../marketplace/Cards'
 import { Reveal } from './ProductTour'
 import { SocialLinks } from '@/components/SocialLinks'
 
@@ -55,7 +55,7 @@ export const Eyebrow: React.FC<{ children: React.ReactNode; light?: boolean; cen
 )
 
 export const H2: React.FC<{ children: React.ReactNode; light?: boolean; className?: string }> = ({ children, light, className }) => (
-  <h2 className={cn('mt-3 font-display text-3xl font-extrabold tracking-[-0.02em] sm:text-[44px] sm:leading-[1.08]', light ? 'text-white' : 'text-ink-900', className)}>{children}</h2>
+  <h2 className={cn('mt-3 font-display text-[26px] font-extrabold leading-tight tracking-[-0.02em] sm:text-4xl lg:text-[44px] lg:leading-[1.08]', light ? 'text-white' : 'text-ink-900', className)}>{children}</h2>
 )
 
 // Icons for event types by slug; anything else gets a sparkle
@@ -190,12 +190,13 @@ export const SearchHero: React.FC = () => {
 
         {hero.show_categories && eventTypes.length > 0 && (
           <>
-            <p className="mt-10 text-base font-medium text-white/80">Or browse popular categories</p>
-            <ul className="mx-auto mt-4 grid max-w-5xl grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-8 lg:gap-3">
+            <p className="mt-8 text-base font-medium text-white/80 sm:mt-10">Or browse popular categories</p>
+            {/* Phones: one swipeable row; larger screens: a grid */}
+            <ul className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-auto sm:grid sm:max-w-5xl sm:grid-cols-4 sm:overflow-visible sm:px-0 lg:grid-cols-8 lg:gap-3 [&::-webkit-scrollbar]:hidden">
               {[{ slug: '', name: 'All events' }, ...eventTypes.slice(0, 7)].map((t) => {
                 const Icon = t.slug ? iconFor(t.slug) : LayoutGrid
                 return (
-                  <li key={t.slug || 'all'}>
+                  <li key={t.slug || 'all'} className="w-[96px] shrink-0 sm:w-auto">
                     <Link
                       to={t.slug ? `/events?category=${t.slug}` : '/events'}
                       className={cn(
@@ -234,22 +235,22 @@ export const EventsShowcase: React.FC = () => {
   const { events: sec } = useHomeContent()
   const { data = [], isLoading } = useUpcoming()
   const eventTypes = useEventCategories()
-  const [tab, setTab] = useState<'featured' | 'upcoming'>('featured')
+  const [picked, setTab] = useState<'featured' | 'upcoming' | null>(null)
   const [type, setType] = useState('')
+  // "Featured" shows only what the superadmin featured; with nothing featured the tab hides itself
+  const anyFeatured = data.some((e) => e.is_featured)
+  const tab = picked ?? (anyFeatured ? 'featured' : 'upcoming')
   const list = useMemo(() => {
     let l = data
     if (type) l = l.filter((e) => e.category === type)
-    if (tab === 'featured') {
-      const featured = l.filter((e) => e.is_featured)
-      l = featured.length ? [...featured, ...l.filter((e) => !e.is_featured)] : l
-    }
-    return l.slice(0, 4)
+    if (tab === 'featured') l = l.filter((e) => e.is_featured)
+    return l.slice(0, 3)
   }, [data, tab, type])
   const usedTypes = eventTypes.filter((t) => data.some((e) => e.category === t.slug))
   if (!sec.show || (!isLoading && data.length === 0)) return null
 
   return (
-    <section className="bg-white py-20 sm:py-24">
+    <section className="bg-white py-14 sm:py-16">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -257,7 +258,7 @@ export const EventsShowcase: React.FC = () => {
             <H2>{sec.title}</H2>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {(['featured', 'upcoming'] as const).map((t) => (
+            {(anyFeatured ? (['featured', 'upcoming'] as const) : (['upcoming'] as const)).map((t) => (
               <button
                 key={t}
                 type="button"
@@ -269,7 +270,7 @@ export const EventsShowcase: React.FC = () => {
               </button>
             ))}
             <Link to="/events" className={buttonClass('secondary', 'md', 'rounded-full')}>
-              View all <ArrowRight className="h-4 w-4" aria-hidden />
+              View all events <ArrowRight className="h-4 w-4" aria-hidden />
             </Link>
           </div>
         </div>
@@ -291,11 +292,52 @@ export const EventsShowcase: React.FC = () => {
             ))}
           </div>
         )}
-        <ul className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <ul className="mt-8 -mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:gap-5 sm:overflow-visible sm:px-0 sm:pb-0 sm:grid-cols-2 lg:grid-cols-3 [&::-webkit-scrollbar]:hidden [&>*]:w-[85%] [&>*]:shrink-0 [&>*]:snap-start sm:[&>*]:w-auto">
           {list.map((e) => (
             <EventCard key={e.id} event={e} past={false} />
           ))}
         </ul>
+      </div>
+    </section>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* Featured marketplace (dark band; superadmin picks in Featured listings) */
+
+export const FeaturedMarketShowcase: React.FC = () => {
+  const { market: sec } = useHomeContent()
+  const on = useModuleEnabled('marketplace') && sec.show
+  const venues = useQuery({ queryKey: ['featured-market', 'venues'], queryFn: () => api.getVenues({ featured: true }), enabled: on, staleTime: 60_000 })
+  const vendors = useQuery({ queryKey: ['featured-market', 'vendors'], queryFn: () => api.getVendors({ featured: true }), enabled: on, staleTime: 60_000 })
+  // Alternate venues and vendors so both show when there are some of each
+  const items: ({ kind: 'venue'; v: VenueWithSpaces } | { kind: 'vendor'; v: Vendor })[] = []
+  const a = (venues.data ?? []) as VenueWithSpaces[]
+  const b = vendors.data ?? []
+  for (let i = 0; items.length < 3 && (i < a.length || i < b.length); i++) {
+    if (i < a.length) items.push({ kind: 'venue', v: a[i] })
+    if (items.length < 3 && i < b.length) items.push({ kind: 'vendor', v: b[i] })
+  }
+  if (!on || items.length === 0) return null
+  return (
+    <section className="bg-[#1c0f17] py-14 text-white sm:py-16">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <Eyebrow light>{sec.eyebrow}</Eyebrow>
+            <H2 light>{sec.title}</H2>
+          </div>
+          <Link to="/marketplace" className={buttonClass('primary', 'lg', 'rounded-full')}>
+            Explore the marketplace <ArrowRight className="h-4 w-4" aria-hidden />
+          </Link>
+        </div>
+        <div className="mt-8 text-ink-900 -mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:gap-5 sm:overflow-visible sm:px-0 sm:pb-0 sm:grid-cols-2 lg:grid-cols-3 [&::-webkit-scrollbar]:hidden [&>*]:w-[85%] [&>*]:shrink-0 [&>*]:snap-start sm:[&>*]:w-auto">
+          {items.map((x) =>
+            x.kind === 'venue'
+              ? <VenueCard compact key={`venue-${x.v.id}`} venue={x.v} to={`/marketplace/venues/${x.v.slug}`} />
+              : <VendorCard compact key={`vendor-${x.v.id}`} vendor={x.v} to={`/marketplace/vendors/${x.v.id}`} />,
+          )}
+        </div>
       </div>
     </section>
   )
@@ -310,23 +352,23 @@ export const VendorsShowcase: React.FC = () => {
   const categories = useVendorCategories().data ?? []
   const [cat, setCat] = useState('')
   const used = categories.filter((c) => data.some((v) => v.category_slug === c.slug))
-  const list = (cat ? data.filter((v) => v.category_slug === cat) : data).slice(0, 6)
+  const list = (cat ? data.filter((v) => v.category_slug === cat) : data).slice(0, 3)
   if (!sec.show || (!isLoading && data.length === 0)) return null
 
   return (
-    <section className="bg-brand-50/60 py-20 sm:py-24">
+    <section className="bg-white py-14 sm:py-16">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <Eyebrow>{sec.eyebrow}</Eyebrow>
             <H2>{sec.title}</H2>
           </div>
-          <Link to="/marketplace" className={buttonClass('primary', 'lg', 'rounded-full')}>
-            Explore all vendors <ArrowRight className="h-4 w-4" aria-hidden />
+          <Link to="/marketplace" className={buttonClass('secondary', 'md', 'rounded-full')}>
+            View all vendors <ArrowRight className="h-4 w-4" aria-hidden />
           </Link>
         </div>
         {used.length > 1 && (
-          <div className="mt-6 flex flex-wrap gap-2" role="group" aria-label="Vendor type">
+          <div className="-mx-4 mt-6 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0 [&::-webkit-scrollbar]:hidden [&>*]:shrink-0" role="group" aria-label="Vendor type">
             {[{ slug: '', name: 'All' }, ...used].map((c) => (
               <button
                 key={c.slug || 'all'}
@@ -340,9 +382,9 @@ export const VendorsShowcase: React.FC = () => {
             ))}
           </div>
         )}
-        <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-8 -mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:gap-5 sm:overflow-visible sm:px-0 sm:pb-0 sm:grid-cols-2 lg:grid-cols-3 [&::-webkit-scrollbar]:hidden [&>*]:w-[85%] [&>*]:shrink-0 [&>*]:snap-start sm:[&>*]:w-auto">
           {list.map((v) => (
-            <VendorCard key={v.id} vendor={v} to={`/marketplace/vendors/${v.id}`} />
+            <VendorCard compact key={v.id} vendor={v} to={`/marketplace/vendors/${v.id}`} />
           ))}
         </div>
       </div>
@@ -374,27 +416,27 @@ export const FeaturesEight: React.FC = () => {
   const { features: sec } = useHomeContent()
   if (!sec.show || !sec.items.length) return null
   return (
-  <section id="features" className="scroll-mt-20 bg-white py-20 sm:py-24">
+  <section id="features" className="scroll-mt-20 bg-ink-50 py-14 sm:py-16">
     <div className="mx-auto max-w-6xl px-4 sm:px-6">
       <Reveal className="text-center">
         <Eyebrow center>{sec.eyebrow}</Eyebrow>
         <H2>{sec.title}</H2>
       </Reveal>
-      <ul className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <ul className="mt-8 grid grid-cols-2 gap-3 sm:mt-12 sm:gap-4 lg:grid-cols-4">
         {sec.items.map((f, i) => {
           const Icon = FEATURE_ICON[f.icon] ?? Sparkles
           return (
           <li
             key={i}
             className={cn(
-              'rounded-3xl border p-6 shadow-sm',
+              'rounded-3xl border p-4 shadow-sm sm:p-6',
               f.accent ? 'border-transparent bg-gradient-to-br from-brand-600 to-brand-800 text-white' : 'border-ink-100 bg-white',
             )}
           >
             <span className={cn('flex h-11 w-11 items-center justify-center rounded-xl', f.accent ? 'bg-white/15' : 'bg-brand-50 text-brand-700')}>
               <Icon className="h-5 w-5" aria-hidden />
             </span>
-            <h3 className={cn('mt-5 text-lg font-bold', f.accent ? 'text-white' : 'text-ink-900')}>{f.title}</h3>
+            <h3 className={cn('mt-3 text-base font-bold sm:mt-5 sm:text-lg', f.accent ? 'text-white' : 'text-ink-900')}>{f.title}</h3>
             <p className={cn('mt-1.5 text-sm leading-relaxed', f.accent ? 'text-white/80' : 'text-ink-600')}>{f.body}</p>
           </li>
           )
@@ -414,7 +456,7 @@ export const PoweredBy: React.FC = () => {
   const shown = data.filter((e: PublicEvent) => e.banner).slice(0, 5)
   if (!sec.show || shown.length < 3) return null
   return (
-    <section className="bg-white py-20 sm:py-24">
+    <section className="bg-white py-14 sm:py-16">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <Reveal className="text-center">
           <Eyebrow center>{sec.eyebrow}</Eyebrow>
@@ -455,7 +497,7 @@ export const StepsTabs: React.FC = () => {
   const s: StepsTab = sec[who]
   if (!sec.show) return null
   return (
-    <section className="bg-gradient-to-b from-brand-50/70 to-white py-20 sm:py-24">
+    <section className="bg-white py-14 sm:py-16">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <Reveal className="text-center">
           <Eyebrow center>{sec.eyebrow}</Eyebrow>
@@ -478,11 +520,12 @@ export const StepsTabs: React.FC = () => {
             )
           })}
         </div>
-        <ol role="tabpanel" className="mt-8 grid gap-8 rounded-3xl border border-ink-100 bg-white p-6 shadow-sm sm:grid-cols-2 sm:p-10 lg:grid-cols-4">
+        {/* Phones: swipe through the steps; larger screens: all in a row */}
+        <ol role="tabpanel" className="-mx-4 mt-8 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-8 sm:overflow-visible sm:rounded-3xl sm:border sm:border-ink-100 sm:bg-white sm:p-10 sm:shadow-sm lg:grid-cols-4 [&::-webkit-scrollbar]:hidden">
           {s.steps.map((st, i) => {
             const Icon = STEP_ICONS[who].steps[i] ?? Sparkles
             return (
-            <li key={i}>
+            <li key={i} className="w-[78%] shrink-0 snap-start rounded-2xl border border-ink-100 bg-white p-5 shadow-sm sm:w-auto sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
               <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-md">
                 <Icon className="h-6 w-6" aria-hidden />
               </span>
@@ -529,26 +572,26 @@ export const ContactSection: React.FC = () => {
     ...(c.hours ? [{ icon: Clock, label: 'Support hours', value: c.hours }] : []),
   ]
   return (
-    <section id="contact" className="scroll-mt-20 bg-white py-20 sm:py-24">
+    <section id="contact" className="scroll-mt-20 bg-[#1c0f17] py-14 text-white sm:py-16">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-[1fr_1.1fr]">
         <div>
-          <Eyebrow>{c.eyebrow}</Eyebrow>
-          <H2>{c.title}</H2>
-          <p className="mt-4 max-w-md text-lg text-ink-600">{c.body}</p>
+          <Eyebrow light>{c.eyebrow}</Eyebrow>
+          <H2 light>{c.title}</H2>
+          <p className="mt-4 max-w-md text-lg text-white/70">{c.body}</p>
           <ul className="mt-8 space-y-5">
             {info.map((x) => (
               <li key={x.label} className="flex items-center gap-4">
-                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/10 text-brand-300">
                   <x.icon className="h-5 w-5" aria-hidden />
                 </span>
                 <span>
-                  <span className="block font-semibold text-ink-900">{x.label}</span>
+                  <span className="block font-semibold text-white">{x.label}</span>
                   {x.href ? (
-                    <a href={x.href} className="text-ink-600 hover:text-brand-700">
+                    <a href={x.href} className="text-white/70 hover:text-white">
                       {x.value}
                     </a>
                   ) : (
-                    <span className="text-ink-600">{x.value}</span>
+                    <span className="text-white/70">{x.value}</span>
                   )}
                 </span>
               </li>
@@ -561,7 +604,7 @@ export const ContactSection: React.FC = () => {
             e.preventDefault()
             send.mutate()
           }}
-          className="space-y-4 rounded-3xl border border-ink-100 bg-white p-6 shadow-lg sm:p-8"
+          className="space-y-4 rounded-3xl border border-white/10 bg-white p-6 text-ink-900 shadow-2xl sm:p-8"
         >
           <h3 className="text-xl font-bold text-ink-900">Send us a message</h3>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -593,7 +636,7 @@ export const Testimonials: React.FC = () => {
   const items = sec.items.filter((t) => t.quote.trim() && t.name.trim())
   if (!sec.show || !items.length) return null
   return (
-    <section className="bg-ink-50 py-20 sm:py-24">
+    <section className="bg-ink-50 py-14 sm:py-16">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <Reveal className="text-center">
           <Eyebrow center>{sec.eyebrow}</Eyebrow>
@@ -634,7 +677,7 @@ export const Partners: React.FC = () => {
   const items = sec.items.filter((p) => p.name.trim())
   if (!sec.show || !items.length) return null
   return (
-    <section className="bg-white pt-20 sm:pt-24">
+    <section className="bg-white pt-14 sm:pt-16">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <Reveal className="text-center">
           <Eyebrow center>{sec.eyebrow}</Eyebrow>

@@ -44,12 +44,14 @@ const LinkFallback: React.FC<{ link: string }> = ({ link }) => (
 const EMPTY: NewOrganization = { organization_name: '', email: '', role: 'organizer', phone: '', city: '', is_verified: false }
 
 /** Superadmin → Organizations → Add organization. The organization sets its own password from the welcome email. */
-export const AddOrganizationModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
+export const AddOrganizationModal: React.FC<{ open: boolean; onClose: () => void; role?: NewOrganization['role'] }> = ({ open, onClose, role = 'organizer' }) => {
   const cities = useCities()
   const toast = useToast()
   const qc = useQueryClient()
   const navigate = useNavigate()
-  const [form, setForm] = useState(EMPTY)
+  const [form, setForm] = useState({ ...EMPTY, role })
+  // Opened from "Add vendor": start on the vendor type
+  React.useEffect(() => { if (open) setForm((f) => ({ ...f, role })) }, [open, role])
   const [errors, setErrors] = useState<Partial<Record<keyof NewOrganization, string>>>({})
   const [fallback, setFallback] = useState<{ id: string; link: string } | null>(null)
   const set = <K extends keyof NewOrganization>(k: K, v: NewOrganization[K]) => setForm((f) => ({ ...f, [k]: v }))
@@ -75,7 +77,7 @@ export const AddOrganizationModal: React.FC<{ open: boolean; onClose: () => void
     },
     onError: (err: Error) => {
       const data = err instanceof ApiError ? (err.data as Record<string, string[] | undefined>) : {}
-      const fieldErrors = { organization_name: data?.organization_name?.[0], email: data?.email?.[0], role: data?.role?.[0] }
+      const fieldErrors = { organization_name: data?.organization_name?.[0], email: data?.email?.[0], role: data?.role?.[0], phone: data?.phone?.[0] }
       setErrors(fieldErrors)
       if (!Object.values(fieldErrors).some(Boolean)) toast.error('Couldn’t add the organization', err.message)
     },
@@ -107,7 +109,7 @@ export const AddOrganizationModal: React.FC<{ open: boolean; onClose: () => void
     <Modal
       open={open}
       onClose={close}
-      title="Add organization"
+      title={form.role === 'vendor' ? 'Add vendor' : 'Add organization'}
       description="They get an email with a link to set their password. Starts on the Free plan."
       footer={
         <>
@@ -129,11 +131,13 @@ export const AddOrganizationModal: React.FC<{ open: boolean; onClose: () => void
           const errs: typeof errors = {}
           if (!form.organization_name.trim()) errs.organization_name = 'Enter the organization name.'
           if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) errs.email = 'Enter a valid email address.'
+          const digits = (form.phone ?? '').replace(/\D/g, '').length
+          if (digits < 7 || digits > 15) errs.phone = 'Enter a valid mobile number.'
           setErrors(errs)
           if (!Object.keys(errs).length) create.mutate()
         }}
       >
-        <Input label="Organization name" required autoFocus value={form.organization_name} error={errors.organization_name} onChange={(e) => set('organization_name', e.target.value)} />
+        <Input label={form.role === 'vendor' ? 'Business name' : 'Organization name'} required autoFocus value={form.organization_name} error={errors.organization_name} onChange={(e) => set('organization_name', e.target.value)} />
         <Input label="Email" type="email" required value={form.email} error={errors.email} onChange={(e) => set('email', e.target.value)} hint="They sign in with this" />
         <div className="grid gap-4 sm:grid-cols-2">
           <Select label="Type" value={form.role} error={errors.role} onChange={(e) => set('role', e.target.value as NewOrganization['role'])}>
@@ -147,7 +151,7 @@ export const AddOrganizationModal: React.FC<{ open: boolean; onClose: () => void
             ))}
           </Select>
         </div>
-        <Input label="Phone" type="tel" hint="Optional" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
+        <Input label="Mobile number" type="tel" required placeholder="98XXXXXXXX" value={form.phone} error={errors.phone} onChange={(e) => set('phone', e.target.value)} />
         <label className="flex items-center justify-between gap-4 rounded-[10px] border border-ink-200 p-3">
           <span className="text-sm">
             <span className="block font-medium text-ink-900">Verified</span>

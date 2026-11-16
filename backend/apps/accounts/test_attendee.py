@@ -33,7 +33,7 @@ def code_from_outbox():
 class AttendeeSignupTests(APITestCase):
     def test_attendee_signup_gets_attendee_role_and_a_code(self):
         res = self.client.post('/api/auth/register/', {
-            'email': 'Asha@x.com', 'password': 'password123', 'account_type': 'attendee',
+            'email': 'Asha@x.com', 'password': 'password123', 'account_type': 'attendee', 'phone': '9800000000',
             'first_name': 'Asha', 'last_name': 'Rai', 'terms': True,
         }, format='json')
         self.assertEqual(res.status_code, 201, res.content)
@@ -44,11 +44,11 @@ class AttendeeSignupTests(APITestCase):
         self.assertRegex(code_from_outbox(), r'^\d{6}$')
 
     def test_default_is_still_organizer(self):
-        self.client.post('/api/auth/register/', {'email': 'o@x.com', 'password': 'password123', 'terms': True}, format='json')
+        self.client.post('/api/auth/register/', {'email': 'o@x.com', 'password': 'password123', 'phone': '9800000000', 'phone': '9800000000', 'terms': True}, format='json')
         self.assertEqual(User.objects.get(email='o@x.com').role, 'organizer')
 
     def test_cannot_sign_up_as_staff_or_superadmin(self):
-        res = self.client.post('/api/auth/register/', {'email': 'o@x.com', 'password': 'password123',
+        res = self.client.post('/api/auth/register/', {'email': 'o@x.com', 'password': 'password123', 'phone': '9800000000',
                                                        'account_type': 'superadmin', 'terms': True}, format='json')
         self.assertEqual(res.status_code, 400)
 
@@ -427,7 +427,7 @@ class TermsConsentTests(APITestCase):
         cache.clear()
 
     def register(self, **extra):
-        body = {'email': 'new@x.com', 'password': 'password123', 'account_type': 'attendee', 'first_name': 'Asha'}
+        body = {'email': 'new@x.com', 'password': 'password123', 'account_type': 'attendee', 'first_name': 'Asha', 'phone': '9800000000'}
         body.update(extra)
         return self.client.post('/api/auth/register/', body, format='json')
 
@@ -492,3 +492,19 @@ class TermsConsentTests(APITestCase):
 
     def test_config_exposes_terms_version(self):
         self.assertEqual(self.client.get('/api/auth/social/config/').data['terms_version'], '2026-10-28')
+
+
+class SignupPhoneRuleTests(APITestCase):
+    URL = '/api/auth/register/'
+
+    def test_phone_required_except_old_app_builds(self):
+        body = {'email': 'a1@x.com', 'password': 'password123', 'account_type': 'attendee', 'terms': True}
+        # Updated app (sends its header) and the website: a number is required
+        r = self.client.post(self.URL, body, format='json', HTTP_X_EVENTLAYA_CLIENT='app')
+        self.assertEqual((r.status_code, 'phone' in r.json()), (400, True))
+        r = self.client.post(self.URL, {**body, 'account_type': 'organizer', 'organization_name': 'X'}, format='json')
+        self.assertEqual(r.status_code, 400)
+        # Old app builds (no header, attendee): still allowed; the website asks for the number later
+        self.assertEqual(self.client.post(self.URL, body, format='json').status_code, 201)
+        r = self.client.post(self.URL, {**body, 'email': 'a2@x.com', 'phone': '98'}, format='json', HTTP_X_EVENTLAYA_CLIENT='app')
+        self.assertEqual(r.status_code, 400)  # a number, but not a valid one

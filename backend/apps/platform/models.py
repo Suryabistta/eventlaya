@@ -285,6 +285,10 @@ class AdminAction(models.Model):
         UNVERIFIED = 'unverified', 'Removed verification'
         FEATURED_EVENT = 'featured_event', 'Featured an event'
         UNFEATURED_EVENT = 'unfeatured_event', 'Stopped featuring an event'
+        FEATURED_LISTING = 'featured_listing', 'Featured a venue or vendor'
+        HID_EVENT = 'hid_event', 'Hid an event from the public'
+        UNHID_EVENT = 'unhid_event', 'Showed a hidden event again'
+        UNFEATURED_LISTING = 'unfeatured_listing', 'Stopped featuring a venue or vendor'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='+')

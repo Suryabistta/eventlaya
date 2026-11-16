@@ -330,7 +330,7 @@ def _upcoming_events(request=None):
     from apps.events.models import Event
     from apps.events.views import PUBLIC_EVENT_STATUSES
     today = timezone.localdate()
-    qs = Event.objects.filter(status__in=PUBLIC_EVENT_STATUSES).exclude(status=Event.Status.COMPLETED)
+    qs = Event.objects.filter(status__in=PUBLIC_EVENT_STATUSES, hidden_by_admin=False).exclude(status=Event.Status.COMPLETED)
     qs = qs.filter(Q(end_date__gte=today) | Q(end_date__isnull=True, start_date__gte=today))
     if request is not None:
         from apps.accounts.tenancy import scope_events
@@ -380,7 +380,7 @@ def event_page(ctx, slug):
     from apps.events.views import PUBLIC_EVENT_STATUSES
     # Drafts are not found: no title, date or picture of an unpublished event leaks into a link preview.
     ev = scope_events(Event.objects.select_related('organizer'), ctx.request).filter(
-        slug=slug, status__in=PUBLIC_EVENT_STATUSES + [Event.Status.CANCELLED]).first()
+        slug=slug, status__in=PUBLIC_EVENT_STATUSES + [Event.Status.CANCELLED], hidden_by_admin=False).first()
     if ev is None:
         return None
     base = event_base_url(ctx, ev)

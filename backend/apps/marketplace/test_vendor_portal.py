@@ -38,7 +38,7 @@ class SignupTests(APITestCase):
     url = '/api/auth/register/'
 
     def payload(self, **extra):
-        data = {'email': 'new@x.com', 'password': 'password123', 'organization_name': 'Biz', 'terms': True}
+        data = {'email': 'new@x.com', 'password': 'password123', 'organization_name': 'Biz', 'phone': '9800000000', 'terms': True}
         data.update(extra)
         return data
 
@@ -60,9 +60,12 @@ class SignupTests(APITestCase):
         self.assertEqual((user.business_type, user.city), ('sound_stage', 'Dharan'))
 
     def test_vendor_signup_needs_phone_and_business_type(self):
+        res = self.client.post(self.url, self.payload(account_type='vendor', phone=''), format='json')
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('phone', res.json())  # every account needs a mobile number
         res = self.client.post(self.url, self.payload(account_type='vendor'), format='json')
         self.assertEqual(res.status_code, 400)
-        self.assertEqual(set(res.json()), {'phone', 'business_type'})
+        self.assertEqual(set(res.json()), {'business_type'})
         res = self.client.post(self.url, self.vendor_payload(business_type='spaceship'), format='json')
         self.assertEqual(res.status_code, 400)
         self.assertIn('business_type', res.json())

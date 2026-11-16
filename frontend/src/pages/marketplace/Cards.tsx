@@ -3,17 +3,19 @@ import { Link } from 'react-router-dom'
 import { MapPin, Store, Users } from 'lucide-react'
 import type { Vendor, VenueWithSpaces } from '@/services/api'
 import { Badge, ButtonLink, Card } from '@/components/ui'
-import { BusinessLogo, Photo, Rating, Verified, formatRs, spaceCountLabel } from './shared'
+import { BusinessLogo, Photo, Rating, Verified, formatRs, priceHidden, spaceCountLabel } from './shared'
 import { mediaUrl } from '@/lib/account'
+import { cn } from '@/lib/utils'
 
 // The title link stretches over the whole card (after:inset-0); the button sits above it.
 const stretchedLink = 'after:absolute after:inset-0 after:rounded-2xl after:content-[""] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-brand-500'
 
-export const VenueCard: React.FC<{ venue: VenueWithSpaces; to: string }> = ({ venue, to }) => {
+/** `compact`: shorter photo, no amenities or host line (home page). */
+export const VenueCard: React.FC<{ venue: VenueWithSpaces; to: string; compact?: boolean }> = ({ venue, to, compact }) => {
   const spaces = venue.spaces ?? []
   return (
   <Card className="relative flex flex-col overflow-hidden transition-shadow hover:shadow-md">
-    <div className="relative h-48 shrink-0 sm:h-60">
+    <div className={cn('relative shrink-0', compact ? 'h-40 sm:h-44' : 'h-48 sm:h-60')}>
       <Photo src={venue.featured_image || venue.images?.[0]} className="h-full w-full" />
       <div className="absolute left-3 top-3 flex gap-1.5">
         <Badge className="bg-white/95 text-ink-800 shadow-2xs">{venue.venue_type_display || venue.venue_type}</Badge>
@@ -39,9 +41,15 @@ export const VenueCard: React.FC<{ venue: VenueWithSpaces; to: string }> = ({ ve
           </p>
         </div>
         <div className="flex shrink-0 items-baseline gap-1 sm:block sm:text-right">
-          {spaces.length > 0 && <p className="text-xs text-ink-500 sm:text-right">from</p>}
-          <p className="font-display text-lg font-bold text-ink-900 tabular">{formatRs(venue.price_from ?? venue.price_per_day)}</p>
-          <p className="text-xs text-ink-500">per day</p>
+          {priceHidden(venue.price_from ?? venue.price_per_day) ? (
+            <p className="text-sm font-semibold text-ink-700">Price on request</p>
+          ) : (
+            <>
+              {spaces.length > 0 && <p className="text-xs text-ink-500 sm:text-right">from</p>}
+              <p className="font-display text-lg font-bold text-ink-900 tabular">{formatRs(venue.price_from ?? venue.price_per_day)}</p>
+              <p className="text-xs text-ink-500">per day</p>
+            </>
+          )}
         </div>
       </div>
 
@@ -54,7 +62,7 @@ export const VenueCard: React.FC<{ venue: VenueWithSpaces; to: string }> = ({ ve
         <Rating value={venue.review_average ?? venue.rating} count={venue.review_total || venue.review_count} />
       </div>
 
-      {venue.amenities?.length > 0 && (
+      {!compact && venue.amenities?.length > 0 && (
         <ul className="flex flex-wrap gap-1.5" aria-label="Amenities">
           {venue.amenities.slice(0, 4).map((a) => (
             <li key={a} className="rounded-md bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-700">
@@ -68,7 +76,7 @@ export const VenueCard: React.FC<{ venue: VenueWithSpaces; to: string }> = ({ ve
 
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ink-100 px-5 py-3">
       <p className="min-w-0 text-sm text-ink-500">
-        {venue.contact_person && venue.show_host !== false && (
+        {!compact && venue.contact_person && venue.show_host !== false && (
           <>
             Hosted by <span className="font-medium text-ink-700">{venue.contact_person}</span>
           </>
@@ -82,16 +90,15 @@ export const VenueCard: React.FC<{ venue: VenueWithSpaces; to: string }> = ({ ve
   )
 }
 
-export const VendorCard: React.FC<{ vendor: Vendor; to: string }> = ({ vendor, to }) => (
+export const VendorCard: React.FC<{ vendor: Vendor; to: string; compact?: boolean }> = ({ vendor, to, compact }) => (
   <Card className="relative flex flex-col overflow-hidden transition-shadow hover:shadow-md">
     {/* Same photo area as venue cards, with the vendor type on the top left */}
-    <div className="relative h-48 shrink-0 sm:h-60">
+    <div className={cn('relative shrink-0', compact ? 'h-40 sm:h-44' : 'h-48 sm:h-60')}>
       <Photo src={vendor.featured_image || vendor.portfolio_images?.[0]} icon={Store} className="h-full w-full" />
-      {vendor.category_name && (
-        <div className="absolute left-3 top-3">
-          <Badge className="bg-white/95 text-ink-800 shadow-2xs">{vendor.category_name}</Badge>
-        </div>
-      )}
+      <div className="absolute left-3 top-3 flex gap-1.5">
+        {vendor.category_name && <Badge className="bg-white/95 text-ink-800 shadow-2xs">{vendor.category_name}</Badge>}
+        {vendor.is_featured && <Badge tone="warning" className="shadow-2xs">Featured</Badge>}
+      </div>
     </div>
     <div className="flex flex-1 flex-col gap-3 p-5">
       <div className="flex justify-end">
@@ -115,7 +122,7 @@ export const VendorCard: React.FC<{ vendor: Vendor; to: string }> = ({ vendor, t
     </div>
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ink-100 px-5 py-3">
       <p className="text-sm text-ink-500">
-        From <span className="font-semibold text-ink-900 tabular">{formatRs(vendor.starting_price)}</span>
+        {priceHidden(vendor.starting_price) ? <span className="font-semibold text-ink-700">Price on request</span> : <>From <span className="font-semibold text-ink-900 tabular">{formatRs(vendor.starting_price)}</span></>}
       </p>
       <ButtonLink to={to} size="sm" variant="secondary" className="relative z-10" tabIndex={-1} aria-hidden icon={<Store className="h-4 w-4" aria-hidden />}>
         View vendor

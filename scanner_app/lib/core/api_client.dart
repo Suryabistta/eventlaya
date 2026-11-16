@@ -108,6 +108,8 @@ class ApiClient {
         options.receiveTimeout = const Duration(seconds: 15);
         if (options.data is! FormData) options.headers['Content-Type'] = 'application/json';
         options.headers['Accept'] = 'application/json';
+        // Lets the server tell this (phone-asking) build apart from older app builds
+        options.headers['X-Eventlaya-Client'] = 'app';
 
         final token = await AppStorage.getAuthToken();
         if (token != null) {

@@ -469,7 +469,7 @@ def _event_counts(organizer_id):
     from apps.events.models import Event
     from apps.events.views import PUBLIC_EVENT_STATUSES
     counts = {'live': 0, 'upcoming': 0, 'past': 0}
-    for event in Event.objects.filter(organizer_id=organizer_id, status__in=PUBLIC_EVENT_STATUSES):
+    for event in Event.objects.filter(organizer_id=organizer_id, status__in=PUBLIC_EVENT_STATUSES, hidden_by_admin=False):
         phase = event.phase()
         if phase == 'live':
             counts['live'] += 1

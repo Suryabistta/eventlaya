@@ -8,11 +8,12 @@ const ease = [0.22, 1, 0.36, 1] as const
 
 export const Faq: React.FC = () => {
   const { faq } = useHomeContent()
-  const [open, setOpen] = useState<number | null>(0)
+  // All answers start closed so the list stays short; tap a question to open it
+  const [open, setOpen] = useState<number | null>(null)
   const faqs = faq.items.filter((f) => f.q.trim() && f.a.trim())
   if (!faq.show || !faqs.length) return null
   return (
-    <section className="bg-ink-50 py-20 sm:py-28">
+    <section className="bg-ink-50 py-14 sm:py-16">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-[0.8fr_1.2fr]">
         <Reveal>
           <h2 className="font-display text-3xl font-bold text-ink-900 sm:text-[44px] sm:leading-[1.05]">{faq.title}</h2>

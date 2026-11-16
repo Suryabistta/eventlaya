@@ -11,7 +11,7 @@ ORGS = '/api/platform/organizations/'
 class CreateOrganizationTests(PlatformTestBase):
     def test_superadmin_creates_org_and_welcome_email_sent(self):
         self.as_(self.admin)
-        r = self.client.post(ORGS, {'organization_name': 'Dharan Film Festival', 'email': 'DFF@x.com', 'city': 'Dharan', 'is_verified': True})
+        r = self.client.post(ORGS, {'organization_name': 'Dharan Film Festival', 'email': 'DFF@x.com', 'phone': '9812345678', 'city': 'Dharan', 'is_verified': True})
         self.assertEqual(r.status_code, status.HTTP_201_CREATED, r.data)
         self.assertTrue(r.data['email_sent'])
         self.assertNotIn('set_password_link', r.data)
@@ -24,13 +24,15 @@ class CreateOrganizationTests(PlatformTestBase):
 
     def test_vendor_gets_marketplace_access(self):
         self.as_(self.admin)
-        self.client.post(ORGS, {'organization_name': 'Boom Sound', 'email': 'boom@x.com', 'role': 'vendor'})
+        self.client.post(ORGS, {'organization_name': 'Boom Sound', 'email': 'boom@x.com', 'phone': '9812345678', 'role': 'vendor'})
         self.assertTrue(User.objects.get(email='boom@x.com').has_marketplace_access)
 
     def test_duplicate_email_and_bad_role_rejected(self):
         self.as_(self.admin)
         self.assertEqual(self.client.post(ORGS, {'organization_name': 'X', 'email': 'ORG@x.com'}).status_code, 400)
         self.assertEqual(self.client.post(ORGS, {'organization_name': 'X', 'email': 'new@x.com', 'role': 'superadmin'}).status_code, 400)
+        r = self.client.post(ORGS, {'organization_name': 'X', 'email': 'nophone@x.com'})
+        self.assertEqual((r.status_code, 'phone' in r.data), (400, True))  # a mobile number is required
 
     def test_non_admin_forbidden(self):
         self.as_(self.org)

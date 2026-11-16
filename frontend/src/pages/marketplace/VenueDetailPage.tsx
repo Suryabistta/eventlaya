@@ -8,7 +8,7 @@ import type { PublicSlot } from '@/lib/availability'
 import { useAuth } from '@/lib/auth'
 import { Badge, ButtonLink, Card, CardHeader, ErrorState, Skeleton } from '@/components/ui'
 import { cn } from '@/lib/utils'
-import { BackLink, DETAIL_ASIDE, DETAIL_GRID, DETAIL_MAIN, DetailShell, Fact, MobileActionBar, NotFound, NotTakingRequests, Photo, Rating, Verified, fetchVenueBySlug, formatRs, spaceCapacity, spaceCountLabel, spaceTypeLabel, useErrorToast, useMarketplaceBase } from './shared'
+import { BackLink, DETAIL_ASIDE, DETAIL_GRID, DETAIL_MAIN, DetailShell, Fact, MobileActionBar, NotFound, NotTakingRequests, Photo, Rating, Verified, fetchVenueBySlug, formatRs, priceHidden, spaceCapacity, spaceCountLabel, spaceTypeLabel, useErrorToast, useMarketplaceBase } from './shared'
 import { VenueInquiryForm } from './VenueInquiryForm'
 import { AvailabilitySection } from './AvailabilitySection'
 import { ReviewsSection } from '@/components/reviews'
@@ -196,8 +196,8 @@ export const VenueDetailPage: React.FC = () => {
                   {spaces.length > 0 && <span className="text-ink-500"> across {spaceCountLabel(spaces)}</span>}
                 </Fact>
                 <Fact label="Price">
-                  {spaces.length > 0 && 'From '}
-                  <span className="font-semibold tabular">{formatRs(venue.price_from ?? venue.price_per_day)}</span> per day
+                  {spaces.length > 0 && !priceHidden(venue.price_from ?? venue.price_per_day) && 'From '}
+                  <span className="font-semibold tabular">{formatRs(venue.price_from ?? venue.price_per_day)}</span>{!priceHidden(venue.price_from ?? venue.price_per_day) && ' per day'}
                 </Fact>
                 <Fact label="Address">{location}</Fact>
                 {venue.contact_person && <Fact label="Contact person">{venue.contact_person}</Fact>}
@@ -257,8 +257,8 @@ export const VenueDetailPage: React.FC = () => {
         label={slot ? 'Request this slot' : 'Send inquiry'}
         summary={
           <>
-            {spaces.length > 0 && 'From '}
-            <span className="font-semibold text-ink-900 tabular">{formatRs(venue.price_from ?? venue.price_per_day)}</span> per day
+            {spaces.length > 0 && !priceHidden(venue.price_from ?? venue.price_per_day) && 'From '}
+            <span className="font-semibold text-ink-900 tabular">{formatRs(venue.price_from ?? venue.price_per_day)}</span>{!priceHidden(venue.price_from ?? venue.price_per_day) && ' per day'}
           </>
         }
       />}
@@ -320,7 +320,7 @@ const SpacePicker: React.FC<{ spaces: VenueSpace[]; value: string; onChange: (id
               {s.amenities?.length > 0 && <p className="text-xs text-ink-500">{s.amenities.slice(0, 4).join(', ')}</p>}
               <p className="mt-auto pt-1 text-sm">
                 <span className="font-semibold text-ink-900 tabular">{formatRs(s.price_per_day)}</span>
-                <span className="text-ink-500"> per day</span>
+                {!priceHidden(s.price_per_day) && <span className="text-ink-500"> per day</span>}
               </p>
             </div>
             {selected && <span className="sr-only">Selected</span>}

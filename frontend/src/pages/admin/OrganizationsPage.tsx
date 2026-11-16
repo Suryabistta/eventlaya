@@ -74,7 +74,7 @@ export const OrganizationsPage: React.FC = () => {
   const plan = params.get('plan') || 'all'
   const city = params.get('city') || ''
   const [search, setSearch] = useState(params.get('search') || '')
-  const [adding, setAdding] = useState(false)
+  const [adding, setAdding] = useState<false | 'organizer' | 'vendor'>(false)
   const [debounced, setDebounced] = useState(search)
   const orgStatus = useOrgStatus()
 
@@ -117,12 +117,17 @@ export const OrganizationsPage: React.FC = () => {
         title="Organizations"
         description="Every event company and vendor on Eventlaya. Open one to see their events, or suspend an account."
         actions={
-          <Button icon={<Plus className="h-4 w-4" />} onClick={() => setAdding(true)}>
-            Add organization
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" icon={<Plus className="h-4 w-4" />} onClick={() => setAdding('vendor')}>
+              Add vendor
+            </Button>
+            <Button icon={<Plus className="h-4 w-4" />} onClick={() => setAdding('organizer')}>
+              Add organization
+            </Button>
+          </div>
         }
       />
-      <AddOrganizationModal open={adding} onClose={() => setAdding(false)} />
+      <AddOrganizationModal open={Boolean(adding)} role={adding || 'organizer'} onClose={() => setAdding(false)} />
 
       <Card>
         <div className="grid gap-3 border-b border-ink-100 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-4 2xl:grid-cols-[minmax(0,1fr)_200px_160px_160px_190px]">

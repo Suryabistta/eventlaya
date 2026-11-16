@@ -386,7 +386,7 @@ class PublicContestListView(APIView):
         sync_due_polls()
         if not module_enabled(CONTESTS, user_of(request)):
             return Response({'results': [], 'counts': {}, 'cities': []})
-        events = scope_events(Event.objects.filter(status__in=PUBLIC_EVENT_STATUSES), request)
+        events = scope_events(Event.objects.filter(status__in=PUBLIC_EVENT_STATUSES, hidden_by_admin=False), request)
         qs = Poll.objects.filter(kind=Poll.Kind.CONTEST, show_on_public_page=True, event__in=events) \
             .exclude(status=Poll.Status.DRAFT).select_related('event', 'event__organizer')
         search = request.query_params.get('search', '').strip()

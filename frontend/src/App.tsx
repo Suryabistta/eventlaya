@@ -82,6 +82,7 @@ const SegmentsPage = lazyPage(() => import('./pages/admin/SegmentsPage'), 'Segme
 const ModulesPage = lazyPage(() => import('./pages/admin/ModulesPage'), 'ModulesPage')
 const CatalogPage = lazyPage(() => import('./pages/admin/CatalogPage'), 'CatalogPage')
 const BannersPage = lazyPage(() => import('./pages/admin/BannersPage'), 'BannersPage')
+const FeaturedListingsPage = lazyPage(() => import('./pages/admin/FeaturedListingsPage'), 'FeaturedListingsPage')
 const FeaturedEventsPage = lazyPage(() => import('./pages/admin/FeaturedEventsPage'), 'FeaturedEventsPage')
 const SiteLogoPage = lazyPage(() => import('./pages/admin/SiteLogoPage'), 'SiteLogoPage')
 const ActivityPage = lazyPage(() => import('./pages/admin/ActivityPage'), 'ActivityPage')
@@ -303,6 +304,7 @@ export const App: React.FC = () => {
                 <Route path="site-logo" element={<SiteLogoPage />} />
                 <Route path="home-page" element={<HomePageEditorPage />} />
                 <Route path="featured-events" element={<FeaturedEventsPage />} />
+                <Route path="featured-listings" element={<FeaturedListingsPage />} />
                 <Route path="activity" element={<ActivityPage />} />
                 <Route path="blog" element={<BlogAdminPage />} />
                 <Route path="blog/new" element={<BlogEditorPage />} />

@@ -12,6 +12,9 @@ export interface FeaturedEventRow {
   organizer: string
   /** The event has already happened */
   over: boolean
+  /** Hidden from the public by the superadmin (moderation) */
+  hidden_by_admin: boolean
+  hidden_reason: string
 }
 import { request, type Banner, type City, type DomainCheckResult, type TenantDomainStatus, type VendorCategory } from '@/services/api'
 
@@ -221,8 +224,13 @@ export const platformApi = {
   saveCategory: (c: Partial<VendorCategory>) =>
     c.id ? request<VendorCategory>(`/marketplace/categories/${c.id}/`, json('PATCH', c)) : request<VendorCategory>('/marketplace/categories/', json('POST', c)),
   deleteCategory: (id: string) => request<void>(`/marketplace/categories/${id}/`, json('DELETE')),
+  featuredListings: (search: string, onlyFeatured: boolean, kind: '' | 'venue' | 'vendor') =>
+    request<FeaturedListingRow[]>(`/platform/featured-listings/?${new URLSearchParams({ ...(search ? { search } : {}), ...(onlyFeatured ? { featured: '1' } : {}), ...(kind ? { kind } : {}) })}`),
+  featureListing: (kind: 'venue' | 'vendor', id: string, is_featured: boolean) =>
+    request<FeaturedListingRow>(`/platform/featured-listings/${kind}/${id}/feature/`, json('POST', { is_featured })),
   featuredEvents: (search: string, onlyFeatured: boolean) =>
     request<FeaturedEventRow[]>(`/platform/events/?${new URLSearchParams({ search, ...(onlyFeatured ? { featured: '1' } : {}) })}`),
+  hideEvent: (id: string, hidden: boolean, reason = '') => request<FeaturedEventRow>(`/platform/events/${id}/hide/`, json('POST', { hidden, reason })),
   featureEvent: (id: string, is_featured: boolean) => request<FeaturedEventRow>(`/platform/events/${id}/feature/`, json('POST', { is_featured })),
   eventTypes: () => request<EventCategoryItem[]>('/platform/event-categories/?all=1'),
   saveEventType: (c: Partial<EventCategoryItem>) =>
@@ -282,3 +290,14 @@ export const whiteLabelApi = {
 
 /** Shared with AppLayout's approvals badge, so approving here updates the sidebar count. */
 export const STATS_KEY = ['platform-stats'] as const
+
+export interface FeaturedListingRow {
+  id: string
+  kind: 'venue' | 'vendor'
+  name: string
+  city: string
+  type: string
+  owner: string
+  image: string
+  is_featured: boolean
+}

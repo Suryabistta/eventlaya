@@ -41,7 +41,7 @@ export const ProductTour: React.FC = () => {
   if (!sec.show) return null
 
   return (
-    <section id="dashboard" className="scroll-mt-20 bg-[#241a22] bg-[radial-gradient(ellipse_at_85%_60%,rgba(194,33,90,0.35),transparent_55%)] py-20 sm:py-28">
+    <section id="dashboard" className="scroll-mt-20 bg-[#241a22] bg-[radial-gradient(ellipse_at_85%_60%,rgba(194,33,90,0.35),transparent_55%)] py-14 sm:py-16">
       <div ref={ref} className="mx-auto max-w-6xl px-4 sm:px-6" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
         <Reveal className="mx-auto max-w-2xl text-center">
           <p className="flex items-center justify-center gap-3 text-xs font-bold uppercase tracking-[0.2em] text-brand-300">

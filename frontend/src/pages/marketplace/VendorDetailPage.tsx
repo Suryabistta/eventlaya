@@ -7,7 +7,7 @@ import { Badge, ButtonLink, Card, CardHeader, ErrorState, Skeleton } from '@/com
 import { useAuth } from '@/lib/auth'
 import { ListingStatusNotice } from '../business/status'
 import { cn } from '@/lib/utils'
-import { BackLink, DETAIL_ASIDE, DETAIL_GRID, DETAIL_MAIN, DetailShell, Fact, MobileActionBar, NotFound, BusinessLogo, NotTakingRequests, Photo, Rating, Verified, fetchVendor, formatRs, useErrorToast, useMarketplaceBase } from './shared'
+import { BackLink, DETAIL_ASIDE, DETAIL_GRID, DETAIL_MAIN, DetailShell, Fact, MobileActionBar, NotFound, BusinessLogo, NotTakingRequests, Photo, Rating, Verified, fetchVendor, formatRs, priceHidden, useErrorToast, useMarketplaceBase } from './shared'
 import { mediaUrl } from '@/lib/account'
 import { PhotoLightbox, withCover } from '@/components/PhotoLightbox'
 import { PackagesSection } from './Packages'
@@ -131,6 +131,7 @@ export const VendorDetailPage: React.FC = () => {
                   <span className="font-semibold tabular">{formatRs(vendor.starting_price)}</span>
                 </Fact>
                 <Fact label="Based in">{location}</Fact>
+                {(vendor.service_areas?.length ?? 0) > 0 && <Fact label="Also serves">{vendor.service_areas!.join(', ')}</Fact>}
                 {vendor.phone && (
                   <Fact label="Phone">
                     <a href={`tel:${vendor.phone}`} className="text-brand-700 underline-offset-2 hover:underline">
@@ -201,7 +202,7 @@ export const VendorDetailPage: React.FC = () => {
         label={slot ? 'Request this slot' : 'Request a quote'}
         summary={
           <>
-            From <span className="font-semibold text-ink-900 tabular">{formatRs(vendor.starting_price)}</span>
+            {!priceHidden(vendor.starting_price) && 'From '}<span className="font-semibold text-ink-900 tabular">{formatRs(vendor.starting_price)}</span>
           </>
         }
       />}
