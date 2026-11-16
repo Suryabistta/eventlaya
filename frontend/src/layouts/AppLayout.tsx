@@ -89,13 +89,14 @@ interface NavExtras {
   contests: boolean
   /** Applications page: current event takes applications; badge = waiting for review */
   applications: boolean
+  applicationsModule: boolean
   applicationsPending: number
   /** The current event's kind (null without one): the event menu shows only what that kind needs */
   kind: 'ticketing' | 'registration' | 'pageant' | null
   ticketsOn: boolean
   passes: boolean
 }
-const noExtras: NavExtras = { chat: false, chatUnread: 0, reviews: false, marketplace: true, whiteLabel: true, payments: true, printedTickets: false, contests: false, applications: false, applicationsPending: 0, kind: null, ticketsOn: false, passes: false }
+const noExtras: NavExtras = { chat: false, chatUnread: 0, reviews: false, marketplace: true, whiteLabel: true, payments: true, printedTickets: false, contests: false, applications: false, applicationsModule: false, applicationsPending: 0, kind: null, ticketsOn: false, passes: false }
 
 /** Modules on for this user + chat unread count, for the sidebar, More sheet and tab bar. */
 function useNavExtras(): NavExtras {
@@ -115,6 +116,7 @@ function useNavExtras(): NavExtras {
     ticketsOn: Boolean(ev) && ev!.tickets_enabled !== false,
     passes: Boolean(ev) && ev!.tickets_enabled !== false && ev!.registration_mode !== 'form',
     applications: appsOn,
+    applicationsModule: modules.enabled('applications'),
     applicationsPending: appsOn ? (applications ?? []).filter((a) => a.review_status === 'pending').length : 0,
     chat: chat.available,
     chatUnread: chat.unread,
@@ -158,7 +160,8 @@ const eventTools = (x: NavExtras): NavGroup => {
       roles: ORGANIZER,
     },
   ]
-  if (k === 'pageant' || x.applications) {
+  // Always listed while the module is on, so organizers can find it; the page explains how to turn the stage on
+  if (k === 'pageant' || x.applications || (k && x.applicationsModule)) {
     items.push({ label: 'Applications', to: '/app/applications', icon: Inbox, roles: ORGANIZER, badge: x.applicationsPending })
   }
   if (k) items.push({ label: 'Dynamic forms', to: '/app/forms', icon: FileText, roles: ORGANIZER })
