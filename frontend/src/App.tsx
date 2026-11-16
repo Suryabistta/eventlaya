@@ -1,4 +1,5 @@
 import React from 'react'
+import { lazyPage } from '@/lib/lazy-page'
 import { BrowserRouter, Routes, Route, Navigate, Link, Outlet, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider, RequireAuth } from './lib/auth'
@@ -12,10 +13,6 @@ import { LegalFooter } from './components/LegalFooter'
 import { SeoHead } from './lib/seo'
 import { AnalyticsTracker } from './lib/analytics'
 
-/** Route-level code splitting: each page downloads only when it's first opened. */
-function lazyPage<M extends Record<string, unknown>>(load: () => Promise<M>, name: keyof M & string) {
-  return React.lazy(() => load().then((m) => ({ default: m[name] as React.ComponentType })))
-}
 
 // White-label site (event.dharanfilmfestival.org, <name>.eventlaya.com, or ?tenant= in development)
 const TenantApp = lazyPage(() => import('./tenant/TenantApp'), 'TenantApp')

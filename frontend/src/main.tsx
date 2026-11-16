@@ -3,6 +3,12 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import './fonts.css'
 import './index.css'
+import { reloadForNewVersion } from './lib/lazy-page'
+
+// A deploy replaced the code files this tab was using: reload once to get the new version
+window.addEventListener('vite:preloadError', (event) => {
+  if (reloadForNewVersion()) event.preventDefault()
+})
 
 const app = (
   <React.StrictMode>

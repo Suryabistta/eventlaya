@@ -6,6 +6,7 @@
  * The API scopes every public call to this organizer (X-Tenant-Host, see services/api.ts).
  */
 import React, { useLayoutEffect } from 'react'
+import { lazyPage } from '@/lib/lazy-page'
 import { Link, NavLink, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowUpRight, CalendarDays, CalendarX2, LogOut, Mail, Radio, Ticket } from 'lucide-react'
@@ -18,11 +19,7 @@ import { cn } from '@/lib/utils'
 import { EmptyState, ErrorState, Skeleton } from '@/components/ui'
 import { EventCard } from '@/pages/ExploreEventsPage'
 import { bottomBarPadding } from '@/components/LegalFooter'
-import { LEGAL_PATHS, legalHref } from '@/lib/legal'
 
-function lazyPage<M extends Record<string, unknown>>(load: () => Promise<M>, name: keyof M & string) {
-  return React.lazy(() => load().then((m) => ({ default: m[name] as React.ComponentType })))
-}
 
 const PublicEventPage = lazyPage(() => import('@/pages/PublicEventPage'), 'PublicEventPage')
 const EventRegisterPage = lazyPage(() => import('@/pages/EventRegisterPage'), 'EventRegisterPage')
