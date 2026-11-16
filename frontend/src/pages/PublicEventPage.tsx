@@ -2,7 +2,7 @@ import React, { useEffect, useId, useMemo, useState } from 'react'
 import { CountdownBoxes, StageArt } from './voting/stage'
 import { FavouriteButton } from '@/lib/favourites'
 import { useCountdown as useMsLeft } from './voting/shared'
-import { formatDate } from '@/lib/dates'
+import { formatDate, formatDateTime } from '@/lib/dates'
 import { track } from '@/lib/analytics'
 import { useTenant } from '@/lib/tenant'
 import { Link, useParams } from 'react-router-dom'
@@ -199,7 +199,8 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
           </div>
         </div>
 
-        {timelineStages(event).length > 1 && <StageTimeline event={event} />}
+        {/* While applying is the only way in, the Apply card says it all; no step timeline */}
+        {!applyFirst && timelineStages(event).length > 1 && <StageTimeline event={event} />}
 
         {/* Key facts */}
         <dl className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -945,7 +946,7 @@ const RegistrationCard: React.FC<{ event: PublicEvent; state: ReturnType<typeof 
             <p className="mt-2 text-sm text-ink-600">
               Open until{' '}
               <span className="font-semibold text-ink-900">
-                {new Date(apps.closes_at).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
+                {formatDateTime(apps.closes_at)}
               </span>
             </p>
           )}
