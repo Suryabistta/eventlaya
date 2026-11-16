@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import NepaliDate from 'nepali-date-converter'
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 import { BS_MONTHS, setCalendarSystem, toBs } from '@/lib/calendar'
@@ -66,12 +67,40 @@ export const BsDateInput: React.FC<Props> = ({ id, type, value, min, max, requir
   const today = toBs(new Date())
   const [view, setView] = useState(() => ({ year: (picked ?? today)?.year ?? 2083, month: (picked ?? today)?.month ?? 0 }))
   const box = useRef<HTMLDivElement>(null)
+  const pop = useRef<HTMLDivElement>(null)
+  // Fixed position on <body>: a modal's scroll area would otherwise clip the calendar
+  const [pos, setPos] = useState<{ left: number; top: number; inDialog: boolean } | null>(null)
+  useLayoutEffect(() => {
+    if (!open) return setPos(null)
+    const place = () => {
+      const r = box.current?.getBoundingClientRect()
+      if (!r) return
+      const h = pop.current?.offsetHeight ?? 380
+      const w = pop.current?.offsetWidth ?? 296
+      const below = window.innerHeight - r.bottom
+      const top = below >= h + 8 || r.top < h + 8 ? r.bottom + 4 : r.top - h - 4
+      const left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8))
+      // Inside a <dialog> (top layer) the calendar is placed in it, so offset by the dialog's own box
+      const host = box.current?.closest('dialog')?.getBoundingClientRect()
+      setPos({ left: left - (host?.left ?? 0), top: Math.max(8, top) - (host?.top ?? 0), inDialog: Boolean(host) })
+    }
+    place()
+    const raf = requestAnimationFrame(place)
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, true)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
+    }
+  }, [open])
 
   useEffect(() => {
     if (!open) return
     if (picked) setView({ year: picked.year, month: picked.month })
     const onDown = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) setOpen(false)
+      const t = e.target as Node
+      if (!box.current?.contains(t) && !pop.current?.contains(t)) setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
     document.addEventListener('mousedown', onDown)
@@ -127,8 +156,14 @@ export const BsDateInput: React.FC<Props> = ({ id, type, value, min, max, requir
         <CalendarDays className="h-4 w-4 shrink-0 text-ink-500" aria-hidden />
       </button>
 
-      {open && (
-        <div role="dialog" aria-label="Choose a date" className="absolute left-0 z-50 mt-1 w-[18.5rem] rounded-xl border border-ink-200 bg-white p-3 shadow-lg">
+      {open && createPortal(
+        <div
+          ref={pop}
+          role="dialog"
+          aria-label="Choose a date"
+          style={{ position: pos?.inDialog ? 'absolute' : 'fixed', left: pos?.left ?? -9999, top: pos?.top ?? -9999 }}
+          className="z-[1000] w-[18.5rem] rounded-xl border border-ink-200 bg-white p-3 shadow-lg"
+        >
           <div className="mb-2 flex items-center justify-between">
             <button type="button" onClick={() => step(-1)} className="rounded-md p-1.5 text-ink-600 hover:bg-ink-100" aria-label="Previous month">
               <ChevronLeft className="h-4 w-4" />
@@ -253,7 +288,8 @@ export const BsDateInput: React.FC<Props> = ({ id, type, value, min, max, requir
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        box.current?.closest('dialog') ?? document.body,
       )}
     </div>
   )
