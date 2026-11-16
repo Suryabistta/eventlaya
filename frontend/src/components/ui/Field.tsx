@@ -1,6 +1,6 @@
 import React, { useId } from 'react'
-import { calendarSystem } from '@/lib/calendar'
-import { formatDate } from '@/lib/dates'
+import { setCalendarSystem, useCalendarSystem } from '@/lib/calendar'
+import { BsDateInput } from './BsDateInput'
 import { cn } from '@/lib/utils'
 
 export const controlClass =
@@ -39,12 +39,41 @@ type InputProps = React.InputHTMLAttributes<HTMLInputElement> & { label: string;
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ label, hint, error, required, className, containerClassName, ...props }, ref) => {
-    // Date pickers are AD (the browser's); show the picked day in BS too when the viewer reads BS
-    const bsHint = props.type === 'date' && typeof props.value === 'string' && props.value && calendarSystem() === 'bs' ? formatDate(props.value, 'full') : ''
-    const shownHint = bsHint ? (hint ? `${bsHint} · ${hint}` : bsHint) : hint
+    const [system] = useCalendarSystem()
+    const isDate = props.type === 'date' || props.type === 'datetime-local'
+    // Viewers reading BS get the Nepali picker; the value stays AD, so forms and the API are unchanged
+    if (isDate && system === 'bs') {
+      return (
+        <Field label={label} hint={hint} error={error} required={required} className={containerClassName}>
+          {(a11y) => (
+            <BsDateInput
+              {...a11y}
+              type={props.type as 'date' | 'datetime-local'}
+              value={typeof props.value === 'string' ? props.value : undefined}
+              min={typeof props.min === 'string' ? props.min : undefined}
+              max={typeof props.max === 'string' ? props.max : undefined}
+              name={props.name}
+              disabled={props.disabled}
+              required={required}
+              onChange={props.onChange}
+              className={className}
+            />
+          )}
+        </Field>
+      )
+    }
     return (
-      <Field label={label} hint={shownHint} error={error} required={required} className={containerClassName}>
-        {(a11y) => <input ref={ref} required={required} className={cn(controlClass, className)} {...a11y} {...props} />}
+      <Field label={label} hint={hint} error={error} required={required} className={containerClassName}>
+        {(a11y) => (
+          <>
+            <input ref={ref} required={required} className={cn(controlClass, className)} {...a11y} {...props} />
+            {isDate && (
+              <button type="button" onClick={() => setCalendarSystem('bs')} className="mt-1 text-xs font-medium text-ink-500 hover:text-ink-800">
+                Use Nepali (BS) calendar
+              </button>
+            )}
+          </>
+        )}
       </Field>
     )
   },
