@@ -282,10 +282,10 @@ export const EventCard: React.FC<{ event: PublicEvent; past: boolean }> = ({ eve
         )}
 
         <div className="relative z-[1] mt-auto pt-5">
-          {/* Applications only (tickets later): the button goes straight to the application form */}
-          {callOnly(e) && applicationsOpen(e) ? (
+          {/* Applying is the way in (no tickets, or registration closed): the button goes straight to the application form */}
+          {applicationsOpen(e) && (callOnly(e) || !open) ? (
             <Link to={`/e/${e.slug}/apply`} className={buttonClass('primary', 'md', 'w-full')}>
-              {bookLabel(e)}
+              {e.application_cta?.trim() || 'Apply'}
             </Link>
           ) : open ? (
             <Link to={`/e/${e.slug}`} className={buttonClass('primary', 'md', 'w-full')}>
