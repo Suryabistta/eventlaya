@@ -22,6 +22,7 @@ import {
   Crown,
   Trash2,
   Users,
+  Inbox,
 } from 'lucide-react'
 import { api, request, type Event, type EventKind } from '@/services/api'
 import { contestApi } from '@/pages/voting/contest/api'
@@ -474,24 +475,26 @@ export const EventFormPage: React.FC = () => {
   }
 
   // Remount when switching between events so the form starts from the right values
-  return <EventBuilder key={event?.id ?? `new-${kindParam}`} event={event} page={pageQuery.data} />
+  return <EventBuilder key={event?.id ?? `new-${kindParam}-${params.get('call') ?? ''}`} event={event} page={pageQuery.data} />
 }
 
-const KIND_CARDS: { kind: EventKind; icon: React.ElementType; title: string; text: string; examples: string }[] = [
+/** `call`: an open call (applications you accept or reject, no voting). It is a pageant-kind event without the contest. */
+const KIND_CARDS: { kind: EventKind; call?: boolean; icon: React.ElementType; title: string; text: string; examples: string }[] = [
   { kind: 'ticketing', icon: TicketIcon, title: 'Ticketing', text: 'Paid or free tickets with a QR pass for the gate.', examples: 'Concerts, shows, festivals, sports' },
-  { kind: 'registration', icon: ClipboardList, title: 'Registration', text: 'People sign up with a short form. No tickets or payments.', examples: 'Seminars, workshops, college events, meetups' },
-  { kind: 'pageant', icon: Crown, title: 'Pageant (applications & voting)', text: 'People apply, you pick contestants, the public votes, you announce winners.', examples: 'Beauty pageants, talent hunts, auditions, film submissions' },
+  { kind: 'registration', icon: ClipboardList, title: 'Registration', text: 'Everyone who signs up is in. A short form, no tickets or payments.', examples: 'Seminars, workshops, college events, meetups' },
+  { kind: 'pageant', call: true, icon: Inbox, title: 'Applications / submissions', text: 'People apply with your form, you accept or reject each one, and they are notified.', examples: 'Film submissions, call for entries, auditions, grants' },
+  { kind: 'pageant', icon: Crown, title: 'Pageant (applications & voting)', text: 'People apply, you pick contestants, the public votes, you announce winners.', examples: 'Beauty pageants, talent hunts, singing contests' },
 ]
 
 /** First screen of "Create event": what kind of event it is. */
 const KindPicker: React.FC<{ applicationsOn: boolean }> = ({ applicationsOn }) => (
   <>
     <PageHeader title="Create event" description="What kind of event is it? You only see the settings it needs." />
-    <ul className="grid gap-4 md:grid-cols-3">
+    <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       {KIND_CARDS.filter((c) => c.kind !== 'pageant' || applicationsOn).map((c) => (
-        <li key={c.kind}>
+        <li key={c.title}>
           <Link
-            to={`/app/events/new?kind=${c.kind}`}
+            to={`/app/events/new?kind=${c.kind}${c.call ? '&call=1' : ''}`}
             className="group flex h-full flex-col gap-3 rounded-2xl border border-ink-200 bg-white p-5 transition-colors hover:border-brand-400 hover:bg-brand-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
           >
             <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
@@ -509,12 +512,12 @@ const KindPicker: React.FC<{ applicationsOn: boolean }> = ({ applicationsOn }) =
 
 /** The sample pieces each kind starts with: a VIP ticket, or a pageant application form and a draft contest. Best effort: the
  *  event is already saved, so a failure here only means the organizer adds that piece by hand. */
-async function setUpKind(saved: Event, kind: EventKind, draft: EventDraft) {
+async function setUpKind(saved: Event, kind: EventKind, draft: EventDraft, call = false) {
   try {
     if (kind === 'ticketing' && draft.is_paid && Number(draft.ticket_price) > 0) {
       await ticketsApi.create(saved.id, { name: 'VIP', price: (Number(draft.ticket_price) * 2).toFixed(2), description: 'Front seating and early entry', order: 2 })
     }
-    if (kind === 'pageant') {
+    if (kind === 'pageant' && !call) {
       await contestApi.create({ event: saved.id, title: saved.title, preset: 'simple' })
     }
   } catch {
@@ -527,6 +530,12 @@ const KIND_PRESETS: Record<EventKind, { title: string; draft: Partial<EventDraft
   ticketing: { title: 'New ticketing event', draft: { is_paid: true, registration_mode: 'pass' } },
   registration: { title: 'New registration event', draft: { registration_mode: 'form', is_paid: false, form_template: 'tpl:registration' } },
   pageant: { title: 'New pageant', draft: { tickets_enabled: false, date_tba: true, applications_enabled: true, applications_close: inDays(30), application_cta: 'Apply now', limit_spots: false, form_template: 'tpl:pageant' } },
+}
+
+/** "Applications / submissions": the pageant setup with a general application form and no contest */
+const CALL_PRESET: { title: string; draft: Partial<EventDraft> } = {
+  title: 'New applications event',
+  draft: { ...KIND_PRESETS.pageant.draft, application_cta: 'Apply', form_template: 'tpl:film' },
 }
 
 function inDays(n: number) {
@@ -552,7 +561,8 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
   const isEdit = Boolean(event)
 
   const kindParam = params.get('kind') as EventKind | null
-  const preset = !event && kindParam ? KIND_PRESETS[kindParam] : undefined
+  const openCall = !event && kindParam === 'pageant' && params.get('call') === '1'
+  const preset = !event && kindParam ? (openCall ? CALL_PRESET : KIND_PRESETS[kindParam]) : undefined
   const initial = useMemo(() => (event ? fromEvent(event, page) : { ...emptyDraft, ...preset?.draft }), [event, page, preset])
   // Applications without tickets (film submissions, auditions) use the applications form, like a pageant
   const kind: EventKind = event ? (event.applications_enabled && !event.tickets_enabled ? 'pageant' : (event.event_kind ?? 'ticketing')) : (kindParam ?? 'ticketing')
@@ -703,7 +713,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
           toast.error('Event saved, but the form wasn’t created', 'Add it from Forms.')
         }
       }
-      if (!event && kindParam) await setUpKind(saved, kindParam, draft)
+      if (!event && kindParam) await setUpKind(saved, kindParam, draft, openCall)
       try {
         await eventPageApi.put(saved.id, {
           map_query: draft.map_query.trim(),

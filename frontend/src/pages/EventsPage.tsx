@@ -32,7 +32,7 @@ const KINDS: Record<EventKind, { title: string; description: string; create: str
   },
   registration: {
     title: 'Registration',
-    description: 'Seminars, workshops and open calls: a free sign-up form, no tickets.',
+    description: 'Seminars, workshops and meetups: a free sign-up form, everyone who signs up is in.',
     create: 'New registration event',
     empty: 'No registration events yet',
     emptyText: 'You choose the sign-up form while creating it: a template, a copy of one of your forms, or name, email and phone only.',
