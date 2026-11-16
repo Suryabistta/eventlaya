@@ -68,6 +68,7 @@ class EventViewSet(viewsets.ModelViewSet):
                 assigned_event_ids = user.gate_assignments.filter(is_active=True).values_list('event_id', flat=True)
                 return Event.objects.filter(models.Q(id__in=assigned_event_ids) | models.Q(status=Event.Status.PUBLISHED))
             # Organizers see their own events
+            Event.open_due_registrations(Event.objects.filter(organizer=user))
             return Event.objects.filter(organizer=user).prefetch_related('polls')
         # Visitors use /api/events/public/: it hides counts the organizer chose to hide and respects white-label
         # sites. This organizer view would show registered/checked-in counts for every event.
@@ -121,6 +122,7 @@ class PublicEventListView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
+        Event.open_due_registrations(Event.objects.filter(status__in=PUBLIC_EVENT_STATUSES))
         events = scope_events(Event.objects.filter(status__in=PUBLIC_EVENT_STATUSES, hidden_by_admin=False).select_related('organizer'), request)
 
         when = request.query_params.get('when', 'upcoming')
@@ -172,6 +174,8 @@ class PublicEventDetailView(APIView):
             slug=slug, status__in=PUBLIC_EVENT_STATUSES + [Event.Status.CANCELLED], hidden_by_admin=False,
         )
         from .online_payments import online_options, release_expired_reservations
+        if Event.open_due_registrations(Event.objects.filter(pk=event.pk)):
+            event.refresh_from_db()
         release_expired_reservations(event)  # unpaid online holds past their time give their spots back
         data = EventSerializer(event).data
         data['payment_options'] = online_options(event, request.user)

@@ -120,7 +120,7 @@ class EventSerializer(serializers.ModelSerializer):
             'tagline', 'category', 'category_name', 'event_kind', 'is_featured', 'phase', 'registration_open', 'registration_closed_reason', 'applications_closed_reason', 'hidden_by_admin', 'hidden_reason',
             'max_tickets_per_order', 'show_spots_left',
             'managed_by', 'managed_by_logo', 'show_managed_by', 'managed_by_label', 'ticket_layout', 'show_seat_number', 'registration_mode', 'cta_label',
-            'tickets_enabled', 'date_tba', 'applications_enabled', 'application_form', 'applications_close', 'application_cta',
+            'tickets_enabled', 'date_tba', 'applications_enabled', 'application_form', 'applications_close', 'application_cta', 'registration_opens',
             'phone_required', 'arrival_alerts', 'reminders_enabled', 'reminders_sms', 'bib_numbers', 'bib_start',
             'parent', 'parent_title',
         ]
@@ -249,6 +249,23 @@ class EventSerializer(serializers.ModelSerializer):
             changed = 'applications_close' in attrs and (self.instance is None or attrs['applications_close'] != self.instance.applications_close)
             if changed and close < timezone.now():
                 raise serializers.ValidationError({'applications_close': 'The closing time can’t be in the past.'})
+        # Scheduled opening (module stage_schedule). "Open now" / "Close now" (allow_registration or tickets_enabled
+        # sent without a new time) are the organizer taking over by hand, so they cancel the schedule.
+        if attrs.get('registration_opens'):
+            request = self.context.get('request')
+            from apps.accounts.modules import module_enabled
+            if not module_enabled('stage_schedule', getattr(request, 'user', None)):
+                raise serializers.ValidationError({'registration_opens': 'Scheduled opening is not available on this plan.'})
+            if get('date_tba', False):
+                raise serializers.ValidationError({'registration_opens': 'Set the event date and venue before scheduling registration.'})
+            changed = self.instance is None or attrs['registration_opens'] != self.instance.registration_opens
+            if changed and attrs['registration_opens'] < timezone.now():
+                raise serializers.ValidationError({'registration_opens': 'The opening time can’t be in the past.'})
+            deadline = get('registration_deadline')
+            if deadline and attrs['registration_opens'] >= deadline:
+                raise serializers.ValidationError({'registration_opens': 'Registration must open before it closes.'})
+        elif self.instance and 'registration_opens' not in attrs and ('allow_registration' in attrs or 'tickets_enabled' in attrs):
+            attrs['registration_opens'] = None
         if get('date_tba', False) and get('tickets_enabled', True):
             raise serializers.ValidationError({'date_tba': 'Set the date and venue before turning on tickets or registration.'})
         if get('date_tba', False):

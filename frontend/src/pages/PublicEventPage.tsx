@@ -39,6 +39,7 @@ import {
   initials,
   priceLabel,
   registrationState,
+  registrationOpensLater,
   shareOrCopy,
   spotsInfo,
   toDate,
@@ -155,6 +156,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
   const showCta = !over || Boolean(storedPass)
   /** Applications are the way in right now: an open call without tickets, or registration closed while applications are open */
   const applyFirst = Boolean(event.applications?.open) && (callOnly(event) || (!state.open && !storedPass))
+  const appsOver = Boolean(event.applications && !event.applications.open && event.tickets_enabled !== false) && !(event.stages ?? []).some((x) => x.kind === 'voting')
 
   return (
     <div className="pb-28 lg:pb-12">
@@ -199,8 +201,9 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
           </div>
         </div>
 
-        {/* While applying is the only way in, the Apply card says it all; no step timeline */}
-        {!applyFirst && timelineStages(event).length > 1 && <StageTimeline event={event} />}
+        {/* While applying is the only way in, the Apply card says it all; once applications are over (and the event
+            takes registrations) the old step is just clutter. The timeline stays for voting journeys. */}
+        {!applyFirst && !appsOver && timelineStages(event).length > 1 && <StageTimeline event={event} />}
 
         {/* Key facts */}
         <dl className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -936,8 +939,12 @@ const RegistrationCard: React.FC<{ event: PublicEvent; state: ReturnType<typeof 
   }
   const apps = event.applications
   const applyFirst = Boolean(apps?.open) && !state.open && !hasPass
-  // Applications stage (participants): its own card, next to tickets or on its own while tickets are off
-  const appsCard = apps && (
+  const opensLater = registrationOpensLater(event)
+  const regWord = event.registration_mode === 'form' ? 'Registration' : 'Tickets'
+  // Applications stage (participants): its own card, next to tickets or on its own while tickets are off.
+  // Once applications have closed and the event takes registrations, the card goes: it would only say "closed".
+  const showApps = apps && (apps.open || (event.tickets_enabled === false && !opensLater))
+  const appsCard = showApps && apps && (
     <Card className="p-5">
       <h2 className="text-base font-bold text-ink-900">Applications</h2>
       {apps.open ? (
@@ -954,6 +961,11 @@ const RegistrationCard: React.FC<{ event: PublicEvent; state: ReturnType<typeof 
             {apps.cta}
           </ButtonLink>
           <p className="mt-3 text-center text-xs text-ink-500">Free to apply. The organizer reviews every application and emails you.</p>
+          {opensLater && (
+            <p className="mt-3 border-t border-ink-100 pt-3 text-sm text-ink-600">
+              {regWord} for the event opens on <span className="font-semibold text-ink-900">{formatDateTime(event.registration_opens)}</span>.
+            </p>
+          )}
         </>
       ) : (
         <p className="mt-2 text-sm text-ink-600">{apps.closed_reason}</p>
@@ -961,7 +973,7 @@ const RegistrationCard: React.FC<{ event: PublicEvent; state: ReturnType<typeof 
     </Card>
   )
   // A pageant / open call without tickets: just the applications card (no "Tickets go on sale later")
-  if (event.tickets_enabled === false && appsCard) return <div className="space-y-4">{appsCard}</div>
+  if (event.tickets_enabled === false && appsCard && (apps?.open || !opensLater)) return <div className="space-y-4">{appsCard}</div>
   // Registration closed but applications open: only the applications card (a closed registration is just noise)
   if (applyFirst && appsCard) return <div className="space-y-4">{appsCard}</div>
   if (event.tickets_enabled === false) {
@@ -970,7 +982,9 @@ const RegistrationCard: React.FC<{ event: PublicEvent; state: ReturnType<typeof 
         {appsCard}
         <Card className="p-5">
           <h2 className="text-base font-bold text-ink-900">{event.registration_mode === 'form' ? 'Registration' : 'Tickets'}</h2>
-          <p className="mt-2 text-sm text-ink-600">{event.registration_mode === 'form' ? 'Registration opens later.' : 'Tickets go on sale later.'}</p>
+          <p className="mt-2 text-sm text-ink-600">
+            {opensLater ? state.reason : event.registration_mode === 'form' ? 'Registration opens later.' : 'Tickets go on sale later.'}
+          </p>
         </Card>
       </div>
     )

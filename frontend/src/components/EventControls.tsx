@@ -44,7 +44,8 @@ export const EventControls: React.FC<{ event: Event; className?: string }> = ({ 
   const navigate = useNavigate()
   const contestsOn = useModuleEnabled('contests')
   const applicationsOn = useModuleEnabled('applications')
-  const [dates, setDates] = useState<null | { kind: 'applications' | 'tickets' } | { kind: 'contest'; contest: Contest }>(null)
+  const scheduleOn = useModuleEnabled('stage_schedule')
+  const [dates, setDates] = useState<null | { kind: 'applications' | 'tickets' | 'opens' } | { kind: 'contest'; contest: Contest }>(null)
 
   const { data: contests = [] } = useQuery({
     queryKey: ['contests', event.id],
@@ -92,6 +93,10 @@ export const EventControls: React.FC<{ event: Event; className?: string }> = ({ 
   const ticketsOn = event.tickets_enabled !== false
   const salesReason = event.registration_closed_reason ?? null
   const salesOpen = ticketsOn && !salesReason
+  // Registration set to open by itself (module stage_schedule); "linked" = it opens the moment applications close
+  const opensAt = scheduleOn && event.registration_opens ? new Date(event.registration_opens).getTime() : null
+  const scheduled = opensAt !== null && opensAt > now
+  const linked = scheduled && appsClose !== null && Math.abs(opensAt! - appsClose) < 60_000
 
   const warnings: string[] = []
   if (!published && (appsOpen || salesOpen || contests.some((c) => c.status === 'open'))) {
@@ -103,7 +108,7 @@ export const EventControls: React.FC<{ event: Event; className?: string }> = ({ 
   const canAddApps = applicationsOn && !event.applications_enabled
   // Voting belongs to pageants only; ticketing and registration events never get it
   const canAddVoting = contestsOn && contests.length === 0 && event.event_kind === 'pageant'
-  const canAddTickets = !ticketsOn
+  const canAddTickets = !ticketsOn && !scheduled
 
   return (
     <Card className={className}>
@@ -141,8 +146,10 @@ export const EventControls: React.FC<{ event: Event; className?: string }> = ({ 
                   <ButtonLink size="sm" to="/app/forms">Add application form</ButtonLink>
                 ) : appsOpen ? (
                   <Button size="sm" variant="secondary" disabled={busy} onClick={async () => {
-                    if (await toast.confirm({ title: 'Close applications now?', description: 'Nobody can apply after this. You can reopen by picking a new closing date.', confirmLabel: 'Close now', danger: true }))
-                      patch.mutate({ applications_close: new Date().toISOString() })
+                    if (await toast.confirm({ title: 'Close applications now?', description: linked ? `Nobody can apply after this, and ${ticketWord.toLowerCase()} opens now instead of on its scheduled time.` : 'Nobody can apply after this. You can reopen by picking a new closing date.', confirmLabel: 'Close now', danger: true }))
+                      patch.mutate(linked
+                        ? ({ applications_close: new Date().toISOString(), tickets_enabled: true, allow_registration: true } as Partial<Event>)
+                        : { applications_close: new Date().toISOString() })
                   }}>Close now</Button>
                 ) : (
                   <Button size="sm" disabled={busy} onClick={() => setDates({ kind: 'applications' })}>Reopen…</Button>
@@ -190,7 +197,23 @@ export const EventControls: React.FC<{ event: Event; className?: string }> = ({ 
           )
         })}
 
-        {ticketsOn && (
+        {scheduled && (
+          <Row
+            icon={<Ticket className="h-4 w-4" />}
+            title={ticketWord}
+            pill={<Pill tone="soon">Scheduled</Pill>}
+            detail={`Opens by itself ${fmt(event.registration_opens)}${linked ? ' (when applications close)' : ''}`}
+            actions={
+              <>
+                <Button size="sm" disabled={busy} onClick={() => patch.mutate({ tickets_enabled: true, allow_registration: true })}>Open now</Button>
+                <Button size="sm" variant="secondary" disabled={busy} onClick={() => patch.mutate({ registration_opens: null })}>Cancel schedule</Button>
+                <Button size="sm" variant="ghost" onClick={() => setDates({ kind: 'opens' })}>Change time</Button>
+              </>
+            }
+          />
+        )}
+
+        {ticketsOn && !scheduled && (
           <Row
             icon={<Ticket className="h-4 w-4" />}
             title={ticketWord}
@@ -206,6 +229,9 @@ export const EventControls: React.FC<{ event: Event; className?: string }> = ({ 
                   }>Open now</Button>
                 )}
                 <Button size="sm" variant="ghost" onClick={() => setDates({ kind: 'tickets' })}>Deadline</Button>
+                {!salesOpen && scheduleOn && !over && (
+                  <Button size="sm" variant="ghost" onClick={() => setDates({ kind: 'opens' })}>Schedule</Button>
+                )}
               </>
             }
           />
@@ -239,6 +265,9 @@ export const EventControls: React.FC<{ event: Event; className?: string }> = ({ 
           {canAddTickets && (
             <AddLink disabled={busy} onClick={() => patch.mutate({ tickets_enabled: true, allow_registration: true })}>{formOnly ? 'Registration' : 'Tickets'}</AddLink>
           )}
+          {canAddTickets && scheduleOn && !event.date_tba && (
+            <AddLink onClick={() => setDates({ kind: 'opens' })}>{formOnly ? 'Registration' : 'Tickets'} later (scheduled)</AddLink>
+          )}
         </div>
       )}
 
@@ -251,7 +280,9 @@ export const EventControls: React.FC<{ event: Event; className?: string }> = ({ 
           onClose={() => setDates(null)}
           onSave={(a, b) => {
             const d = dates
-            if (d.kind === 'applications') patch.mutate({ applications_enabled: true, applications_close: a } as Partial<Event>)
+            // Linked schedule: moving the applications deadline moves the registration opening with it
+            if (d.kind === 'applications') patch.mutate({ applications_enabled: true, applications_close: a, ...(linked ? { registration_opens: a } : {}) } as Partial<Event>)
+            else if (d.kind === 'opens') patch.mutate({ registration_opens: a } as Partial<Event>)
             else if (d.kind === 'tickets') patch.mutate({ registration_deadline: a, allow_registration: true } as Partial<Event>)
             else if (d.kind === 'contest') contestUpdate.mutate({ id: d.contest.id, body: { status: 'scheduled', opens_at: a, closes_at: b } as Partial<Contest> })
             setDates(null)
@@ -285,26 +316,30 @@ const AddLink: React.FC<{ onClick: () => void; disabled?: boolean; children: Rea
 )
 
 const DatesModal: React.FC<{
-  state: { kind: 'applications' | 'tickets' } | { kind: 'contest'; contest: Contest }
+  state: { kind: 'applications' | 'tickets' | 'opens' } | { kind: 'contest'; contest: Contest }
   event: Event
   busy: boolean
   onClose: () => void
   onSave: (a: string | null, b: string | null) => void
 }> = ({ state, event, busy, onClose, onSave }) => {
   const contest = state.kind === 'contest' ? state.contest : null
-  const [a, setA] = useState(() => toLocal(contest ? contest.opens_at : state.kind === 'applications' ? event.applications_close : event.registration_deadline))
+  const [a, setA] = useState(() =>
+    toLocal(contest ? contest.opens_at : state.kind === 'applications' ? event.applications_close : state.kind === 'opens' ? (event.registration_opens ?? event.applications_close) : event.registration_deadline))
   const [b, setB] = useState(() => toLocal(contest?.closes_at))
   const future = (v: string) => !v || new Date(v).getTime() > Date.now()
   const err = contest
     ? !a ? 'Pick when voting opens.' : !future(a) ? 'Pick a time in the future, or use Open now.' : b && new Date(b) <= new Date(a) ? 'Closing must be after opening.' : ''
-    : state.kind === 'applications' && !a ? 'Pick when applications close.' : !future(a) ? 'Pick a time in the future.' : ''
-  const title = contest ? 'Schedule voting' : state.kind === 'applications' ? 'Applications closing date' : 'Sign-up deadline'
+    : state.kind === 'applications' && !a ? 'Pick when applications close.'
+    : state.kind === 'opens' && !a ? 'Pick when registration opens.'
+    : !future(a) ? 'Pick a time in the future.'
+    : state.kind === 'opens' && event.registration_deadline && new Date(a) >= new Date(event.registration_deadline) ? 'Registration must open before its deadline.' : ''
+  const title = contest ? 'Schedule voting' : state.kind === 'applications' ? 'Applications closing date' : state.kind === 'opens' ? 'Open registration later' : 'Sign-up deadline'
   return (
     <Modal open onClose={onClose} title={title}
       footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button disabled={Boolean(err) || busy} onClick={() => onSave(fromLocal(a), fromLocal(b))}>Save</Button></>}>
       <div className="space-y-4">
-        <Input type="datetime-local" label={contest ? 'Voting opens' : state.kind === 'applications' ? 'Applications close' : 'Sign-ups close'} value={a} onChange={(e) => setA(e.target.value)}
-          hint={state.kind === 'tickets' ? 'Leave empty to keep sign-ups open until the event.' : undefined} />
+        <Input type="datetime-local" label={contest ? 'Voting opens' : state.kind === 'applications' ? 'Applications close' : state.kind === 'opens' ? 'Registration opens' : 'Sign-ups close'} value={a} onChange={(e) => setA(e.target.value)}
+          hint={state.kind === 'tickets' ? 'Leave empty to keep sign-ups open until the event.' : state.kind === 'opens' ? 'Registration stays closed until then and opens by itself. The event page shows the opening time.' : undefined} />
         {contest && <Input type="datetime-local" label="Voting closes (optional)" value={b} onChange={(e) => setB(e.target.value)} />}
         {err && <p className="text-sm text-red-700" role="alert">{err}</p>}
       </div>

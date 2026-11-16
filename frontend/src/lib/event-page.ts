@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { formatDate } from './dates'
+import { formatDate, formatDateTime } from './dates'
 import { request, type DynamicForm, type Event, type Ticket } from '@/services/api'
 import { eventPriceLabel } from '@/lib/tickets'
 import { eventPhase, type EventPhase } from '@/lib/phase'
@@ -167,11 +167,18 @@ export function spotsInfo(e: Pick<PublicEvent, 'capacity' | 'registered_count' |
 }
 
 /** Status of registration for an event, with a reason to show when it's closed. Prefers the server's phase/registration_open. */
+/** Registration is scheduled to open by itself at a future time */
+export const registrationOpensLater = (e: Pick<Event, 'registration_opens'>): e is { registration_opens: string } =>
+  Boolean(e.registration_opens && new Date(e.registration_opens).getTime() > Date.now())
+
 export function registrationState(e: PublicEvent): { open: boolean; reason?: string; label?: string; phase: EventPhase } {
   const phase = eventPhase(e)
   if (phase === 'cancelled') return { open: false, phase, label: 'Event cancelled', reason: e.registration_closed_reason || 'The organizer cancelled this event.' }
   if (phase === 'ended') return { open: false, phase, label: 'Event has ended', reason: e.registration_closed_reason || 'This event has already happened.' }
   if (e.is_full) return { open: false, phase, label: 'Fully booked', reason: e.registration_closed_reason || 'Every spot has been taken.' }
+  // Scheduled to open by itself (module stage_schedule): say when, in the viewer's calendar
+  if (e.registration_open === false && registrationOpensLater(e))
+    return { open: false, phase, label: `Opens ${formatDate(e.registration_opens, 'short')}`, reason: `Registration opens on ${formatDateTime(e.registration_opens)}.` }
   if (e.registration_open !== undefined) {
     if (e.registration_open) return { open: true, phase }
     const reason = e.registration_closed_reason || 'Registration is closed.'

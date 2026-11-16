@@ -28,6 +28,7 @@ export type ModuleSlug =
   | 'offline_tickets'
   | 'applications'
   | 'guest_management'
+  | 'stage_schedule'
   | 'sms'
 
 interface ModulesResponse {

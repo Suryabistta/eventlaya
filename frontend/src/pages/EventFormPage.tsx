@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { gapsText, pageGaps } from '@/lib/publish-check'
 import { FormChoicePicker, LinkedFormsSummary, applyFormChoice } from '@/components/EventFormStep'
-import { formatDate } from '@/lib/dates'
+import { formatDate, formatDateTime } from '@/lib/dates'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -65,6 +65,10 @@ interface EventDraft {
   applications_enabled: boolean
   applications_close: string // datetime-local value
   application_cta: string
+  // Scheduled stages (module stage_schedule): registration opens by itself at this time (datetime-local value),
+  // or exactly when applications close (opens_after_apps)
+  registration_opens: string
+  opens_after_apps: boolean
   phone_required: boolean
   bib_numbers: boolean
   bib_start: string
@@ -152,6 +156,8 @@ const emptyDraft: EventDraft = {
   applications_enabled: false,
   applications_close: '',
   application_cta: '',
+  registration_opens: '',
+  opens_after_apps: false,
   phone_required: true,
   bib_numbers: false,
   bib_start: '1',
@@ -230,6 +236,10 @@ function fromEvent(ev: Event, page?: EventPageContent): EventDraft {
     applications_enabled: ev.applications_enabled ?? false,
     applications_close: toLocalInput(ev.applications_close ?? undefined),
     application_cta: ev.application_cta ?? '',
+    registration_opens: toLocalInput(ev.registration_opens ?? undefined),
+    opens_after_apps: Boolean(
+      ev.registration_opens && ev.applications_close && Math.abs(new Date(ev.registration_opens).getTime() - new Date(ev.applications_close).getTime()) < 60_000,
+    ),
     phone_required: ev.phone_required ?? true,
     bib_numbers: ev.bib_numbers ?? false,
     bib_start: String(ev.bib_start ?? 1),
@@ -340,7 +350,7 @@ const localToday = () => {
 const FIELD_STEP: Record<string, StepId> = {
   title: 'basics', tagline: 'basics', parent: 'basics', category: 'basics', description: 'basics', banner: 'basics', banner_url: 'basics',
   start_date: 'when', start_time: 'when', end_date: 'when', end_time: 'when', location: 'when', map_query: 'when',
-  capacity: 'registration', limit_spots: 'registration', show_spots_left: 'registration', status: 'registration', registration_deadline: 'registration', ticket_price: 'registration', is_paid: 'registration', allow_registration: 'registration', ticket_layout: 'registration', show_seat_number: 'registration', registration_mode: 'registration', cta_label: 'registration', tickets_enabled: 'stages', applications_enabled: 'stages', applications_close: 'stages', application_cta: 'stages', date_tba: 'when', phone_required: 'registration', bib_numbers: 'registration', bib_start: 'registration', form_template: 'form', buyer_form_template: 'form', arrival_alerts: 'registration', reminders_enabled: 'registration', reminders_sms: 'registration',
+  capacity: 'registration', limit_spots: 'registration', show_spots_left: 'registration', status: 'registration', registration_deadline: 'registration', ticket_price: 'registration', is_paid: 'registration', allow_registration: 'registration', ticket_layout: 'registration', show_seat_number: 'registration', registration_mode: 'registration', cta_label: 'registration', tickets_enabled: 'stages', applications_enabled: 'stages', applications_close: 'stages', application_cta: 'stages', registration_opens: 'registration', opens_after_apps: 'stages', date_tba: 'when', phone_required: 'registration', bib_numbers: 'registration', bib_start: 'registration', form_template: 'form', buyer_form_template: 'form', arrival_alerts: 'registration', reminders_enabled: 'registration', reminders_sms: 'registration',
   managed_by: 'page', managed_by_label: 'page', managed_by_logo: 'page', show_managed_by: 'page',
 }
 
@@ -354,6 +364,13 @@ function validateStep(id: StepId, d: EventDraft, p: PageDraft, isNew = false): E
     if (!d.tickets_enabled && !d.applications_enabled) e.tickets_enabled = 'Turn on tickets / registration, applications, or both.'
     if (d.applications_enabled && !d.applications_close) e.applications_close = 'Pick when applications close.'
     else if (d.applications_enabled && isNew && new Date(d.applications_close) < new Date()) e.applications_close = 'The closing time can’t be in the past.'
+  }
+  if (id === 'when' && d.date_tba && d.opens_after_apps && d.applications_enabled) {
+    e.date_tba = 'Registration opens by itself when applications close, so set the date and venue now.'
+  }
+  if (id === 'registration' && d.registration_opens && !(d.opens_after_apps && d.applications_enabled)) {
+    if (new Date(d.registration_opens) < new Date()) e.registration_opens = 'The opening time can’t be in the past. Leave it empty to open now.'
+    else if (d.registration_deadline && new Date(d.registration_opens) >= new Date(d.registration_deadline)) e.registration_opens = 'Registration must open before it closes.'
   }
   if (id === 'when' && d.date_tba) {
     // Date and venue to be announced: nothing to check until tickets go on sale
@@ -538,6 +555,14 @@ const CALL_PRESET: { title: string; draft: Partial<EventDraft> } = {
   draft: { ...KIND_PRESETS.pageant.draft, application_cta: 'Apply', form_template: 'tpl:film' },
 }
 
+/** When registration opens by itself (ISO), or null: right when applications close, or the time picked */
+function scheduledOpening(d: EventDraft): string | null {
+  const local = d.opens_after_apps && d.applications_enabled ? d.applications_close : d.registration_opens
+  if (!local) return null
+  const at = new Date(local)
+  return at.getTime() > Date.now() ? at.toISOString() : null
+}
+
 function inDays(n: number) {
   const d = new Date(Date.now() + n * 864e5)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T23:59`
@@ -550,6 +575,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
   const applicationsOn = useModuleEnabled('applications')
   const guestsOn = useModuleEnabled('guest_management')
   const smsOn = useModuleEnabled('sms')
+  const scheduleOn = useModuleEnabled('stage_schedule')
   const { events: myEvents } = useCurrentEvent()
   // Main events this one can sit under: the organizer's own top-level events, not itself
   const parentChoices = myEvents.filter((e) => !e.parent && e.id !== event?.id)
@@ -689,6 +715,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
         applications_enabled: draft.applications_enabled,
         applications_close: draft.applications_close ? new Date(draft.applications_close).toISOString() : null,
         application_cta: draft.application_cta.trim(),
+        ...(scheduleOn ? { registration_opens: scheduledOpening(draft) } : {}),
         phone_required: draft.phone_required,
         bib_numbers: draft.bib_numbers,
         bib_start: Math.max(1, Number(draft.bib_start) || 1),
@@ -1055,16 +1082,26 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                         <>
                           Edit the application form in <span className="font-semibold">Forms → Applications</span>.
                         </>
+                      ) : openCall ? (
+                        'A ready-made submission form (film title, director, runtime, synopsis, screener link, poster) is created with the event. You can change it.'
                       ) : (
                         'A ready-made application form (age, height, photos, bio) and a draft contest are created with the event. You can change both.'
                       )}
                     </p>
+                    {scheduleOn && !draft.tickets_enabled && (
+                      <Checkbox
+                        label={`Open ${draft.registration_mode === 'pass' ? 'tickets' : 'registration'} by itself when applications close`}
+                        hint="Applying comes first. At the closing time the Apply button goes away and the audience can register, with nothing for you to do. You will need the event date and venue."
+                        checked={draft.opens_after_apps}
+                        onChange={(v) => setDraft((d) => ({ ...d, opens_after_apps: v, date_tba: v ? false : d.date_tba }))}
+                      />
+                    )}
                     <MoreSettings open={moreShown} onToggle={setMoreOpen}>
                       <Checkbox
-                        label="Sell tickets for the finale now"
-                        hint="Turn on when the audience can get tickets. You can also do this later."
+                        label={openCall ? 'Open registration for the event now' : 'Sell tickets for the finale now'}
+                        hint="Turn on when the audience can get tickets or register. You can also do this later."
                         checked={draft.tickets_enabled}
-                        onChange={(v) => setDraft((d) => ({ ...d, tickets_enabled: v, date_tba: v ? false : d.date_tba }))}
+                        onChange={(v) => setDraft((d) => ({ ...d, tickets_enabled: v, opens_after_apps: v ? false : d.opens_after_apps, date_tba: v ? false : d.date_tba }))}
                       />
                       {phoneAndGuestSettings}
                     </MoreSettings>
@@ -1125,6 +1162,20 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                     />
                     {draft.limit_spots && (
                       <Input label="How many people" type="number" inputMode="numeric" min={1} required containerClassName="sm:max-w-xs" {...bind('capacity')} />
+                    )}
+                    {scheduleOn && !(draft.opens_after_apps && draft.applications_enabled) && (
+                      <Input
+                        label={kind === 'registration' ? 'Sign-up opens' : 'Ticket sales open'}
+                        type="datetime-local"
+                        hint="Optional. Leave empty to open as soon as the event is published. Until then the page says when it opens."
+                        containerClassName="sm:max-w-xs"
+                        {...bind('registration_opens')}
+                      />
+                    )}
+                    {draft.opens_after_apps && draft.applications_enabled && draft.applications_close && (
+                      <p className="rounded-xl bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                        Registration opens by itself when applications close ({formatDateTime(new Date(draft.applications_close))}).
+                      </p>
                     )}
                     <Input
                       label={kind === 'registration' ? 'Sign-up closes' : 'Ticket sales close'}
@@ -1209,6 +1260,14 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                               <Input label="Applications close" type="datetime-local" required {...bind('applications_close')} />
                               <ApplyButtonText value={draft.application_cta} onChange={(v) => set('application_cta', v)} />
                             </div>
+                          )}
+                          {draft.applications_enabled && scheduleOn && (
+                            <Checkbox
+                              label="Keep registration closed until applications close"
+                              hint="Applying comes first. At the closing time registration opens by itself and the Apply button goes away."
+                              checked={draft.opens_after_apps}
+                              onChange={(v) => set('opens_after_apps', v)}
+                            />
                           )}
                         </>
                       )}
@@ -1611,7 +1670,9 @@ const Review: React.FC<{ draft: EventDraft; content: PageDraft; event?: Event; s
       rows: [
         ['Capacity', !draft.limit_spots ? 'No limit' : draft.capacity ? `${draft.capacity} people` : 'Not set'],
         ['Status', statusOptions.find((s) => s.value === draft.status)?.label ?? draft.status],
-        ['Registration', draft.allow_registration ? (draft.registration_deadline ? `Open until ${new Date(draft.registration_deadline).toLocaleString()}` : 'Open') : 'Closed'],
+        ['Registration', scheduledOpening(draft)
+          ? `Opens by itself ${formatDateTime(scheduledOpening(draft))}${draft.registration_deadline ? `, until ${formatDateTime(new Date(draft.registration_deadline))}` : ''}`
+          : draft.allow_registration ? (draft.registration_deadline ? `Open until ${formatDateTime(new Date(draft.registration_deadline))}` : 'Open') : 'Closed'],
         ['Price', event ? ticketSummary ?? 'Set on the Tickets page' : draft.is_paid ? `Rs ${draft.ticket_price || '?'}, paid at the venue` : 'Free'],
       ],
     },

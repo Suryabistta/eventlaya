@@ -117,6 +117,10 @@ class Event(models.Model):
     )
     applications_close = models.DateTimeField(null=True, blank=True)
     application_cta = models.CharField(max_length=30, blank=True, help_text='Apply button text; blank = "Apply"')
+    # Scheduled stages (module `stage_schedule`): registration / tickets open by themselves at this time (for example
+    # when applications close). Until then registration is closed with "opens on ..."; once due, the stage is switched
+    # on (tickets_enabled, allow_registration) and this is cleared. Organizer "Open now" / "Close now" clear it too.
+    registration_opens = models.DateTimeField(null=True, blank=True)
 
     # Guests (docs/plan-2026-11-guest-management.md)
     # On for every event created in the app (EventSerializer default) and for events that existed before
@@ -234,6 +238,28 @@ class Event(models.Model):
             return 'live'
         return 'upcoming'
 
+    def registration_schedule(self, now=None):
+        """'waiting' before registration_opens, 'due' once it has passed, None with no schedule (or the module off)."""
+        if not self.registration_opens:
+            return None
+        from django.utils import timezone
+        from apps.accounts.modules import module_enabled
+        if not module_enabled('stage_schedule'):
+            return None
+        return 'waiting' if (now or timezone.now()) < self.registration_opens else 'due'
+
+    @classmethod
+    def open_due_registrations(cls, queryset=None, now=None):
+        """Switch on registration for events whose scheduled opening time has passed. Cheap (one UPDATE), so list and
+        detail views call it before reading events; the schedule then shows as a plain open registration."""
+        from django.utils import timezone
+        from apps.accounts.modules import module_enabled
+        if not module_enabled('stage_schedule'):
+            return 0
+        qs = queryset if queryset is not None else cls.objects.all()
+        return qs.filter(registration_opens__lte=now or timezone.now()).update(
+            tickets_enabled=True, allow_registration=True, registration_opens=None)
+
     def registration_closed_reason(self, now=None):
         """Why attendees can't register right now, or None when registration is open."""
         from django.utils import timezone
@@ -247,6 +273,14 @@ class Event(models.Model):
             return 'This event was cancelled by the organizer.'
         if phase == 'ended':
             return 'This event has ended.'
+        scheduled = self.registration_schedule()
+        if scheduled == 'waiting':
+            return 'Registration opens soon.'
+        if scheduled == 'due':
+            # Opened by the schedule (the flags catch up on the next open_due_registrations)
+            if self.registration_deadline and now > self.registration_deadline:
+                return 'Registration deadline has passed.'
+            return None
         if not self.tickets_enabled:
             return 'Tickets are not on sale yet.' if self.registration_mode == self.RegistrationMode.PASS else 'Registration is not open yet.'
         if not self.allow_registration:

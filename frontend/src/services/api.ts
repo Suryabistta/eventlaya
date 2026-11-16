@@ -31,6 +31,8 @@ export interface Event {
   hidden_by_admin?: boolean
   hidden_reason?: string
   applications_close?: string | null
+  /** Scheduled stages (module stage_schedule): registration opens by itself at this time; null = no schedule */
+  registration_opens?: string | null
   application_cta?: string
   /** Guests (docs/plan-2026-11-guest-management.md) */
   phone_required?: boolean

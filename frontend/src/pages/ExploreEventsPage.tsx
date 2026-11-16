@@ -11,7 +11,7 @@ import { api, type Event } from '@/services/api'
 import { buttonClass } from '@/components/ui/Button'
 import { Badge, EmptyState, ErrorState, Skeleton } from '@/components/ui'
 import { eventPhase } from '@/lib/phase'
-import { applicationsOpen, bookLabel, callOnly, spotsInfo, useEventCategories } from '@/lib/event-page'
+import { applicationsOpen, bookLabel, callOnly, registrationOpensLater, spotsInfo, useEventCategories } from '@/lib/event-page'
 import { cn } from '@/lib/utils'
 import { FavouriteButton } from '@/lib/favourites'
 
@@ -293,7 +293,7 @@ export const EventCard: React.FC<{ event: PublicEvent; past: boolean }> = ({ eve
             </Link>
           ) : (
             <span className="inline-flex h-10 w-full items-center justify-center rounded-[10px] bg-ink-100 px-4 text-sm font-semibold text-ink-600">
-              {phase === 'cancelled' ? 'Cancelled' : over ? 'Ended' : full ? 'Fully booked' : e.tickets_enabled === false ? 'Tickets later' : 'Bookings closed'}
+              {phase === 'cancelled' ? 'Cancelled' : over ? 'Ended' : full ? 'Fully booked' : registrationOpensLater(e) ? `Opens ${formatDate(e.registration_opens, 'short')}` : e.tickets_enabled === false ? 'Tickets later' : 'Bookings closed'}
             </span>
           )}
         </div>
