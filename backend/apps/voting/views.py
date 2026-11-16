@@ -312,7 +312,7 @@ def with_viewer(data, poll, request):
 def get_public_event(slug, request=None):
     from apps.accounts.tenancy import scope_events
     events = scope_events(Event.objects.all(), request) if request is not None else Event.objects.all()
-    return get_object_or_404(events, slug=slug, status__in=PUBLIC_EVENT_STATUSES)
+    return get_object_or_404(events, slug=slug, status__in=PUBLIC_EVENT_STATUSES, hidden_by_admin=False)
 
 
 class PublicEventPollsView(APIView):

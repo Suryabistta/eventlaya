@@ -136,7 +136,11 @@ class VendorProfileViewSet(ListingWritePermissionsMixin, viewsets.ModelViewSet):
         if category_slug:
             qs = qs.filter(category__slug=category_slug)
         if city:
-            qs = qs.filter(city__iexact=city)
+            # Their own city, or a place they list under service areas
+            from django.db.models import Q
+            qs = qs.filter(Q(city__iexact=city) | Q(service_areas__icontains=city))
+        if self.request.query_params.get('featured') == '1':
+            qs = qs.filter(is_featured=True)
 
         return qs
 
@@ -198,6 +202,8 @@ class VenueListingViewSet(ListingWritePermissionsMixin, viewsets.ModelViewSet):
         else:
             # Detail lookups (by id or slug) also let owners preview and edit their own listing.
             qs = visible_listings(qs, user, 'owner')
+        if self.request.query_params.get('featured') == '1':
+            qs = qs.filter(is_featured=True)
         city = self.request.query_params.get('city')
         venue_type = self.request.query_params.get('type')
         min_cap = self.request.query_params.get('min_capacity')
@@ -268,9 +274,14 @@ class VenueListingViewSet(ListingWritePermissionsMixin, viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         spaces = venue.spaces.all()
         user = request.user
-        if not (user.is_authenticated and (venue.owner_id == user.id or user.is_superadmin)):
+        owner = user.is_authenticated and (venue.owner_id == user.id or user.is_superadmin)
+        if not owner:
             spaces = spaces.filter(is_active=True)
-        return Response(VenueSpaceSerializer(spaces, many=True).data)
+        data = VenueSpaceSerializer(spaces, many=True).data
+        if venue.hide_price and not owner:
+            for sp in data:
+                sp['price_per_day'] = None  # "Price on request"
+        return Response(data)
 
     @action(detail=True, methods=['get', 'put', 'patch', 'delete'], url_path=r'spaces/(?P<space_id>[0-9a-f-]+)',
             permission_classes=[permissions.AllowAny])

@@ -81,6 +81,9 @@ class Event(models.Model):
     managed_by_label = models.CharField(max_length=40, blank=True)
     # Set by the superadmin (Admin → Featured events): listed first on the events page, with a badge
     is_featured = models.BooleanField(default=False, db_index=True)
+    # Superadmin moderation: hidden events are gone from every public page and list, and take no sign-ups
+    hidden_by_admin = models.BooleanField(default=False, db_index=True)
+    hidden_reason = models.CharField(max_length=300, blank=True, help_text='Shown to the organizer')
 
     class PassLayout(models.TextChoices):
         VERTICAL = 'vertical', 'Vertical (phone)'
@@ -146,6 +149,8 @@ class Event(models.Model):
         from django.utils import timezone
         from apps.accounts.modules import module_enabled
         now = now or timezone.now()
+        if self.hidden_by_admin:
+            return 'This event isn’t available right now.'
         if not self.applications_enabled or not module_enabled('applications'):
             return 'This event is not taking applications.'
         if self.status not in (self.Status.PUBLISHED, self.Status.ONGOING):
@@ -233,6 +238,8 @@ class Event(models.Model):
         """Why attendees can't register right now, or None when registration is open."""
         from django.utils import timezone
         now = now or timezone.now()
+        if self.hidden_by_admin:
+            return 'This event isn’t available right now.'
         phase = self.phase(now)
         if phase == 'draft':
             return 'This event is not accepting registrations.'

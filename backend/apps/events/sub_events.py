@@ -21,7 +21,7 @@ def sub_event_cards(event):
     from .views import PUBLIC_EVENT_STATUSES
     if event.parent_id or not sub_events_on(event):
         return []
-    subs = event.sub_events.filter(status__in=PUBLIC_EVENT_STATUSES).order_by('start_date', 'start_time', 'title')
+    subs = event.sub_events.filter(status__in=PUBLIC_EVENT_STATUSES, hidden_by_admin=False).order_by('start_date', 'start_time', 'title')
     return [
         {
             'id': str(s.id), 'title': s.title, 'slug': s.slug, 'tagline': s.tagline,

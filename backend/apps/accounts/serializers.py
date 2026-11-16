@@ -105,11 +105,27 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('An account with this email already exists.')
         return value
 
+    def _legacy_app_signup(self, attrs):
+        # Temporary: app builds released before Nov 2026 have no phone field and send no X-Eventlaya-Client header.
+        # Their attendees still sign up; the website asks for the number once. Remove when old builds are gone.
+        request = self.context.get('request')
+        return (attrs.get('account_type') == 'attendee' and request is not None
+                and not request.headers.get('X-Eventlaya-Client'))
+
+    def validate_phone(self, value):
+        # A mobile number is required for every account (platform rule); blank is caught in validate()
+        value = (value or '').strip()
+        if not value:
+            return value
+        if not 7 <= sum(c.isdigit() for c in value) <= 15:
+            raise serializers.ValidationError('Enter a valid mobile number.')
+        return value
+
     def validate(self, attrs):
+        if not (attrs.get('phone') or '').strip() and not self._legacy_app_signup(attrs):
+            raise serializers.ValidationError({'phone': 'Enter your mobile number.'})
         if attrs.get('account_type') == 'vendor':
             errors = {}
-            if not (attrs.get('phone') or '').strip():
-                errors['phone'] = 'Add a phone number so organizers can reach your business.'
             if attrs.get('business_type') not in self.BUSINESS_TYPES:
                 errors['business_type'] = 'Choose what your business offers.'
             if errors:

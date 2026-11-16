@@ -117,14 +117,14 @@ class EventSerializer(serializers.ModelSerializer):
             'capacity', 'status', 'allow_registration', 'registration_deadline',
             'is_paid', 'ticket_price', 'registration_form', 'registration_form_title',
             'registered_count', 'checked_in_count', 'created_at', 'updated_at',
-            'tagline', 'category', 'category_name', 'event_kind', 'is_featured', 'phase', 'registration_open', 'registration_closed_reason', 'applications_closed_reason',
+            'tagline', 'category', 'category_name', 'event_kind', 'is_featured', 'phase', 'registration_open', 'registration_closed_reason', 'applications_closed_reason', 'hidden_by_admin', 'hidden_reason',
             'max_tickets_per_order', 'show_spots_left',
             'managed_by', 'managed_by_logo', 'show_managed_by', 'managed_by_label', 'ticket_layout', 'show_seat_number', 'registration_mode', 'cta_label',
             'tickets_enabled', 'date_tba', 'applications_enabled', 'application_form', 'applications_close', 'application_cta',
             'phone_required', 'arrival_alerts', 'reminders_enabled', 'reminders_sms', 'bib_numbers', 'bib_start',
             'parent', 'parent_title',
         ]
-        read_only_fields = ['id', 'organizer', 'is_featured', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'organizer', 'is_featured', 'hidden_by_admin', 'hidden_reason', 'created_at', 'updated_at']
         # Open calls (registration_mode apply) have no date or venue of their own; validate() fills them in
         # Events with date and venue to be announced (date_tba) don't send them; validate() fills them in
         extra_kwargs = {'start_date': {'required': False}, 'location': {'required': False, 'allow_blank': True}}

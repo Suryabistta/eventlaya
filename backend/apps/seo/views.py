@@ -122,7 +122,7 @@ def sitemap_events(request=None, tenant=None):
     from apps.events.models import Event
     from apps.events.views import PUBLIC_EVENT_STATUSES
     since = timezone.localdate() - timedelta(days=180)
-    qs = Event.objects.filter(status__in=PUBLIC_EVENT_STATUSES).filter(
+    qs = Event.objects.filter(status__in=PUBLIC_EVENT_STATUSES, hidden_by_admin=False).filter(
         Q(end_date__gte=since) | Q(end_date__isnull=True, start_date__gte=since)).select_related('organizer')
     if tenant is not None:
         return list(qs.filter(organizer_id=tenant.organizer_id).order_by('-start_date'))

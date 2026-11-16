@@ -121,7 +121,7 @@ class PublicEventListView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        events = scope_events(Event.objects.filter(status__in=PUBLIC_EVENT_STATUSES).select_related('organizer'), request)
+        events = scope_events(Event.objects.filter(status__in=PUBLIC_EVENT_STATUSES, hidden_by_admin=False).select_related('organizer'), request)
 
         when = request.query_params.get('when', 'upcoming')
         today = timezone.localdate()
@@ -169,7 +169,7 @@ class PublicEventDetailView(APIView):
     def get(self, request, slug):
         event = get_object_or_404(
             scope_events(Event.objects.select_related('organizer').prefetch_related('agenda', 'speakers', 'faqs'), request),
-            slug=slug, status__in=PUBLIC_EVENT_STATUSES + [Event.Status.CANCELLED],
+            slug=slug, status__in=PUBLIC_EVENT_STATUSES + [Event.Status.CANCELLED], hidden_by_admin=False,
         )
         from .online_payments import online_options, release_expired_reservations
         release_expired_reservations(event)  # unpaid online holds past their time give their spots back

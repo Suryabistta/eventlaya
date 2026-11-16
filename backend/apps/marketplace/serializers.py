@@ -123,17 +123,36 @@ def validate_slot_presets(value):
     return out
 
 
+
+def sees_real_price(serializer, owner_id):
+    """Owners and the superadmin always see the real price; everyone else sees none when it's hidden."""
+    request = serializer.context.get('request')
+    user = getattr(request, 'user', None)
+    return bool(user and user.is_authenticated and (user.id == owner_id or getattr(user, 'is_superadmin', False)))
+
 class VendorProfileSerializer(AdminOnlyFieldsMixin, serializers.ModelSerializer):
     validate_slot_presets = staticmethod(validate_slot_presets)
     ADMIN_ONLY_FIELDS = ('is_verified', 'is_featured', 'rating')
     category_name = serializers.CharField(source='category.name', read_only=True)
     category_slug = serializers.CharField(source='category.slug', read_only=True)
 
+    def validate_service_areas(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError('Service areas must be a list of places.')
+        out = []
+        for v in value:
+            v = ' '.join(str(v).split())[:60]
+            if v and v.lower() not in {x.lower() for x in out}:
+                out.append(v)
+        if len(out) > 20:
+            raise serializers.ValidationError('Up to 20 service areas.')
+        return out
+
     class Meta:
         model = VendorProfile
         fields = [
             'id', 'user', 'business_name', 'logo', 'category', 'category_name',
-            'category_slug', 'city', 'address', 'phone', 'email',
+            'category_slug', 'city', 'service_areas', 'address', 'phone', 'email', 'hide_price',
             'description', 'starting_price', 'portfolio_images', 'featured_image',
             'is_verified', 'is_featured', 'rating', 'listing_status', 'review_note', 'is_paused', 'slot_presets', 'created_at'
         ]
@@ -149,7 +168,10 @@ class VendorProfileSerializer(AdminOnlyFieldsMixin, serializers.ModelSerializer)
         return safe_url(value, 'Cover photo')
 
     def to_representation(self, obj):
-        return apply_review_stats(super().to_representation(obj), obj, 'vendor', None)
+        data = apply_review_stats(super().to_representation(obj), obj, 'vendor', None)
+        if obj.hide_price and not sees_real_price(self, obj.user_id):
+            data['starting_price'] = None  # "Price on request"
+        return data
 
 
 class VenueSpaceSerializer(serializers.ModelSerializer):
@@ -224,7 +246,7 @@ class VenueListingSerializer(AdminOnlyFieldsMixin, serializers.ModelSerializer):
         fields = [
             'id', 'owner', 'owner_name', 'name', 'slug', 'venue_type',
             'venue_type_display', 'city', 'address', 'capacity_min',
-            'capacity_max', 'price_per_day', 'price_from', 'amenities', 'images', 'featured_image',
+            'capacity_max', 'price_per_day', 'price_from', 'hide_price', 'amenities', 'images', 'featured_image',
             'contact_person', 'show_host', 'contact_phone', 'contact_email',
             'description', 'rules_policy', 'is_verified', 'is_featured',
             'rating', 'review_count', 'inquiries_count', 'spaces',
@@ -260,6 +282,12 @@ class VenueListingSerializer(AdminOnlyFieldsMixin, serializers.ModelSerializer):
             mins = [s.capacity_seated or s.capacity_standing or 0 for s in spaces]
             data['capacity_min'] = min(mins)
             data['capacity_max'] = max(sizes)
+        if obj.hide_price and not sees_real_price(self, obj.owner_id):
+            # "Price on request": no prices leave the server for the public
+            data['price_per_day'] = data['price_from'] = None
+            for sp in data.get('spaces') or []:
+                if isinstance(sp, dict):
+                    sp['price_per_day'] = None
         return apply_review_stats(data, obj, 'venue', 'review_count')
 
 
@@ -367,6 +395,9 @@ class PublicSlotSerializer(serializers.ModelSerializer):
         return obj.status == AvailabilitySlot.Status.OPEN
 
     def get_price(self, obj):
+        listing = obj.venue if obj.venue_id else obj.vendor
+        if listing is not None and listing.hide_price:
+            return None  # "Price on request"
         return str(obj.effective_price) if self.get_available(obj) else None
 
     def get_note(self, obj):
