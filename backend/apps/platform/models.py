@@ -335,6 +335,8 @@ class SiteBranding(models.Model):
 
     logo = models.CharField(max_length=500, blank=True, help_text='Image URL from /api/uploads/ (wide, transparent PNG works best)')
     logo_white = models.CharField(max_length=500, blank=True, help_text='Optional light version for dark backgrounds')
+    # Browser tab / home-screen icon (square). Blank = the built-in favicon files.
+    icon = models.CharField(max_length=500, blank=True, help_text='Square image URL from /api/uploads/ (PNG, at least 512 × 512)')
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

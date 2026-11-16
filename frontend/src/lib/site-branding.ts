@@ -5,6 +5,8 @@ import { request } from '@/services/api'
 export interface SiteBranding {
   logo: string
   logo_white: string
+  /** Browser tab / home-screen icon (square); blank = the built-in favicon */
+  icon?: string
 }
 
 export const siteBrandingApi = {

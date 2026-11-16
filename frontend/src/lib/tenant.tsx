@@ -59,7 +59,8 @@ export function brandPalette(hex: string): Record<string, RGB> | null {
   }
 }
 
-function setFavicon(href: string) {
+/** Replace the tab and home-screen icons (white-label sites, or the superadmin's site icon) */
+export function setFavicon(href: string) {
   document.querySelectorAll<HTMLLinkElement>('link[rel="icon"], link[rel="apple-touch-icon"]').forEach((l) => l.remove())
   for (const rel of ['icon', 'apple-touch-icon']) {
     const link = document.createElement('link')

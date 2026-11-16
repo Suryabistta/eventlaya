@@ -9,6 +9,8 @@ import { MarketingLayout } from './layouts/MarketingLayout'
 import { AppLayout } from './layouts/AppLayout'
 import { AppHome, LegacyMarketplaceRedirect, RequireBusiness } from './pages/business/guards'
 import { TENANT_HOST } from './lib/tenant-host'
+import { setFavicon } from './lib/tenant'
+import { useSiteBranding } from './lib/site-branding'
 import { LegalFooter } from './components/LegalFooter'
 import { SeoHead } from './lib/seo'
 import { AnalyticsTracker } from './lib/analytics'
@@ -167,6 +169,8 @@ export const App: React.FC = () => {
             {TENANT_HOST ? (
               <TenantApp />
             ) : (
+            <>
+            <SiteIcon />
             <Routes>
               {/* Marketing site */}
               <Route element={<MarketingLayout />}>
@@ -320,6 +324,7 @@ export const App: React.FC = () => {
               <Route path="/superadmin" element={<Navigate to="/admin" replace />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </>
             )}
             </React.Suspense>
             {/* Title, description, canonical, Open Graph and JSON-LD for the current page (lib/seo.tsx) */}
@@ -356,3 +361,12 @@ const NotFound: React.FC = () => (
 )
 
 export default App
+
+/** The superadmin's browser icon (Admin → Site logo), replacing the built-in favicon once branding loads */
+function SiteIcon() {
+  const { data } = useSiteBranding()
+  React.useEffect(() => {
+    if (data?.icon) setFavicon(data.icon)
+  }, [data?.icon])
+  return null
+}

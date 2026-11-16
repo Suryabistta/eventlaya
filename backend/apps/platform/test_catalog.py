@@ -134,6 +134,16 @@ class SiteBrandingTests(PlatformTestBase):
         self.client.force_authenticate(None)
         self.assertEqual(self.client.get(self.URL).data['logo'], '/media/x.png')
 
+    def test_browser_icon(self):
+        self.assertEqual(self.client.get(self.URL).data['icon'], '')
+        self.as_(self.org)
+        self.assertEqual(self.client.patch(self.URL, {'icon': '/media/i.png'}, format='json').status_code, status.HTTP_403_FORBIDDEN)
+        self.as_(self.admin)
+        self.assertEqual(self.client.patch(self.URL, {'icon': 'javascript:alert(1)'}, format='json').status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.client.patch(self.URL, {'icon': '/media/i.png'}, format='json').data['icon'], '/media/i.png')
+        self.client.force_authenticate(None)
+        self.assertEqual(self.client.get(self.URL).data['icon'], '/media/i.png')
+
 
 class EventCategoryTests(PlatformTestBase):
     URL = '/api/platform/event-categories/'

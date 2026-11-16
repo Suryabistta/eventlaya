@@ -105,9 +105,12 @@ class SiteBrandingSerializer(serializers.ModelSerializer):
     def validate_logo_white(self, value):
         return safe_url(value, 'Logo')
 
+    def validate_icon(self, value):
+        return safe_url(value, 'Icon')
+
     class Meta:
         model = SiteBranding
-        fields = ['logo', 'logo_white', 'updated_at']
+        fields = ['logo', 'logo_white', 'icon', 'updated_at']
         read_only_fields = ['updated_at']
 
 
