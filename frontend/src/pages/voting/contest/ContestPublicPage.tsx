@@ -913,7 +913,7 @@ export const ContestantPage: React.FC<{ slug: string; contestRef: string; contes
       </div>
 
       {/* Sticky vote bar */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-200 bg-white/95 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] md:bottom-0 z-30 border-t border-ink-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6">
           {mainOpen ? (
             <Button size="lg" className="w-full sm:ml-auto sm:w-auto sm:min-w-[320px]" onClick={() => vote.open(toTarget(c))}>

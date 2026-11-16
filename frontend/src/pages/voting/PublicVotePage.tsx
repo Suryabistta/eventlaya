@@ -301,7 +301,7 @@ const BallotPage: React.FC<{ slug: string; pollId: string }> = ({ slug, pollId }
       </fieldset>
       {poll.results_visible && <details className="text-sm text-ink-600"><summary className="cursor-pointer font-medium">See current standings</summary><div className="mt-3">{standings}</div></details>}
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-200 bg-white/95 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] md:bottom-0 z-30 border-t border-ink-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6">
           <p className="min-w-0 flex-1 truncate text-sm text-ink-600">{picked.length ? pickedNames.join(', ') : 'Nothing selected yet'}</p>
           <Button disabled={!picked.length} onClick={() => { setIdentityError(undefined); setConfirming(true) }}>

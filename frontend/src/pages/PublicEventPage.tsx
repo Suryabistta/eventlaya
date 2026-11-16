@@ -384,7 +384,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
 
       {/* Mobile register bar */}
       {showCta && (
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
+      <div className="fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] md:bottom-0 z-30 border-t border-ink-200 bg-white/95 backdrop-blur lg:hidden">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-6">
           <div className="min-w-0 flex-1">
             <p className="font-display text-lg font-bold leading-tight text-ink-900">{price}</p>

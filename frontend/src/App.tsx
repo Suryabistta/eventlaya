@@ -176,6 +176,11 @@ export const App: React.FC = () => {
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/events" element={<ExploreEventsPage />} />
                 <Route path="/voting" element={<VotingListPage />} />
+                {/* Event and contest pages use the full site header (registration and apply keep the focused frame) */}
+                <Route path="/e/:slug" element={<PublicEventPage />} />
+                <Route path="/e/:slug/vote" element={<PublicVotePage />} />
+                <Route path="/e/:slug/vote/:pollId" element={<PublicVotePage />} />
+                <Route path="/e/:slug/vote/:pollId/c/:cref" element={<PublicVotePage />} />
                 <Route path="/pricing" element={<PricingPage />} />
                 <Route path="/marketplace" element={<MarketplacePage />} />
                 <Route path="/marketplace/venues/:slug" element={<VenueDetailPage />} />
@@ -191,12 +196,8 @@ export const App: React.FC = () => {
 
               {/* Attendee pages */}
               <Route element={<PublicLayout />}>
-                <Route path="/e/:slug" element={<PublicEventPage />} />
                 <Route path="/e/:slug/register" element={<EventRegisterPage />} />
                 <Route path="/e/:slug/apply" element={<ApplyPage />} />
-                <Route path="/e/:slug/vote" element={<PublicVotePage />} />
-                <Route path="/e/:slug/vote/:pollId" element={<PublicVotePage />} />
-                <Route path="/e/:slug/vote/:pollId/c/:cref" element={<PublicVotePage />} />
                 <Route path="/ticket/:token" element={<PublicPassPage />} />
                 <Route path="/contestant/:token" element={<ContestantSelfPage />} />
               </Route>
