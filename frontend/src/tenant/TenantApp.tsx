@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils'
 import { EmptyState, ErrorState, Skeleton } from '@/components/ui'
 import { EventCard } from '@/pages/ExploreEventsPage'
 import { bottomBarPadding } from '@/components/LegalFooter'
+import { useSiteBranding } from '@/lib/site-branding'
 
 
 const PublicEventPage = lazyPage(() => import('@/pages/PublicEventPage'), 'PublicEventPage')
@@ -179,7 +180,7 @@ const TenantFooter: React.FC<{ tenant: ResolvedTenant }> = ({ tenant }) => {
         {!tenant.remove_watermark && (
           <a href={platformUrl('/')} className="inline-flex items-center justify-center gap-2 text-xs text-ink-500 hover:text-ink-800 sm:justify-end">
             Powered by
-            <img src="/brand/logo.png" alt="Eventlaya" className="h-5 w-auto" />
+            <PlatformLogo />
           </a>
         )}
       </div>
@@ -369,4 +370,10 @@ const SiteNotReady: React.FC<{ host: string; state: 'not_set_up' | 'unavailable'
       </div>
     </div>
   )
+}
+
+/** Eventlaya logo for "Powered by": the superadmin's uploaded logo if set, else the bundled one. */
+function PlatformLogo() {
+  const { data: brand } = useSiteBranding()
+  return <img src={brand?.logo || '/brand/logo.png'} alt="Eventlaya" className="h-5 w-auto" />
 }
