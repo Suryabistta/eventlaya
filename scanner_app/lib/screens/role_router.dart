@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'common/add_phone_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../attendee/attendee_shell.dart';
 import '../models/app_user.dart';
@@ -23,6 +24,8 @@ class RoleRouter extends ConsumerWidget {
     final user = ref.watch(authProvider).user;
     final attendeeView = ref.watch(preferAttendeeViewProvider);
 
+    // Every account needs a mobile number (Google / Facebook sign-ins and older accounts add it once)
+    if (user != null && (user.phoneNumber ?? '').trim().isEmpty) return const AddPhoneScreen();
     if (user == null || attendeeView) return const AttendeeShell();
 
     switch (user.role) {

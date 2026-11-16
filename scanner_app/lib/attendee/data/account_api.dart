@@ -66,6 +66,7 @@ class AccountApi {
     required String lastName,
     required String email,
     required String password,
+    required String phone,
   }) =>
       _wrap(() => _api.post('/api/auth/register/', data: {
             'account_type': 'attendee',
@@ -73,6 +74,7 @@ class AccountApi {
             'last_name': lastName,
             'email': email,
             'password': password,
+            'phone': phone,
             // The sign-up screen says "By creating an account you agree to the Terms of service and Privacy
             // policy"; the server refuses sign-ups without this and records when they agreed.
             'terms': true,

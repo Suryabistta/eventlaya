@@ -24,13 +24,14 @@ class _CreateAccountScreenState extends ConsumerState<CreateAccountScreen> {
   final _last = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _phone = TextEditingController();
   bool _obscure = true;
   bool _busy = false;
   late bool _keep = widget.keepSignedIn;
 
   @override
   void dispose() {
-    for (final c in [_first, _last, _email, _password]) {
+    for (final c in [_first, _last, _email, _password, _phone]) {
       c.dispose();
     }
     super.dispose();
@@ -47,6 +48,7 @@ class _CreateAccountScreenState extends ConsumerState<CreateAccountScreen> {
         lastName: _last.text.trim(),
         email: email,
         password: _password.text,
+        phone: _phone.text.trim(),
       );
       final ok = await ref.read(authProvider.notifier).login(email, _password.text, keepSignedIn: _keep);
       if (!mounted) return;
@@ -115,6 +117,18 @@ class _CreateAccountScreenState extends ConsumerState<CreateAccountScreen> {
                         if (s.isEmpty) return 'Enter your email';
                         if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(s)) return 'Enter a valid email';
                         return null;
+                      },
+                    ),
+                    FieldRow(
+                      controller: _phone,
+                      label: 'Mobile number',
+                      hint: '98XXXXXXXX',
+                      icon: Icons.phone_iphone_rounded,
+                      keyboardType: TextInputType.phone,
+                      autofillHints: const [AutofillHints.telephoneNumber],
+                      validator: (v) {
+                        final digits = (v ?? '').replaceAll(RegExp(r'\D'), '').length;
+                        return digits < 7 || digits > 15 ? 'Enter your mobile number' : null;
                       },
                     ),
                     FieldRow(
