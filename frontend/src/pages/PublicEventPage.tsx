@@ -153,6 +153,8 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
   /** Ended or cancelled: keep the page readable, drop the call to action */
   const over = state.phase === 'ended' || state.phase === 'cancelled'
   const showCta = !over || Boolean(storedPass)
+  /** Applications are the way in right now: an open call without tickets, or registration closed while applications are open */
+  const applyFirst = Boolean(event.applications?.open) && (callOnly(event) || (!state.open && !storedPass))
 
   return (
     <div className="pb-28 lg:pb-12">
@@ -389,7 +391,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
           <div className="min-w-0 flex-1">
             <p className="font-display text-lg font-bold leading-tight text-ink-900">{price}</p>
             <p className="truncate text-xs text-ink-500">
-              {callOnly(event) && event.applications?.open
+              {applyFirst && event.applications
                 ? event.applications.closes_at
                   ? `Applications open until ${formatDate(event.applications.closes_at, 'short')}`
                   : 'Applications are open'
@@ -398,7 +400,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
                   : state.reason}
             </p>
           </div>
-          {callOnly(event) && event.applications?.open ? (
+          {applyFirst && event.applications ? (
             <ButtonLink to={`/e/${event.slug}/apply`} className="px-6">
               {event.applications.cta}
             </ButtonLink>
@@ -932,6 +934,7 @@ const RegistrationCard: React.FC<{ event: PublicEvent; state: ReturnType<typeof 
     )
   }
   const apps = event.applications
+  const applyFirst = Boolean(apps?.open) && !state.open && !hasPass
   // Applications stage (participants): its own card, next to tickets or on its own while tickets are off
   const appsCard = apps && (
     <Card className="p-5">
@@ -946,7 +949,7 @@ const RegistrationCard: React.FC<{ event: PublicEvent; state: ReturnType<typeof 
               </span>
             </p>
           )}
-          <ButtonLink to={`/e/${event.slug}/apply`} variant={event.tickets_enabled === false ? 'primary' : 'secondary'} size="lg" className="mt-4 w-full">
+          <ButtonLink to={`/e/${event.slug}/apply`} variant={event.tickets_enabled === false || applyFirst ? 'primary' : 'secondary'} size="lg" className="mt-4 w-full">
             {apps.cta}
           </ButtonLink>
           <p className="mt-3 text-center text-xs text-ink-500">Free to apply. The organizer reviews every application and emails you.</p>
@@ -958,6 +961,8 @@ const RegistrationCard: React.FC<{ event: PublicEvent; state: ReturnType<typeof 
   )
   // A pageant / open call without tickets: just the applications card (no "Tickets go on sale later")
   if (event.tickets_enabled === false && appsCard) return <div className="space-y-4">{appsCard}</div>
+  // Registration closed but applications open: only the applications card (a closed registration is just noise)
+  if (applyFirst && appsCard) return <div className="space-y-4">{appsCard}</div>
   if (event.tickets_enabled === false) {
     return (
       <div className="space-y-4">
