@@ -1,7 +1,7 @@
 name: eventlaya_scanner
 description: Eventlaya Gate Scanner & Organizer App — QR Ticketing, Attendance Management, Live Stats, Push Notifications
 publish_to: 'none'
-version: 1.0.1+2
+version: 1.0.1+3
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

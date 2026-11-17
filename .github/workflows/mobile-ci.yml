@@ -1,0 +1,29 @@
+name: Mobile CI
+
+on:
+  push:
+    branches: [main]
+    paths: ['scanner_app/**', '.github/workflows/mobile-ci.yml']
+  pull_request:
+    paths: ['scanner_app/**', '.github/workflows/mobile-ci.yml']
+
+concurrency:
+  group: mobile-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: scanner_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.7'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos
+      - run: flutter test

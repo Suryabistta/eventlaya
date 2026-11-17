@@ -1,3 +1,18 @@
+import java.io.FileInputStream
+import java.util.Properties
+
+// Release signing: android/key.properties on a developer machine (made by tool/make_upload_keystore.sh,
+// gitignored), or ANDROID_KEYSTORE_* environment variables in CI. With neither, release builds stay UNSIGNED
+// instead of going out with Flutter's shared debug key: Play refuses those, and anyone could sign as this app.
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) load(FileInputStream(keystorePropertiesFile))
+}
+fun signingValue(prop: String, env: String): String? =
+    (keystoreProperties[prop] as String?)?.takeIf { it.isNotBlank() } ?: System.getenv(env)?.takeIf { it.isNotBlank() }
+val releaseStoreFile = signingValue("storeFile", "ANDROID_KEYSTORE_PATH")
+val hasReleaseSigning = releaseStoreFile != null
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -22,21 +37,29 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.eventlaya.eventlaya_scanner"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = signingValue("storePassword", "ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = signingValue("keyAlias", "ANDROID_KEY_ALIAS") ?: "upload"
+                keyPassword = signingValue("keyPassword", "ANDROID_KEY_PASSWORD")
+                    ?: signingValue("storePassword", "ANDROID_KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Deliberately null without a key: an unsigned build fails loudly instead of looking releasable
+            signingConfig = if (hasReleaseSigning) signingConfigs.getByName("release") else null
         }
     }
 }

@@ -1,0 +1,95 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Eventlaya store screenshots</title>
+<style>
+@font-face{font-family:B;src:url(BricolageGrotesque-ExtraBold.ttf);font-weight:800}
+@font-face{font-family:B;src:url(BricolageGrotesque-Bold.ttf);font-weight:700}
+@font-face{font-family:P;src:url(Poppins-Regular.ttf);font-weight:400}
+@font-face{font-family:P;src:url(Poppins-Medium.ttf);font-weight:500}
+@font-face{font-family:P;src:url(Poppins-SemiBold.ttf);font-weight:600}
+:root{--brand:#C2215A;--brandD:#A3184A;--tint:#FDF2F6;--mari:#E39400;--mariT:#FFF7E6;--ok:#15803D;--okT:#ECFDF5;
+--i100:#F3F0F5;--i200:#E7E2EB;--i400:#7B7186;--i500:#635A6E;--i900:#1C1724}
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1080px;height:1920px;overflow:hidden;font-family:P;color:var(--i900);background:var(--brand)}
+.slide{position:relative;width:1080px;height:1920px;overflow:hidden;
+ background:radial-gradient(circle at 85% 8%,#E0457A 0,transparent 42%),radial-gradient(circle at 0% 100%,#7E1039 0,transparent 55%),linear-gradient(160deg,var(--brand),var(--brandD))}
+.deco{position:absolute;opacity:.12}
+.head{position:absolute;top:210px;left:90px;right:90px;color:#fff}
+.head h1{font-family:B;font-weight:800;font-size:112px;line-height:1;letter-spacing:-2px}
+.head h1 em{font-style:normal;color:#FFC24D}
+.head p{margin-top:28px;font-size:40px;line-height:1.35;opacity:.92;font-weight:500;max-width:860px}
+.brandmark{position:absolute;left:90px;top:70px;background:#fff;border-radius:30px;padding:10px 26px;box-shadow:0 10px 30px rgba(60,0,25,.25);z-index:5}
+.brandmark img{height:90px;display:block}
+.phone{position:absolute;left:170px;top:640px;width:740px;height:1500px;background:#120d18;border-radius:96px;padding:22px;
+ box-shadow:0 60px 120px rgba(40,0,20,.55),0 0 0 3px rgba(255,255,255,.18) inset}
+.scr{width:100%;height:100%;background:#FAF8FB;border-radius:76px;overflow:hidden;position:relative}
+.sb{height:76px;display:flex;justify-content:space-between;align-items:center;padding:14px 56px 0;font-weight:600;font-size:26px}
+.sb .cam{width:28px;height:28px;border-radius:50%;background:#120d18}
+.pad{padding:12px 40px}
+.title{font-family:B;font-weight:800;font-size:50px}
+.muted{color:var(--i500)}
+.chip{display:inline-block;padding:10px 24px;border-radius:40px;font-size:24px;font-weight:600;background:#fff;border:2px solid var(--i200);margin-right:10px}
+.chip.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.card{background:#fff;border-radius:34px;box-shadow:0 6px 24px rgba(28,23,36,.08);overflow:hidden}
+.ban{height:250px;position:relative;display:flex;align-items:flex-end;padding:24px;color:#fff;font-family:B;font-weight:800;font-size:44px}
+.date{position:absolute;top:22px;left:22px;background:#fff;color:var(--i900);border-radius:20px;text-align:center;padding:8px 16px;font-family:B;font-weight:800;font-size:34px;line-height:1}
+.date small{display:block;font-family:P;font-weight:600;font-size:18px;color:var(--brand)}
+.cb{padding:22px 26px;font-size:24px}
+.row{display:flex;justify-content:space-between;align-items:center}
+.price{font-weight:600;color:var(--brand)}
+.btn{background:var(--brand);color:#fff;border-radius:28px;text-align:center;padding:28px;font-weight:600;font-size:30px}
+.tabbar{position:absolute;bottom:0;left:0;right:0;height:130px;background:rgba(255,255,255,.95);border-top:2px solid var(--i200);display:flex;justify-content:space-around;align-items:center;font-size:22px;color:var(--i400);padding-bottom:20px}
+.tabbar b{display:block;width:44px;height:44px;margin:0 auto 6px;border-radius:12px;background:var(--i200)}
+.tabbar .on{color:var(--brand);font-weight:600}.tabbar .on b{background:var(--brand)}
+</style></head><body>
+<script>
+const n=+(new URLSearchParams(location.search).get('n')||1);
+const ticket=`<svg viewBox="0 0 512 512"><path d="M128 152h256a24 24 0 0 1 24 24v52a28 28 0 0 0 0 56v52a24 24 0 0 1-24 24H128a24 24 0 0 1-24-24v-52a28 28 0 0 0 0-56v-52a24 24 0 0 1 24-24z" fill="#fff"/></svg>`;
+const deco=`<div class="deco" style="width:420px;right:-120px;top:380px;transform:rotate(-18deg)">${ticket}</div><div class="deco" style="width:300px;left:-90px;top:1250px;transform:rotate(22deg)">${ticket}</div>`;
+const sb=`<div class="sb"><span>9:41</span><span class="cam"></span><span>●●● 5G ▮</span></div>`;
+const tabs=a=>`<div class="tabbar">${['Explore','Passes','Vote','Profile'].map((t,i)=>`<div class="${i==a?'on':''}"><b></b>${t}</div>`).join('')}</div>`;
+const ev=(t,place,d,m,p,bg)=>`<div class="card" style="margin-bottom:28px"><div class="ban" style="background:${bg}"><div class="date">${d}<small>${m}</small></div>${t}</div><div class="cb row"><span class="muted">📍 ${place}</span><span class="price">${p}</span></div></div>`;
+const qr=(()=>{let s='',seed=7;for(let y=0;y<25;y++)for(let x=0;x<25;x++){seed=(seed*9301+49297)%233280;const f=(x<7&&y<7)||(x>17&&y<7)||(x<7&&y>17);const fin=f?((x%18==0||x%18==6||y%18==0||y%18==6)||((x%18)>=2&&(x%18)<=4&&(y%18)>=2&&(y%18)<=4)):seed/233280>.5;if(fin)s+=`<rect x="${x}" y="${y}" width="1" height="1"/>`}return `<svg viewBox="0 0 25 25" fill="#1C1724" style="width:100%;display:block" shape-rendering="crispEdges">${s}</svg>`})();
+
+const S={
+1:{h:'Find events <em>near you</em>',p:'Concerts, festivals, college fests and workshops across Nepal, all in one app.',
+ s:`<div class="pad"><div class="muted" style="font-size:26px">Namaste 👋</div><div class="title" style="margin-bottom:24px">Explore events</div>
+ <div style="background:#fff;border:2px solid var(--i200);border-radius:26px;padding:22px 26px;font-size:26px;color:var(--i400);margin-bottom:24px">🔍  Search events, venues, cities</div>
+ <div style="margin-bottom:30px;white-space:nowrap"><span class="chip on">This week</span><span class="chip">Dharan</span><span class="chip">Itahari</span><span class="chip">Free</span></div>
+ ${ev('Dharan Film Festival','Dharan','12','DEC','Rs 500','linear-gradient(135deg,#3a1530,#C2215A)')}
+ ${ev('Winter Music Night','Itahari','20','DEC','Rs 800','linear-gradient(135deg,#B57600,#E39400)')}
+ ${ev('Startup Workshop','Biratnagar','05','JAN','Free','linear-gradient(135deg,#1C1724,#635A6E)')}</div>${tabs(0)}`},
+2:{h:'Book in <em>seconds</em>',p:'Pick your ticket and pay with Khalti or eSewa, or pay at the venue.',
+ s:`<div class="ban" style="height:330px;background:linear-gradient(135deg,#3a1530,#C2215A)">Dharan Film Festival</div>
+ <div class="pad" style="padding-top:30px"><div class="muted" style="font-size:26px;margin-bottom:26px">📅 Fri, 12 Dec · 4:00 PM<br>📍 Dharan</div>
+ <div style="font-weight:600;font-size:30px;margin-bottom:18px">Choose ticket</div>
+ ${[['General','Rs 500',1],['VIP','Rs 1,500',0]].map(([a,b,o])=>`<div class="card row" style="padding:28px;margin-bottom:18px;font-size:28px;${o?'border:3px solid var(--brand)':''}"><span><b>${a}</b></span><span class="row" style="gap:22px"><span class="price">${b}</span><span style="border:2px solid var(--i200);border-radius:20px;padding:6px 18px">−  ${o?2:0}  +</span></span></div>`).join('')}
+ <div style="font-weight:600;font-size:30px;margin:30px 0 18px">Pay with</div>
+ <div class="row" style="gap:18px;margin-bottom:36px">${['Khalti','eSewa','At venue'].map((t,i)=>`<div class="card" style="flex:1;text-align:center;padding:26px 0;font-weight:600;font-size:26px;${i==0?'border:3px solid var(--brand);color:var(--brand)':''}">${t}</div>`).join('')}</div>
+ <div class="row" style="font-size:30px;margin-bottom:24px"><span class="muted">Total</span><b>Rs 1,000</b></div>
+ <div class="btn">Book 2 tickets</div></div>`},
+3:{h:'Your pass, <em>on your phone</em>',p:'Show the QR code at the gate. It works even without internet.',
+ s:`<div class="pad"><div class="title" style="margin-bottom:30px">My passes</div>
+ <div class="card" style="border-radius:40px"><div class="ban" style="height:200px;background:linear-gradient(135deg,#3a1530,#C2215A);font-size:40px">Dharan Film Festival</div>
+ <div style="padding:34px 60px 20px"><div style="background:#fff;padding:20px;border-radius:24px;border:2px solid var(--i200)">${qr}</div></div>
+ <div style="border-top:3px dashed var(--i200);margin:10px 0"></div>
+ <div class="cb" style="font-size:26px;padding:24px 40px 36px"><div class="row" style="margin-bottom:12px"><span class="muted">Ticket</span><b>General × 2</b></div>
+ <div class="row" style="margin-bottom:12px"><span class="muted">Date</span><b>Fri, 12 Dec · 4 PM</b></div>
+ <div class="row"><span class="muted">Status</span><span style="background:var(--okT);color:var(--ok);padding:6px 18px;border-radius:20px;font-weight:600">✓ Confirmed</span></div></div></div></div>${tabs(1)}`},
+4:{h:'Vote for your <em>favourites</em>',p:'Support contestants in pageants and talent shows, and follow the results live.',
+ s:`<div class="pad"><div class="title">Contestants</div><div class="muted" style="font-size:26px;margin-bottom:28px">Voting closes in 2 days</div>
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+ ${[['#01','linear-gradient(160deg,#E0457A,#7E1039)'],['#02','linear-gradient(160deg,#E39400,#B57600)'],['#03','linear-gradient(160deg,#635A6E,#1C1724)'],['#04','linear-gradient(160deg,#C2215A,#3a1530)']].map(([c,bg],i)=>`<div class="card"><div style="height:300px;background:${bg};position:relative"><span style="position:absolute;top:18px;left:18px;background:#fff;border-radius:16px;padding:4px 14px;font-weight:600;font-size:22px">${c}</span><svg viewBox="0 0 100 100" style="position:absolute;bottom:0;left:15%;width:70%;opacity:.35"><circle cx="50" cy="38" r="22" fill="#fff"/><path d="M8 100c4-28 22-40 42-40s38 12 42 40z" fill="#fff"/></svg></div>
+ <div style="padding:18px"><div style="font-weight:600;font-size:26px">Contestant ${c}</div><div style="margin-top:14px;background:${i==0?'var(--brand)':'var(--tint)'};color:${i==0?'#fff':'var(--brand)'};border-radius:20px;text-align:center;padding:14px;font-weight:600;font-size:24px">${i==0?'✓ Voted':'Vote'}</div></div></div>`).join('')}</div></div>${tabs(2)}`},
+5:{h:'Run your event <em>at the gate</em>',p:'Organizers scan passes, track check-ins live and chat with their team.',
+ s:`<div style="background:#110D17;height:100%;color:#fff"><div class="sb" style="color:#fff"><span>9:41</span><span class="cam" style="background:#000"></span><span>●●● 5G ▮</span></div>
+ <div class="pad"><div style="font-family:B;font-weight:800;font-size:44px">Main gate</div><div style="opacity:.7;font-size:24px">Dharan Film Festival</div></div>
+ <div style="margin:30px auto;width:500px;height:500px;position:relative;border-radius:30px;background:radial-gradient(circle,#2a2333,#110D17)">
+ ${['top:0;left:0;border-width:10px 0 0 10px','top:0;right:0;border-width:10px 10px 0 0','bottom:0;left:0;border-width:0 0 10px 10px','bottom:0;right:0;border-width:0 10px 10px 0'].map(s=>`<i style="position:absolute;width:110px;height:110px;border:solid #FFC24D;border-radius:24px;${s}"></i>`).join('')}
+ <div style="position:absolute;inset:110px;opacity:.85;background:#fff;padding:14px;border-radius:12px">${qr}</div>
+ <div style="position:absolute;left:30px;right:30px;top:50%;height:6px;background:#FFC24D;box-shadow:0 0 30px #FFC24D"></div></div>
+ <div style="margin:0 40px;background:var(--ok);border-radius:30px;padding:30px;display:flex;gap:24px;align-items:center"><div style="font-size:60px">✓</div><div><div style="font-weight:600;font-size:34px">Checked in</div><div style="opacity:.9;font-size:24px">General × 2 · Gate 1</div></div></div>
+ <div class="row" style="margin:30px 40px;gap:20px">${[['412','Checked in'],['588','Expected'],['70%','Arrived']].map(([a,b])=>`<div style="flex:1;background:#2A2333;border-radius:26px;padding:26px;text-align:center"><div style="font-family:B;font-weight:800;font-size:46px;color:#FFC24D">${a}</div><div style="opacity:.7;font-size:22px">${b}</div></div>`).join('')}</div></div>`}
+};
+const x=S[n];
+document.body.innerHTML=`<div class="slide">${deco}<div class="head"><h1>${x.h}</h1><p>${x.p}</p></div><div class="phone"><div class="scr">${n==5?'':sb}${x.s}</div></div><div class="brandmark"><img src="header-logo.png"></div></div>`;
+</script></body></html>

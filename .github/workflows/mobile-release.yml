@@ -1,0 +1,118 @@
+# Signed Android release → Google Play internal testing.
+#
+# Trigger: push a tag like `app-v1.0.2` (version name = 1.0.2), or run it by hand from the Actions tab.
+# Build number = 100 + run number, so it is always higher than the manual uploads (1.0.1+3 and earlier).
+# Secrets and one-time setup: docs/mobile-release.md §4.
+name: Mobile release
+
+on:
+  push:
+    tags: ['app-v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version name (e.g. 1.0.2). Empty = keep the one in pubspec.yaml'
+        required: false
+      status:
+        description: 'Play release status. Use draft until the app has passed its first review.'
+        type: choice
+        options: [draft, completed]
+        default: draft
+
+permissions:
+  contents: write   # create the GitHub Release
+
+concurrency:
+  group: mobile-release
+  cancel-in-progress: false
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    environment: play   # optional: add required reviewers to this environment in repo settings
+    defaults:
+      run:
+        working-directory: scanner_app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.7'
+          channel: stable
+          cache: true
+
+      - name: Version
+        id: ver
+        run: |
+          current=$(grep -E '^version:' pubspec.yaml | awk '{print $2}')
+          name="${current%%+*}"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then name="${GITHUB_REF_NAME#app-v}"; fi
+          if [[ -n "${{ inputs.version }}" ]]; then name="${{ inputs.version }}"; fi
+          build=$((100 + GITHUB_RUN_NUMBER))
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "Building $name+$build"
+
+      - name: Signing key and Firebase config
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          GOOGLE_SERVICES_B64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          test -n "$KEYSTORE_B64" || { echo "::error::ANDROID_KEYSTORE_BASE64 secret missing"; exit 1; }
+          test -n "$GOOGLE_SERVICES_B64" || { echo "::error::GOOGLE_SERVICES_JSON_BASE64 secret missing"; exit 1; }
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          echo "$GOOGLE_SERVICES_B64" | base64 -d > android/app/google-services.json
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
+
+      - run: flutter pub get
+
+      - name: Test
+        run: flutter test
+
+      - name: Build app bundle
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          flutter build appbundle --release \
+            --build-name=${{ steps.ver.outputs.name }} \
+            --build-number=${{ steps.ver.outputs.build }} \
+            --obfuscate --split-debug-info=build/symbols
+          out=build/release-out; mkdir -p $out
+          tag="${{ steps.ver.outputs.name }}-${{ steps.ver.outputs.build }}"
+          cp build/app/outputs/bundle/release/app-release.aab "$out/eventlaya-$tag.aab"
+          (cd build/symbols && zip -qr "../release-out/symbols-$tag.zip" .)
+          # Refuse to ship an unsigned / debug-signed bundle.
+          keytool -printcert -jarfile "$out/eventlaya-$tag.aab" | grep -q "CN=Eventlaya" \
+            || { echo "::error::bundle is not signed with the Eventlaya upload key"; exit 1; }
+
+      - name: Upload to Play (internal testing)
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.eventlaya.eventlaya_scanner
+          releaseFiles: scanner_app/build/release-out/*.aab
+          track: internal
+          status: ${{ inputs.status || 'draft' }}
+          releaseName: ${{ steps.ver.outputs.name }} (${{ steps.ver.outputs.build }})
+
+      - name: Keep bundle and symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventlaya-${{ steps.ver.outputs.name }}-${{ steps.ver.outputs.build }}
+          path: scanner_app/build/release-out/
+          retention-days: 90
+
+      - name: GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: scanner_app/build/release-out/*
+          generate_release_notes: true
