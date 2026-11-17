@@ -14,10 +14,10 @@ on:
         description: 'Version name (e.g. 1.0.2). Empty = keep the one in pubspec.yaml'
         required: false
       status:
-        description: 'Play release status. Use draft until the app has passed its first review.'
+        description: 'Play release status (completed = testers get it now)'
         type: choice
-        options: [draft, completed]
-        default: draft
+        options: [completed, draft]
+        default: completed
 
 permissions:
   contents: write   # create the GitHub Release
@@ -102,7 +102,7 @@ jobs:
           packageName: com.eventlaya.eventlaya
           releaseFiles: scanner_app/build/release-out/*.aab
           track: internal
-          status: ${{ inputs.status || 'draft' }}
+          status: ${{ inputs.status || 'completed' }}
           releaseName: ${{ steps.ver.outputs.name }} (${{ steps.ver.outputs.build }})
 
       - name: Keep bundle and symbols

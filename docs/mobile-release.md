@@ -76,9 +76,8 @@ After the first manual upload, builds can go to Play automatically.
 
 Release: `git tag app-v1.0.2 && git push origin app-v1.0.2`.
 
-Tag builds upload as a **draft** (Play rejects `completed` until the app has passed its first review). After the
-first review, run it by hand with status `completed`, or change the default in the workflow, so internal testers
-get it straight away. The first `.aab` must still be uploaded by hand (Play needs one before the API works).
+Tag builds go straight out to internal testers (status `completed`; choose `draft` when running it by hand to
+review first). Production is always promoted by hand in Play Console.
 
 ## 5. iOS (later)
 
