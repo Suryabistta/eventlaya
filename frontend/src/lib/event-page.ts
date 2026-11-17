@@ -103,6 +103,8 @@ export type PublicEvent = Event &
     spots_left: number | null
     organizer_info: { name: string; logo: string | null; verified?: boolean }
     /** Only present when the organizer switched "Managed by" on */
+    /** Superadmin hid "Organised by" for this event */
+    hide_organizer?: boolean
     managed_by_info?: { name: string; logo: string | null; label?: string } | null
     /** Applications stage (null when off) */
     applications?: PublicApplications | null

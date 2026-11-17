@@ -4,7 +4,7 @@ import { Hero } from './landing/Hero'
 import { ProductTour } from './landing/ProductTour'
 import { Faq } from './landing/Sections'
 import { VotingShowcase } from './landing/VotingShowcase'
-import { ContactSection, EventsShowcase, FeaturedMarketShowcase, FeaturesEight, Partners, PoweredBy, SearchHero, StepsTabs, Testimonials, VendorsShowcase } from './landing/Discover'
+import { ContactSection, EventsShowcase, FeaturedMarketShowcase, FeaturesEight, Partners, PoweredBy, SearchHero, StepsTabs, Testimonials } from './landing/Discover'
 
 export { GatePassDemo } from './landing/GatePass'
 
@@ -16,7 +16,6 @@ export const LandingPage: React.FC = () => (
     <EventsShowcase />
     <FeaturedMarketShowcase />
     <VotingShowcase />
-    <VendorsShowcase />
     <FeaturesEight />
     <ProductTour />
     <Testimonials />

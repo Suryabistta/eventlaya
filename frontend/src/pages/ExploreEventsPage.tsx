@@ -178,7 +178,8 @@ export const ExploreEventsPage: React.FC = () => {
 }
 
 /** Vertical event card: banner with the tear-off date, details, then the call to action. */
-export const EventCard: React.FC<{ event: PublicEvent; past: boolean }> = ({ event: e, past }) => {
+/** `compact` (home page): smaller corner radius. */
+export const EventCard: React.FC<{ event: PublicEvent; past: boolean; compact?: boolean }> = ({ event: e, past, compact }) => {
   const [bannerFailed, setBannerFailed] = useState(false)
   const start = new Date(`${e.start_date}T${e.start_time || '00:00'}`)
   // Hidden counts come back as capacity 0: use is_full, never "0 spots left"
@@ -191,7 +192,8 @@ export const EventCard: React.FC<{ event: PublicEvent; past: boolean }> = ({ eve
   return (
     <li
       className={cn(
-        'group relative flex flex-col overflow-hidden rounded-2xl border border-ink-200 bg-white transition-[border-color,box-shadow] hover:border-ink-300 hover:shadow-[0_8px_24px_rgba(28,23,36,0.08)]',
+        'group relative flex flex-col overflow-hidden border border-ink-200 bg-white transition-[border-color,box-shadow] hover:border-ink-300 hover:shadow-[0_8px_24px_rgba(28,23,36,0.08)]',
+        compact ? 'rounded-lg' : 'rounded-2xl',
         over && 'bg-ink-50/60 [&_img]:grayscale-[60%]',
       )}
     >

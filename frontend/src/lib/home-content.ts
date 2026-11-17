@@ -48,7 +48,6 @@ export interface HomeContent {
   events: Section
   voting: Section
   market: Section
-  vendors: Section
   features: Section & { items: FeatureItem[] }
   dashboard: Section & { subtitle: string }
   testimonials: Section & { items: Testimonial[] }
@@ -84,8 +83,7 @@ export const HOME_DEFAULTS: HomeContent = {
   },
   events: { show: true, eyebrow: 'Event marketplace', title: 'Featured & upcoming events' },
   voting: { show: true, eyebrow: 'Live voting', title: 'Vote for your favourites' },
-  market: { show: true, eyebrow: 'Featured marketplace', title: 'Venues and vendors we recommend' },
-  vendors: { show: true, eyebrow: 'Vendor marketplace', title: 'Featured vendors' },
+  market: { show: true, eyebrow: 'Featured marketplace', title: 'Featured vendors' },
   features: {
     show: true,
     eyebrow: 'Features',

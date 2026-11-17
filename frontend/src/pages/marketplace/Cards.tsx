@@ -10,12 +10,12 @@ import { cn } from '@/lib/utils'
 // The title link stretches over the whole card (after:inset-0); the button sits above it.
 const stretchedLink = 'after:absolute after:inset-0 after:rounded-2xl after:content-[""] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-brand-500'
 
-/** `compact`: shorter photo, no amenities or host line (home page). */
+/** `compact`: 16:9 photo and the event-card look, no amenities or host line (home page). */
 export const VenueCard: React.FC<{ venue: VenueWithSpaces; to: string; compact?: boolean }> = ({ venue, to, compact }) => {
   const spaces = venue.spaces ?? []
   return (
-  <Card className="relative flex flex-col overflow-hidden transition-shadow hover:shadow-md">
-    <div className={cn('relative shrink-0', compact ? 'h-40 sm:h-44' : 'h-48 sm:h-60')}>
+  <Card className={cn('relative flex flex-col overflow-hidden', compact ? 'rounded-lg border border-ink-200 bg-white shadow-none transition-[border-color,box-shadow] hover:border-ink-300 hover:shadow-[0_8px_24px_rgba(28,23,36,0.08)]' : 'transition-shadow hover:shadow-md')}>
+    <div className={cn('relative shrink-0', compact ? 'aspect-[16/9]' : 'h-48 sm:h-60')}>
       <Photo src={venue.featured_image || venue.images?.[0]} className="h-full w-full" />
       <div className="absolute left-3 top-3 flex gap-1.5">
         <Badge className="bg-white/95 text-ink-800 shadow-2xs">{venue.venue_type_display || venue.venue_type}</Badge>
@@ -53,14 +53,16 @@ export const VenueCard: React.FC<{ venue: VenueWithSpaces; to: string; compact?:
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-700">
-        <span className="inline-flex items-center gap-1.5">
-          <Users className="h-4 w-4 text-ink-400" aria-hidden />
-          {spaces.length > 0 && <span className="font-medium text-ink-900">{spaceCountLabel(spaces)},</span>}
-          {venue.capacity_min.toLocaleString()}–{venue.capacity_max.toLocaleString()} guests
-        </span>
-        <Rating value={venue.review_average ?? venue.rating} count={venue.review_total || venue.review_count} />
-      </div>
+      {!compact && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-700">
+          <span className="inline-flex items-center gap-1.5">
+            <Users className="h-4 w-4 text-ink-400" aria-hidden />
+            {spaces.length > 0 && <span className="font-medium text-ink-900">{spaceCountLabel(spaces)},</span>}
+            {venue.capacity_min.toLocaleString()}–{venue.capacity_max.toLocaleString()} guests
+          </span>
+          <Rating value={venue.review_average ?? venue.rating} count={venue.review_total || venue.review_count} />
+        </div>
+      )}
 
       {!compact && venue.amenities?.length > 0 && (
         <ul className="flex flex-wrap gap-1.5" aria-label="Amenities">
@@ -91,9 +93,9 @@ export const VenueCard: React.FC<{ venue: VenueWithSpaces; to: string; compact?:
 }
 
 export const VendorCard: React.FC<{ vendor: Vendor; to: string; compact?: boolean }> = ({ vendor, to, compact }) => (
-  <Card className="relative flex flex-col overflow-hidden transition-shadow hover:shadow-md">
+  <Card className={cn('relative flex flex-col overflow-hidden', compact ? 'rounded-lg border border-ink-200 bg-white shadow-none transition-[border-color,box-shadow] hover:border-ink-300 hover:shadow-[0_8px_24px_rgba(28,23,36,0.08)]' : 'transition-shadow hover:shadow-md')}>
     {/* Same photo area as venue cards, with the vendor type on the top left */}
-    <div className={cn('relative shrink-0', compact ? 'h-40 sm:h-44' : 'h-48 sm:h-60')}>
+    <div className={cn('relative shrink-0', compact ? 'aspect-[16/9]' : 'h-48 sm:h-60')}>
       <Photo src={vendor.featured_image || vendor.portfolio_images?.[0]} icon={Store} className="h-full w-full" />
       <div className="absolute left-3 top-3 flex gap-1.5">
         {vendor.category_name && <Badge className="bg-white/95 text-ink-800 shadow-2xs">{vendor.category_name}</Badge>}
@@ -101,9 +103,11 @@ export const VendorCard: React.FC<{ vendor: Vendor; to: string; compact?: boolea
       </div>
     </div>
     <div className="flex flex-1 flex-col gap-3 p-5">
-      <div className="flex justify-end">
-        <Rating value={vendor.review_average ?? vendor.rating} count={vendor.review_total || undefined} />
-      </div>
+      {!compact && (
+        <div className="flex justify-end">
+          <Rating value={vendor.review_average ?? vendor.rating} count={vendor.review_total || undefined} />
+        </div>
+      )}
       <div className="flex min-w-0 items-center gap-3">
         <BusinessLogo src={mediaUrl(vendor.logo) ?? undefined} />
         <div className="min-w-0">

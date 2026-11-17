@@ -492,6 +492,20 @@ const OrganizerLine: React.FC<{ event: PublicEvent; className?: string; large?: 
   // The Organizer card is about the organizer only; managing an event is a different role (shown under the title)
   const managed = large ? null : event.managed_by_info
   const size = large ? 'h-12 w-12' : 'h-9 w-9'
+  if (event.hide_organizer) {
+    // Organizer hidden by the superadmin: keep only the partner credit, if any
+    if (!managed) return null
+    return (
+      <p className={cn('flex items-center gap-1.5 text-sm text-ink-600', className)}>
+        {managed.logo && !managedLogoFailed && (
+          <img src={managed.logo} alt="" onError={() => setManagedLogoFailed(true)} className="h-5 w-5 shrink-0 rounded border border-ink-200 bg-white object-contain" />
+        )}
+        <span>
+          {managed.label || 'Managed by'} <span className="font-semibold text-ink-900">{managed.name}</span>
+        </span>
+      </p>
+    )
+  }
   return (
     <div className={cn('flex items-center gap-3', className)}>
       {logo && !logoFailed ? (
@@ -667,12 +681,14 @@ const Section: React.FC<{ id: string; title: string; children: React.ReactNode }
 /** Who runs the event, with contact links. Under the registration card on desktop, at the end of the page on phones. */
 const OrganizerCard: React.FC<{ event: PublicEvent; className?: string }> = ({ event, className }) => {
   const headingId = useId()
+  const hidden = Boolean(event.hide_organizer)
+  if (hidden && !event.contact_email && !event.contact_phone) return null
   return (
     <section aria-labelledby={headingId} className={cn('rounded-2xl border border-ink-200 bg-white p-5 sm:p-6', className)}>
       <h2 id={headingId} className="text-lg font-bold text-ink-900">
-        Organizer
+        {hidden ? 'Contact' : 'Organizer'}
       </h2>
-      <OrganizerLine event={event} className="mt-3" large />
+      {!hidden && <OrganizerLine event={event} className="mt-3" large />}
       {(event.contact_email || event.contact_phone) && (
         <div className="mt-4 flex flex-wrap gap-2">
           {event.contact_email && (

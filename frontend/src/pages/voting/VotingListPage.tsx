@@ -174,8 +174,8 @@ export const ContestCard: React.FC<{ c: PublicContestCard; compact?: boolean }> 
   const day = dayIso ? new Date(dayIso) : null
 
   return (
-    <article className="flex flex-col overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-sm transition-shadow hover:shadow-md">
-      <Link to={to} className="relative block aspect-[16/10]" tabIndex={-1} aria-hidden>
+    <article className={cn('flex flex-col overflow-hidden', compact ? 'rounded-lg border border-ink-200 bg-white shadow-none transition-[border-color,box-shadow] hover:border-ink-300 hover:shadow-[0_8px_24px_rgba(28,23,36,0.08)]' : 'rounded-2xl border border-ink-100 bg-white shadow-sm transition-shadow hover:shadow-md')}>
+      <Link to={to} className={cn('relative block', compact ? 'aspect-[16/9]' : 'aspect-[16/10]')} tabIndex={-1} aria-hidden>
         <ContestCover src={c.cover_url || c.event.banner} seed={c.id} />
         <span className="absolute left-3 top-3 rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
           {c.event.category_label}

@@ -81,6 +81,8 @@ class Event(models.Model):
     managed_by_label = models.CharField(max_length=40, blank=True)
     # Set by the superadmin (Admin → Featured events): listed first on the events page, with a badge
     is_featured = models.BooleanField(default=False, db_index=True)
+    # Superadmin only: hide the "Organised by" line and organizer name on the public event page
+    hide_organizer = models.BooleanField(default=False)
     # Superadmin moderation: hidden events are gone from every public page and list, and take no sign-ups
     hidden_by_admin = models.BooleanField(default=False, db_index=True)
     hidden_reason = models.CharField(max_length=300, blank=True, help_text='Shown to the organizer')

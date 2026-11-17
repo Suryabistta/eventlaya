@@ -79,6 +79,8 @@ export interface Event {
   managed_by?: string
   managed_by_logo?: string
   show_managed_by?: boolean
+  /** Superadmin only: hide "Organised by" on the public page */
+  hide_organizer?: boolean
   /** Wording before the name ('' = Managed by) */
   managed_by_label?: string
   ticket_layout?: 'vertical' | 'landscape'

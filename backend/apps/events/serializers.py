@@ -119,7 +119,7 @@ class EventSerializer(serializers.ModelSerializer):
             'registered_count', 'checked_in_count', 'created_at', 'updated_at',
             'tagline', 'category', 'category_name', 'event_kind', 'is_featured', 'phase', 'registration_open', 'registration_closed_reason', 'applications_closed_reason', 'hidden_by_admin', 'hidden_reason',
             'max_tickets_per_order', 'show_spots_left',
-            'managed_by', 'managed_by_logo', 'show_managed_by', 'managed_by_label', 'ticket_layout', 'show_seat_number', 'registration_mode', 'cta_label',
+            'managed_by', 'managed_by_logo', 'show_managed_by', 'hide_organizer', 'managed_by_label', 'ticket_layout', 'show_seat_number', 'registration_mode', 'cta_label',
             'tickets_enabled', 'date_tba', 'applications_enabled', 'application_form', 'applications_close', 'application_cta', 'registration_opens',
             'phone_required', 'arrival_alerts', 'reminders_enabled', 'reminders_sms', 'bib_numbers', 'bib_start',
             'parent', 'parent_title',
@@ -148,6 +148,13 @@ class EventSerializer(serializers.ModelSerializer):
             if self.instance.sub_events.exists():
                 raise serializers.ValidationError('This event has sub-events, so it can’t become a sub-event itself.')
         return parent
+
+    def validate_hide_organizer(self, value):
+        """Only a superadmin may change it; anyone else keeps the saved value."""
+        user = getattr(self.context.get('request'), 'user', None)
+        if getattr(user, 'is_superadmin', False):
+            return value
+        return self.instance.hide_organizer if self.instance else False
 
     def validate_managed_by_logo(self, value):
         from apps.platform.catalog import safe_url

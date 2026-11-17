@@ -33,6 +33,7 @@ import { eventPriceLabel, priceText, ticketKeys, ticketsApi } from '@/lib/ticket
 import { Button, ButtonLink, Card, EmptyState, ErrorState, IconButton, ImageUpload, Input, PageHeader, Select, Skeleton, Textarea, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { useModuleEnabled } from '@/lib/modules'
+import { isSuperadmin as isSuperadminUser, useAuth } from '@/lib/auth'
 
 /* ---------- draft shape ---------- */
 
@@ -55,6 +56,7 @@ interface EventDraft {
   allow_registration: boolean
   show_spots_left: boolean
   show_managed_by: boolean
+  hide_organizer: boolean
   ticket_layout: 'vertical' | 'landscape'
   show_seat_number: boolean
   registration_mode: 'pass' | 'form'
@@ -147,6 +149,7 @@ const emptyDraft: EventDraft = {
   allow_registration: true,
   show_spots_left: true,
   show_managed_by: false,
+  hide_organizer: false,
   ticket_layout: 'vertical',
   show_seat_number: false,
   registration_mode: 'pass',
@@ -227,6 +230,7 @@ function fromEvent(ev: Event, page?: EventPageContent): EventDraft {
     allow_registration: ev.allow_registration,
     show_spots_left: ev.show_spots_left ?? true,
     show_managed_by: ev.show_managed_by ?? false,
+    hide_organizer: ev.hide_organizer ?? false,
     ticket_layout: ev.ticket_layout ?? 'vertical',
     show_seat_number: ev.show_seat_number ?? false,
     registration_mode: ev.registration_mode ?? 'pass',
@@ -351,7 +355,7 @@ const FIELD_STEP: Record<string, StepId> = {
   title: 'basics', tagline: 'basics', parent: 'basics', category: 'basics', description: 'basics', banner: 'basics', banner_url: 'basics',
   start_date: 'when', start_time: 'when', end_date: 'when', end_time: 'when', location: 'when', map_query: 'when',
   capacity: 'registration', limit_spots: 'registration', show_spots_left: 'registration', status: 'registration', registration_deadline: 'registration', ticket_price: 'registration', is_paid: 'registration', allow_registration: 'registration', ticket_layout: 'registration', show_seat_number: 'registration', registration_mode: 'registration', cta_label: 'registration', tickets_enabled: 'stages', applications_enabled: 'stages', applications_close: 'stages', application_cta: 'stages', registration_opens: 'registration', opens_after_apps: 'stages', date_tba: 'when', phone_required: 'registration', bib_numbers: 'registration', bib_start: 'registration', form_template: 'form', buyer_form_template: 'form', arrival_alerts: 'registration', reminders_enabled: 'registration', reminders_sms: 'registration',
-  managed_by: 'page', managed_by_label: 'page', managed_by_logo: 'page', show_managed_by: 'page',
+  managed_by: 'page', managed_by_label: 'page', managed_by_logo: 'page', show_managed_by: 'page', hide_organizer: 'page',
 }
 
 function validateStep(id: StepId, d: EventDraft, p: PageDraft, isNew = false): Errors {
@@ -569,6 +573,7 @@ function inDays(n: number) {
 }
 
 const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ event, page }) => {
+  const isSuperadmin = isSuperadminUser(useAuth().user)
   const eventCategories = useEventCategories()
   const seatsOn = useModuleEnabled('seat_numbers')
   const subEventsOn = useModuleEnabled('sub_events')
@@ -706,6 +711,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
         allow_registration: draft.allow_registration,
         show_spots_left: draft.show_spots_left,
         show_managed_by: draft.show_managed_by,
+        ...(isSuperadmin ? { hide_organizer: draft.hide_organizer } : {}),
         ticket_layout: draft.ticket_layout,
         show_seat_number: draft.show_seat_number,
         registration_mode: draft.registration_mode,
@@ -1324,6 +1330,16 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                       />
                       <Input label="Contact phone" type="tel" hint="Optional" value={content.contact_phone} onChange={(e) => setPage('contact_phone', e.target.value)} />
                     </div>
+                    {isSuperadmin && (
+                      <div className="border-t border-ink-100 pt-5">
+                        <Checkbox
+                          label="Hide “Organised by”"
+                          hint="Superadmin only. Hides the organizer’s name under the title and in the Organizer box on the event page."
+                          checked={draft.hide_organizer}
+                          onChange={(v) => set('hide_organizer', v)}
+                        />
+                      </div>
+                    )}
                     <div className="space-y-4 border-t border-ink-100 pt-5">
                       <Checkbox
                         label="Show a partner credit"

@@ -202,6 +202,7 @@ class PublicEventDetailView(APIView):
         from .sub_events import parent_card, sub_event_cards
         data['sub_events'] = sub_event_cards(event)
         data['parent'] = parent_card(event)
+        data['hide_organizer'] = event.hide_organizer
         data['managed_by_info'] = (
             {'name': event.managed_by, 'logo': event.managed_by_logo or None, 'label': event.managed_by_label.strip() or 'Managed by'}
             if event.show_managed_by and event.managed_by.strip() else None

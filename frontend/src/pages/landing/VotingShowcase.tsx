@@ -9,7 +9,6 @@ import { useModuleEnabled } from '@/lib/modules'
 import { contestApi } from '../voting/contest/api'
 import { ContestCard } from '../voting/VotingListPage'
 import { Eyebrow, H2 } from './Discover'
-import { cn } from '@/lib/utils'
 
 export const VotingShowcase: React.FC = () => {
   const { voting: sec } = useHomeContent()
@@ -29,7 +28,7 @@ export const VotingShowcase: React.FC = () => {
             View all contests <ArrowRight className="h-4 w-4" aria-hidden />
           </Link>
         </div>
-        <div className={cn('mt-8 -mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:gap-6 sm:overflow-visible sm:px-0 sm:pb-0 sm:grid-cols-2 lg:grid-cols-3 [&::-webkit-scrollbar]:hidden [&>*]:w-[85%] [&>*]:shrink-0 [&>*]:snap-start sm:[&>*]:w-auto', list.length === 1 && 'sm:mx-auto sm:max-w-md sm:grid-cols-1 lg:grid-cols-1 [&>*]:w-full', list.length === 2 && 'lg:mx-auto lg:max-w-3xl lg:grid-cols-2')}>
+        <div className="mt-8 -mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:gap-5 sm:overflow-visible sm:px-0 sm:pb-0 sm:grid-cols-2 lg:grid-cols-3 [&::-webkit-scrollbar]:hidden [&>*]:w-[85%] [&>*]:shrink-0 [&>*]:snap-start sm:[&>*]:w-auto">
           {list.map((c) => <ContestCard compact key={c.id} c={c} />)}
         </div>
       </div>

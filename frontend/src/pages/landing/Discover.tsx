@@ -72,7 +72,6 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
 const iconFor = (slug: string) => CATEGORY_ICONS[slug] ?? Sparkles
 
 const useUpcoming = () => useQuery({ queryKey: ['landing', 'events'], queryFn: () => api.getPublicEvents({ when: 'upcoming' }), staleTime: 60_000 })
-const useVendors = () => useQuery({ queryKey: ['landing', 'vendors'], queryFn: () => api.getVendors(), staleTime: 60_000 })
 const useVendorCategories = () => useQuery({ queryKey: ['marketplaceCategories'], queryFn: api.getCategories, staleTime: 5 * 60_000 })
 
 /* ------------------------------------------------------------------ */
@@ -294,7 +293,7 @@ export const EventsShowcase: React.FC = () => {
         )}
         <ul className="mt-8 -mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:gap-5 sm:overflow-visible sm:px-0 sm:pb-0 sm:grid-cols-2 lg:grid-cols-3 [&::-webkit-scrollbar]:hidden [&>*]:w-[85%] [&>*]:shrink-0 [&>*]:snap-start sm:[&>*]:w-auto">
           {list.map((e) => (
-            <EventCard key={e.id} event={e} past={false} />
+            <EventCard compact key={e.id} event={e} past={false} />
           ))}
         </ul>
       </div>
@@ -337,55 +336,6 @@ export const FeaturedMarketShowcase: React.FC = () => {
               ? <VenueCard compact key={`venue-${x.v.id}`} venue={x.v} to={`/marketplace/venues/${x.v.slug}`} />
               : <VendorCard compact key={`vendor-${x.v.id}`} vendor={x.v} to={`/marketplace/vendors/${x.v.id}`} />,
           )}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-/* ------------------------------------------------------------------ */
-/* Featured vendors (live data)                                         */
-
-export const VendorsShowcase: React.FC = () => {
-  const { vendors: sec } = useHomeContent()
-  const { data = [], isLoading } = useVendors()
-  const categories = useVendorCategories().data ?? []
-  const [cat, setCat] = useState('')
-  const used = categories.filter((c) => data.some((v) => v.category_slug === c.slug))
-  const list = (cat ? data.filter((v) => v.category_slug === cat) : data).slice(0, 3)
-  if (!sec.show || (!isLoading && data.length === 0)) return null
-
-  return (
-    <section className="bg-white py-14 sm:py-16">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <Eyebrow>{sec.eyebrow}</Eyebrow>
-            <H2>{sec.title}</H2>
-          </div>
-          <Link to="/marketplace" className={buttonClass('secondary', 'md', 'rounded-full')}>
-            View all vendors <ArrowRight className="h-4 w-4" aria-hidden />
-          </Link>
-        </div>
-        {used.length > 1 && (
-          <div className="-mx-4 mt-6 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0 [&::-webkit-scrollbar]:hidden [&>*]:shrink-0" role="group" aria-label="Vendor type">
-            {[{ slug: '', name: 'All' }, ...used].map((c) => (
-              <button
-                key={c.slug || 'all'}
-                type="button"
-                aria-pressed={cat === c.slug}
-                onClick={() => setCat(c.slug)}
-                className={cn('rounded-full px-4 py-1.5 text-sm font-medium', cat === c.slug ? 'bg-ink-900 text-white' : 'bg-white text-ink-700 hover:bg-ink-50')}
-              >
-                {c.name}
-              </button>
-            ))}
-          </div>
-        )}
-        <div className="mt-8 -mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:gap-5 sm:overflow-visible sm:px-0 sm:pb-0 sm:grid-cols-2 lg:grid-cols-3 [&::-webkit-scrollbar]:hidden [&>*]:w-[85%] [&>*]:shrink-0 [&>*]:snap-start sm:[&>*]:w-auto">
-          {list.map((v) => (
-            <VendorCard compact key={v.id} vendor={v} to={`/marketplace/vendors/${v.id}`} />
-          ))}
         </div>
       </div>
     </section>
