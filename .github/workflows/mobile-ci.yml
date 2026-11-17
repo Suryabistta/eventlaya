@@ -14,6 +14,8 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
+    env:
+      TZ: Asia/Kathmandu   # tests and goldens assume Nepal time (BS dates, countdowns)
     defaults:
       run:
         working-directory: scanner_app

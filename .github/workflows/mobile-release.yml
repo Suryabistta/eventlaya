@@ -30,6 +30,8 @@ jobs:
   android:
     runs-on: ubuntu-latest
     environment: play   # optional: add required reviewers to this environment in repo settings
+    env:
+      TZ: Asia/Kathmandu   # tests and goldens assume Nepal time (BS dates, countdowns)
     defaults:
       run:
         working-directory: scanner_app
