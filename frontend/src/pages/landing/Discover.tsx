@@ -233,19 +233,15 @@ export const SearchHero: React.FC = () => {
 export const EventsShowcase: React.FC = () => {
   const { events: sec } = useHomeContent()
   const { data = [], isLoading } = useUpcoming()
-  const eventTypes = useEventCategories()
   const [picked, setTab] = useState<'featured' | 'upcoming' | null>(null)
-  const [type, setType] = useState('')
   // "Featured" shows only what the superadmin featured; with nothing featured the tab hides itself
   const anyFeatured = data.some((e) => e.is_featured)
   const tab = picked ?? (anyFeatured ? 'featured' : 'upcoming')
   const list = useMemo(() => {
     let l = data
-    if (type) l = l.filter((e) => e.category === type)
     if (tab === 'featured') l = l.filter((e) => e.is_featured)
     return l.slice(0, 3)
-  }, [data, tab, type])
-  const usedTypes = eventTypes.filter((t) => data.some((e) => e.category === t.slug))
+  }, [data, tab])
   if (!sec.show || (!isLoading && data.length === 0)) return null
 
   return (
@@ -273,24 +269,6 @@ export const EventsShowcase: React.FC = () => {
             </Link>
           </div>
         </div>
-        {usedTypes.length > 1 && (
-          <div className="mt-6 flex flex-wrap gap-2" role="group" aria-label="Event type">
-            {[{ slug: '', name: 'All events' }, ...usedTypes].map((t) => (
-              <button
-                key={t.slug || 'all'}
-                type="button"
-                aria-pressed={type === t.slug}
-                onClick={() => setType(t.slug)}
-                className={cn(
-                  'rounded-full border px-4 py-1.5 text-sm font-medium',
-                  type === t.slug ? 'border-brand-600 bg-brand-600 text-white' : 'border-ink-200 text-ink-700 hover:border-ink-300',
-                )}
-              >
-                {t.name}
-              </button>
-            ))}
-          </div>
-        )}
         <ul className="mt-8 -mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:gap-5 sm:overflow-visible sm:px-0 sm:pb-0 sm:grid-cols-2 lg:grid-cols-3 [&::-webkit-scrollbar]:hidden [&>*]:w-[85%] [&>*]:shrink-0 [&>*]:snap-start sm:[&>*]:w-auto">
           {list.map((e) => (
             <EventCard compact key={e.id} event={e} past={false} />
