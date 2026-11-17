@@ -120,7 +120,12 @@ class GlassChip extends StatelessWidget {
             Container(width: 7, height: 7, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
             const SizedBox(width: 6),
           ],
-          Text(label, style: AppType.body(12, weight: FontWeight.w600, color: Colors.white, height: 1.2)),
+          Flexible(
+            child: Text(label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppType.body(12, weight: FontWeight.w600, color: Colors.white, height: 1.2)),
+          ),
         ],
       ),
     );
