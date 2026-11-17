@@ -15,7 +15,7 @@ The scanner app is architected with complete push notification support for:
 
 ## 2. Android App Configuration
 1. In Firebase Project Overview, click **Add App** → **Android**.
-2. **Android package name**: `com.eventlaya.eventlaya_scanner` (must match `namespace` in `android/app/build.gradle.kts`).
+2. **Android package name**: `com.eventlaya.eventlaya` (must match `namespace` in `android/app/build.gradle.kts`).
 3. App nickname: `Eventlaya Scanner`.
 4. Download `google-services.json`.
 5. Move the downloaded file to:

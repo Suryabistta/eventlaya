@@ -15,7 +15,7 @@ class SocialCancelled implements Exception {
 /// Google sign-in via `google_sign_in` (Android Credential Manager / iOS SDK).
 ///
 /// Needs, outside the code (see report): an Android OAuth client for the
-/// package `com.eventlaya.eventlaya_scanner` + the signing SHA-1 in Google
+/// package `com.eventlaya.eventlaya` + the signing SHA-1 in Google
 /// Cloud, and the *Web* OAuth client ID as `serverClientId` so the ID token
 /// is issued for the backend. The Web client ID is taken from
 /// `--dart-define=GOOGLE_SERVER_CLIENT_ID=…` when given, else the first of

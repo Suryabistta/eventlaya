@@ -13,7 +13,7 @@ _Last updated: 2026-10-29_
 | Web app | Vite + React 19 + TS (`frontend/`) | https://eventlaya.com (static files served by Nginx) |
 | API | Django 6 + DRF + Channels (`backend/`) | https://api.eventlaya.com and `https://eventlaya.com/api/` |
 | Real-time chat | Channels WebSockets + Redis | `wss://api.eventlaya.com/ws/chat/` |
-| Mobile app | Flutter (`scanner_app/`), package `com.eventlaya.eventlaya_scanner`, name "Eventlaya" | Android (iOS later) |
+| Mobile app | Flutter (`scanner_app/`), package `com.eventlaya.eventlaya`, name "Eventlaya" | Android (iOS later) |
 | Database | PostgreSQL 16 | on the droplet |
 | Uploads | DigitalOcean block-storage volume `eventlaya-media` | `/mnt/eventlaya_media/media` (`MEDIA_ROOT`) |
 | Push | Firebase Cloud Messaging, project `eventlaya` | key on server, `FIREBASE_CREDENTIALS_PATH` |

@@ -4,7 +4,7 @@ Answers for the Play Console (Data safety, App content) and the Meta app setting
 as of 2026-10-28. Keep them in step with the policies (`frontend/src/pages/legal/`) and the code; when a
 feature starts collecting something new, update the policy, this file and the Play form together.
 
-App: **Eventlaya** — package `com.eventlaya.eventlaya_scanner` (`scanner_app/`).
+App: **Eventlaya** — package `com.eventlaya.eventlaya` (`scanner_app/`).
 
 ## 1. URLs to paste
 

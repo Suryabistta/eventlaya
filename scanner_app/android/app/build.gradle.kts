@@ -37,7 +37,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.eventlaya.eventlaya_scanner"
+        applicationId = "com.eventlaya.eventlaya"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

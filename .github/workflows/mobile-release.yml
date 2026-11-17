@@ -99,7 +99,7 @@ jobs:
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.eventlaya.eventlaya_scanner
+          packageName: com.eventlaya.eventlaya
           releaseFiles: scanner_app/build/release-out/*.aab
           track: internal
           status: ${{ inputs.status || 'draft' }}

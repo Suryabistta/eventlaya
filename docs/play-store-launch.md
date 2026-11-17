@@ -1,6 +1,6 @@
 # Google Play launch — every screen, from "Create app" to production
 
-App: **Eventlaya** · package `com.eventlaya.eventlaya_scanner` · code in `scanner_app/` · same Play developer account
+App: **Eventlaya** · package `com.eventlaya.eventlaya` · code in `scanner_app/` · same Play developer account
 as Flapmo. Signing and builds: `docs/mobile-release.md`. Data safety answers: `docs/play-store.md`.
 
 Checked against the code on 16 Nov 2026: permissions are CAMERA, POST_NOTIFICATIONS, INTERNET, ACCESS_NETWORK_STATE,
@@ -187,7 +187,7 @@ First release: explore events, QR passes, voting, vendors, organizer dashboard a
 ### 6.2 Right after the first upload (important)
 Test and release → **App integrity → App signing**:
 1. Copy the **SHA-1** of the **App signing key** (Play's) and of the **Upload key** (yours) → Firebase → Project
-   settings → Android app `com.eventlaya.eventlaya_scanner` → **Add fingerprint** (both). Download the new
+   settings → Android app `com.eventlaya.eventlaya` → **Add fingerprint** (both). Download the new
    `google-services.json` into `scanner_app/android/app/`. **Without this, Google sign-in fails in Play builds.**
 2. Copy the **SHA-256** of both keys → add them to `frontend/public/.well-known/assetlinks.json`
    (`sha256_cert_fingerprints`), then deploy the website. **Without this, eventlaya.com/e/… and /ticket/… links

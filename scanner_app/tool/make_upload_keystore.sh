@@ -23,7 +23,7 @@ if [[ -e "$KEYSTORE" ]]; then
   exit 1
 fi
 
-echo "Creating the upload keystore for com.eventlaya.eventlaya_scanner"
+echo "Creating the upload keystore for com.eventlaya.eventlaya"
 echo
 echo "Choose a strong password and save it in your password manager NOW, before you type it."
 echo "It cannot be recovered from the keystore."

@@ -1,6 +1,6 @@
 # Mobile app releases (Android) — signing, first upload, CI/CD
 
-App: **Eventlaya** — package `com.eventlaya.eventlaya_scanner`, code in `scanner_app/`. Same Google Play developer
+App: **Eventlaya** — package `com.eventlaya.eventlaya`, code in `scanner_app/`. Same Google Play developer
 account as Flapmo. iOS comes later (needs an Apple Developer account and `GoogleService-Info.plist`).
 
 ## 1. Release signing (once, on your machine)
@@ -40,7 +40,7 @@ version bump.
 3. Fill in App content and Data safety from `docs/play-store.md`.
 4. **Fingerprints for Google sign-in** — Play Console → **Test and release → App integrity → App signing**:
    copy the **SHA-1 of the app signing key** (Play's) and of the **upload key** (yours). Add **both** in
-   Firebase → Project settings → Your apps → Android app `com.eventlaya.eventlaya_scanner` → **Add fingerprint**.
+   Firebase → Project settings → Your apps → Android app `com.eventlaya.eventlaya` → **Add fingerprint**.
    Download the updated `google-services.json` into `scanner_app/android/app/`. Without this, Google sign-in
    fails in Play builds.
 
