@@ -1,3 +1,4 @@
+import { FeatureToggle } from '@/components/FeatureToggle'
 import React, { useEffect, useId, useMemo, useState } from 'react'
 import { CountdownBoxes, StageArt } from './voting/stage'
 import { FavouriteButton } from '@/lib/favourites'
@@ -191,6 +192,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
             <h1 className="mt-3 text-3xl font-bold leading-[1.1] text-ink-900 sm:text-5xl">{event.title}</h1>
             {event.tagline && <p className="mt-3 max-w-3xl text-lg text-ink-600 sm:text-xl">{event.tagline}</p>}
             <OrganizerLine event={event} className="mt-4" />
+            <FeatureToggle kind="event" id={event.id} featured={Boolean(event.is_featured)} className="mt-4" />
           </div>
           <div className="hidden flex-wrap gap-2 lg:flex">
             <Button variant="secondary" icon={<CalendarPlus className="h-4 w-4" aria-hidden />} onClick={addToCalendar}>

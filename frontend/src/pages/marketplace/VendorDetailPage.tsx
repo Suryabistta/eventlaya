@@ -1,3 +1,4 @@
+import { FeatureToggle } from '@/components/FeatureToggle'
 import React, { useEffect, useState } from 'react'
 import { track } from '@/lib/analytics'
 import { useParams } from 'react-router-dom'
@@ -95,6 +96,7 @@ export const VendorDetailPage: React.FC = () => {
         <div className="flex flex-wrap gap-1.5">
           <Badge>{vendor.category_name}</Badge>
           {vendor.is_featured && <Badge tone="warning">Featured</Badge>}
+          <FeatureToggle kind="vendor" id={vendor.id} featured={vendor.is_featured} className="ml-auto" />
         </div>
         <div className="flex items-center gap-4">
           <BusinessLogo src={mediaUrl(vendor.logo) ?? undefined} className="h-16 w-16" />
