@@ -116,8 +116,8 @@ export const PublicEventPage: React.FC = () => {
 
 /* ------------------------------------------------------------------ */
 
-type SectionId = 'about' | 'sessions' | 'tickets' | 'schedule' | 'speakers' | 'venue' | 'faqs'
-const SECTION_LABEL: Record<SectionId, string> = { about: 'About', sessions: 'Sub-events', tickets: 'Tickets', schedule: 'Schedule', speakers: 'Speakers', venue: 'Venue', faqs: 'FAQs' }
+type SectionId = 'about' | 'sessions' | 'tickets' | 'schedule' | 'speakers' | 'venue' | 'faqs' | 'terms'
+const SECTION_LABEL: Record<SectionId, string> = { about: 'About', sessions: 'Sub-events', tickets: 'Tickets', schedule: 'Schedule', speakers: 'Speakers', venue: 'Venue', faqs: 'FAQs', terms: 'Terms' }
 
 const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
   const toast = useToast()
@@ -136,6 +136,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
     if (event.speakers?.length) s.push('speakers')
     if (!event.date_tba) s.push('venue')
     if (event.faqs?.length) s.push('faqs')
+    if (event.terms) s.push('terms')
     return s
   }, [event])
   const active = useActiveSection(sections)
@@ -155,6 +156,8 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
   /** Ended or cancelled: keep the page readable, drop the call to action */
   const over = state.phase === 'ended' || state.phase === 'cancelled'
   const showCta = !over || Boolean(storedPass)
+  // White-label sites have no phone tab bar, so the bar sits on the bottom edge
+  const tenant = useTenant()
   /** Applications are the way in right now: an open call without tickets, or registration closed while applications are open */
   const applyFirst = Boolean(event.applications?.open) && (callOnly(event) || (!state.open && !storedPass))
   const appsOver = Boolean(event.applications && !event.applications.open && event.tickets_enabled !== false) && !(event.stages ?? []).some((x) => x.kind === 'voting')
@@ -393,7 +396,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
 
       {/* Mobile register bar */}
       {showCta && (
-      <div className="fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] md:bottom-0 z-30 border-t border-ink-200 bg-white/95 backdrop-blur lg:hidden">
+      <div className={`fixed inset-x-0 z-30 border-t border-ink-200 bg-white/95 backdrop-blur lg:hidden ${tenant ? 'bottom-0 pb-[env(safe-area-inset-bottom)]' : 'bottom-[calc(60px+env(safe-area-inset-bottom))] md:bottom-0'}`}>
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-6">
           <div className="min-w-0 flex-1">
             <p className="font-display text-lg font-bold leading-tight text-ink-900">{price}</p>
