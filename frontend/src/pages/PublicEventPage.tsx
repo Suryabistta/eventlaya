@@ -213,7 +213,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
 
         {/* Key facts */}
         <dl className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Fact icon={<CalendarDays className="h-5 w-5" aria-hidden />} label={event.date_tba ? 'Applications close' : 'Date'}>
+          <Fact icon={<CalendarDays className="h-5 w-5" aria-hidden />} label={event.date_tba ? 'Applications close' : 'Date'} iconOnly={!event.date_tba}>
             <span className="font-semibold text-ink-900">{when.range}</span>
             {event.start_time && (
               <span className="block text-ink-500">
@@ -225,7 +225,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
           {/* Only the facts that fit the registration type: open calls skip venue (when online), spots and price;
               registration-only events skip price and show spots only when limited */}
           {!event.date_tba && (
-            <Fact icon={<MapPin className="h-5 w-5" aria-hidden />} label="Venue">
+            <Fact icon={<MapPin className="h-5 w-5" aria-hidden />} label="Venue" iconOnly>
               <a href="#venue" className="font-semibold text-ink-900 hover:text-brand-700 hover:underline">
                 {event.location}
               </a>
@@ -582,12 +582,13 @@ const PhaseBanner: React.FC<{ event: PublicEvent; state: ReturnType<typeof regis
   return null
 }
 
-const Fact: React.FC<{ icon: React.ReactNode; label: string; children: React.ReactNode }> = ({ icon, label, children }) => (
+// iconOnly: the icon says what it is (date, venue); the label stays for screen readers
+const Fact: React.FC<{ icon: React.ReactNode; label: string; iconOnly?: boolean; children: React.ReactNode }> = ({ icon, label, iconOnly, children }) => (
   <div className="flex gap-3 rounded-xl border border-ink-200 bg-white p-4">
     <span className="mt-0.5 text-brand-600">{icon}</span>
     <div className="min-w-0 flex-1 text-sm">
-      <dt className="text-xs font-medium text-ink-500">{label}</dt>
-      <dd className="mt-0.5">{children}</dd>
+      <dt className={iconOnly ? 'sr-only' : 'text-xs font-medium text-ink-500'}>{label}</dt>
+      <dd className={iconOnly ? '' : 'mt-0.5'}>{children}</dd>
     </div>
   </div>
 )
