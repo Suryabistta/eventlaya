@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Vote, CalendarDays, House, LayoutDashboard, LogIn, Menu, Store, Ticket, UserRound, X, type LucideIcon } from 'lucide-react'
+import { bottomBarPadding } from '@/components/LegalFooter'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth'
 import { Logo } from '@/components/ui/Logo'
@@ -143,7 +144,7 @@ export const MarketingLayout: React.FC = () => {
         </React.Suspense>
       </main>
 
-      <footer className="border-t border-ink-200 bg-ink-50 text-ink-600">
+      <footer className={cn('border-t border-ink-200 bg-ink-50 text-ink-600', bottomBarPadding(location.pathname))}>
         <div className="mx-auto grid max-w-6xl grid-cols-2 gap-x-6 gap-y-10 px-4 py-14 sm:px-6 md:grid-cols-4 lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr]">
           <div className="col-span-2 max-w-xs md:col-span-4 lg:col-span-1">
             <Logo tagline />

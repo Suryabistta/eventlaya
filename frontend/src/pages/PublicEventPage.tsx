@@ -163,7 +163,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
   const appsOver = Boolean(event.applications && !event.applications.open && event.tickets_enabled !== false) && !(event.stages ?? []).some((x) => x.kind === 'voting')
 
   return (
-    <div className="pb-28 lg:pb-12">
+    <div className="pb-6 lg:pb-12">
       {/* Hero */}
       <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6 sm:pt-8">
         <PhaseBanner event={event} state={state} hasPass={Boolean(storedPass)} />
@@ -275,7 +275,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
       </nav>
 
       <div className="mx-auto grid max-w-6xl gap-10 px-4 pt-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
-        <div className="min-w-0 space-y-14">
+        <div className="min-w-0 space-y-10 lg:space-y-14">
           {sections.includes('about') && (
             <Section id="about" title="About this event">
               {event.description && <p className="whitespace-pre-line text-base leading-relaxed text-ink-700">{event.description}</p>}
