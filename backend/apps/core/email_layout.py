@@ -162,7 +162,7 @@ def render(*, brand, title, preheader='', name=None, paragraphs=(), code=None, c
 
     # ── HTML
     header = (f'<img src="{escape(brand.logo)}" alt="{escape(brand.name)}" height="36" '
-              f'style="display:block;height:36px;width:auto;border:0;">' if brand.logo else
+              f'style="display:block;margin:0 auto;height:36px;width:auto;border:0;">' if brand.logo else
               f'<span style="font-size:20px;font-weight:800;color:{c};">{escape(brand.name)}</span>')
     body = [f'<h1 style="margin:0 0 18px;font-size:22px;line-height:1.3;font-weight:800;color:{INK};">{escape(title)}</h1>']
     if name:
@@ -210,7 +210,7 @@ def render(*, brand, title, preheader='', name=None, paragraphs=(), code=None, c
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:{PAPER};">
 <tr><td align="center" style="padding:28px 12px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
-<tr><td style="padding:0 4px 18px;">{header}</td></tr>
+<tr><td align="center" style="padding:0 4px 18px;text-align:center;">{header}</td></tr>
 <tr><td style="background:#ffffff;border-radius:16px;border:1px solid {LINE};border-top:4px solid {c};padding:28px 26px 12px;">
 {''.join(body)}
 </td></tr>
