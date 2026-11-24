@@ -60,6 +60,8 @@ MODULES = [
      'and topped up on request.', 'MessageSquareText', 22, ['organizer']),
     ('stage_schedule', 'Scheduled stages', 'Registration or tickets open by themselves at a set time, for example when '
      'applications close.', 'CalendarClock', 24, ['organizer', 'staff', 'attendee']),
+    ('organizer_alerts', 'Organizer email alerts', 'Email the organizer when someone registers, buys tickets or applies '
+     'to one of their events.', 'BellRing', 25, ['organizer']),
 ]
 
 # A module is only on when every module it requires is on too (for the same user).

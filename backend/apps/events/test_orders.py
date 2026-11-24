@@ -7,6 +7,11 @@ from rest_framework.test import APITestCase
 
 from apps.events.models import Event, EventTicket, PromoCode, TicketOrder, TicketType
 
+
+def buyer_mails():
+    """Emails to the buyer (leaves out the organizer alert, module organizer_alerts)."""
+    return [m for m in mail.outbox if 'organizer alerts' not in m.body]
+
 User = get_user_model()
 
 
@@ -40,9 +45,9 @@ class OrderTests(APITestCase):
         self.assertEqual((order.ticket_count, order.total), (3, Decimal('1250')))
         self.assertEqual(res.data['order']['reference'], order.reference)
         self.assertEqual(res.data['ticket']['attendee_name'], 'Asha Rai')  # older clients read `ticket`
-        self.assertEqual(len(mail.outbox), 1)
-        self.assertIn('3 passes', mail.outbox[0].subject)
-        self.assertIn('/ticket/', mail.outbox[0].body)
+        self.assertEqual(len(buyer_mails()), 1)
+        self.assertIn('3 passes', buyer_mails()[0].subject)
+        self.assertIn('/ticket/', buyer_mails()[0].body)
 
     def test_limits(self):
         res = self.register([{'ticket_type_id': str(self.general.id), 'quantity': 6}])
@@ -133,3 +138,27 @@ class HiddenSpotsTests(APITestCase):
         ev = self.client.get('/api/events/public/quiet-fest/').data['event']
         self.assertFalse(ev['spots_hidden'])
         self.assertEqual((ev['spots_left'], ev['ticket_types'][0]['remaining']), (99, 40))
+
+
+class OrganizerAlertTests(OrderTests):
+    """Module organizer_alerts: on by default, the superadmin can switch it off."""
+
+    def alerts(self):
+        return [m for m in mail.outbox if m.to == ['org@test.com']]
+
+    def test_organizer_gets_an_email_for_each_booking(self):
+        self.assertEqual(self.register([{'ticket_type_id': str(self.general.id), 'quantity': 2}]).status_code, 201)
+        [alert] = self.alerts()
+        self.assertIn('New booking: Asha Rai', alert.subject)
+        self.assertIn('General × 2', alert.body)
+        self.assertIn(f'/app/events/{self.event.id}/analytics', alert.body)
+
+    def test_off_when_the_superadmin_switches_the_module_off(self):
+        from apps.accounts import modules
+        from apps.accounts.models import PlatformModule
+        PlatformModule.objects.filter(slug='organizer_alerts').update(is_globally_enabled=False)
+        modules.clear_cache()
+        self.addCleanup(modules.clear_cache)
+        self.assertEqual(self.register([{'ticket_type_id': str(self.general.id), 'quantity': 1}]).status_code, 201)
+        self.assertEqual(self.alerts(), [])
+        self.assertEqual(len(buyer_mails()), 1)

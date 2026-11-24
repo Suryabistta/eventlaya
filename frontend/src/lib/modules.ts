@@ -29,6 +29,7 @@ export type ModuleSlug =
   | 'applications'
   | 'guest_management'
   | 'stage_schedule'
+  | 'organizer_alerts'
   | 'sms'
 
 interface ModulesResponse {

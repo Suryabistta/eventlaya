@@ -225,7 +225,10 @@ def on_ticket_paid(intent):
 
         def send():
             fresh = TicketOrder.objects.select_related('event', 'event__organizer').get(pk=order_id)
-            send_order_email(fresh, list(fresh.tickets.order_by('guest_number')), fresh.event)
+            tickets = list(fresh.tickets.order_by('guest_number'))
+            from apps.core import organizer_alerts
+            organizer_alerts.new_order(fresh, tickets, fresh.event)
+            send_order_email(fresh, tickets, fresh.event)
         transaction.on_commit(send)
 
 

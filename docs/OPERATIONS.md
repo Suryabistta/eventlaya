@@ -86,6 +86,7 @@ Every feature is a module the superadmin switches on/off globally and per role
 | `white_label` | organizer branding + white-label sites (custom domain / `<name>.eventlaya.com`); off also stops serving tenant sites | on for organizer (+ superadmin) |
 | `blog` | public blog `/blog` (+ its API and pages for crawlers); superadmins write in Superadmin → Blog. Off → blog pages 404, the footer/menu link hides, it leaves the sitemap and llms.txt. See `docs/seo.md` | on for all |
 | `payments` | online payments (Khalti / eSewa), payments reports, payouts; off → online options disappear, pay at the venue keeps working (provider returns + status polls stay reachable). See `docs/payments.md` | on for organizer, attendee (+ superadmin) |
+| `organizer_alerts` | email the organizer when someone books tickets, registers or applies (`apps/core/organizer_alerts.py`); off → no alerts | on for organizer |
 
 **Rule for new features:** add a module (data migration), map its URL prefix in `PATH_MODULES`,
 and hide it in both apps when it isn't in `/api/auth/modules/`.

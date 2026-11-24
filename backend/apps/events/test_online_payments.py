@@ -18,6 +18,11 @@ from apps.payments import services
 from apps.payments.models import PaymentIntent
 from apps.payments.providers import esewa_signature, esewa_signed_message
 
+
+def buyer_mails():
+    """Emails to the buyer (leaves out the organizer alert, module organizer_alerts)."""
+    return [m for m in mail.outbox if 'organizer alerts' not in m.body]
+
 User = get_user_model()
 T = EventTicket.Status
 P = TicketOrder.PaymentStatus
@@ -108,9 +113,9 @@ class OnlineTicketTests(APITestCase):
         order.refresh_from_db()
         self.assertEqual((order.payment_status, order.paid_via, order.paid_amount), (P.PAID, 'test', Decimal('1000')))
         self.assertEqual(set(order.tickets.values_list('status', flat=True)), {T.VALID})
-        self.assertEqual(len(mail.outbox), 1)
-        self.assertIn('online with Test payment', mail.outbox[0].body)
-        self.assertIn(order.payment_reference, mail.outbox[0].body)
+        self.assertEqual(len(buyer_mails()), 1)
+        self.assertIn('online with Test payment', buyer_mails()[0].body)
+        self.assertIn(order.payment_reference, buyer_mails()[0].body)
 
         status = self.client.get(f'/api/payments/intents/{intent_id}/').data
         self.assertEqual(status['status'], 'paid')
@@ -121,7 +126,7 @@ class OnlineTicketTests(APITestCase):
         # A second return / poll doesn't send another email or change anything
         self.client.get(f'/api/payments/return/test/{intent_id}/')
         self.client.get(f'/api/payments/intents/{intent_id}/')
-        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(len(buyer_mails()), 1)
 
     def test_cancelled_payment_releases_tickets_and_allows_retry(self):
         r = self.register(items=[{'ticket_type_id': str(self.vip.id), 'quantity': 2}])
@@ -219,8 +224,8 @@ class OnlineTicketTests(APITestCase):
         self.assertTrue(r['Location'].endswith('status=paid') and r2['Location'].endswith('status=paid'))
         order = TicketOrder.objects.get()
         self.assertEqual((order.paid_via, order.payment_reference), ('khalti', 'GFq9PFS7b2iYvL8Lir9oXe'))
-        self.assertEqual(len(mail.outbox), 1)
-        self.assertIn('Khalti', mail.outbox[0].body)
+        self.assertEqual(len(buyer_mails()), 1)
+        self.assertIn('Khalti', buyer_mails()[0].body)
 
     def test_esewa_end_to_end_with_mocked_status(self):
         r = self.register(provider='esewa')
@@ -258,7 +263,7 @@ class OnlineTicketTests(APITestCase):
         r = self.register(method='venue', provider='')
         self.assertEqual(r.status_code, 201, r.data)
         self.assertEqual(r.data['ticket']['payment']['label'], 'Pay Rs 1,000 at the venue')
-        self.assertIn('to pay at the venue', mail.outbox[0].body)
+        self.assertIn('to pay at the venue', buyer_mails()[0].body)
         # Older clients send no payment_method: venue
         r = self.client.post('/api/forms/events/dff/register/', {'name': 'Old', 'email': 'old@test.com', 'phone': '9800000000',
                                                                  'ticket_type_id': str(self.general.id)}, format='json')

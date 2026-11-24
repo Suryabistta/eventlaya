@@ -266,6 +266,8 @@ class EventRegisterView(APIView):
 
         if event.registration_only:
             from apps.core.email import send_registration_email
+            from apps.core import organizer_alerts
+            organizer_alerts.new_registration(tickets[0], event)
             send_registration_email(tickets[0], event)
             return Response({
                 'message': f'You are registered for {event.title}.',
@@ -275,6 +277,8 @@ class EventRegisterView(APIView):
             }, status=status.HTTP_201_CREATED)
 
         from apps.core.email import send_order_email
+        from apps.core import organizer_alerts
+        organizer_alerts.new_order(order, tickets, event)
         send_order_email(order, tickets, event)
 
         data = EventTicketSerializer(tickets, many=True).data
@@ -524,6 +528,8 @@ class ApplyView(APIView):
                     FormAnswer.objects.create(response=resp, field=field, value=answers[str(field.id)])
         from apps.core.email import send_application_received
         from apps.core.sms import send_application_sms
+        from apps.core import organizer_alerts
+        organizer_alerts.new_application(resp, event)
         send_application_received(resp, event)
         send_application_sms(resp, event)
         return Response({'message': f'Thank you so much! Your application for {event.title} has been received.', 'application': application_data(resp)},
