@@ -13,7 +13,8 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'email', 'phone', 'role', 'organization_name', 'avatar', 'marketplace_access',
                   'business_type', 'city', 'first_name', 'last_name', 'full_name',
                   'email_verified', 'email_verified_at', 'has_password', 'social_providers', 'date_joined',
-                  'terms_accepted_at', 'terms_version', 'is_verified', 'must_change_password']
+                  'terms_accepted_at', 'terms_version', 'is_verified', 'must_change_password',
+                  'alert_bookings', 'alert_registrations', 'alert_applications']
         read_only_fields = ['id', 'marketplace_access', 'email_verified', 'email_verified_at', 'date_joined',
                             'terms_accepted_at', 'terms_version', 'is_verified', 'must_change_password']
 
@@ -36,7 +37,8 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['first_name', 'last_name', 'phone', 'city', 'organization_name', 'avatar_url']
+        fields = ['first_name', 'last_name', 'phone', 'city', 'organization_name', 'avatar_url',
+                  'alert_bookings', 'alert_registrations', 'alert_applications']
         extra_kwargs = {
             'first_name': {'required': False, 'allow_blank': True, 'max_length': 150},
             'last_name': {'required': False, 'allow_blank': True, 'max_length': 150},

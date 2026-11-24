@@ -88,6 +88,9 @@ export interface ProfileInput {
   organization_name?: string
   /** Path from /api/uploads/ (kind=avatar); '' removes the photo */
   avatar_url?: string
+  alert_bookings?: boolean
+  alert_registrations?: boolean
+  alert_applications?: boolean
 }
 
 export const accountApi = {

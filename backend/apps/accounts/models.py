@@ -48,6 +48,10 @@ class User(AbstractUser):
     is_verified = models.BooleanField(default=False)
     # Set when a platform admin gives out a temporary password; cleared when the user picks their own
     must_change_password = models.BooleanField(default=False)
+    # Organizer email alerts (module organizer_alerts); the organizer switches each kind off in Profile
+    alert_bookings = models.BooleanField(default=True)
+    alert_registrations = models.BooleanField(default=True)
+    alert_applications = models.BooleanField(default=True)
     # Tokens issued before this moment are rejected (admin password reset signs the user out everywhere)
     sessions_valid_after = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)

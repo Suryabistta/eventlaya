@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { AlertTriangle, BadgeCheck, KeyRound, MailWarning, Trash2, UserRound } from 'lucide-react'
+import { AlertTriangle, BadgeCheck, BellRing, KeyRound, MailWarning, Trash2, UserRound } from 'lucide-react'
 import { ApiError } from '@/services/api'
 import { useAuth } from '@/lib/auth'
 import { accountApi, mediaUrl } from '@/lib/account'
@@ -8,6 +8,7 @@ import { Badge, Button, Card, CardHeader, ImageUpload, Input, Modal, PageHeader,
 import { PasswordInput, PasswordStrength } from '../auth/shared'
 import { ACCOUNT_PAGE } from './MyTicketsPage'
 import { LEGAL_PATHS } from '@/lib/legal'
+import { useModuleEnabled } from '@/lib/modules'
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : 'Something went wrong. Try again.')
 
@@ -31,6 +32,7 @@ export const ProfilePage: React.FC = () => {
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <DetailsCard />
         <div className="space-y-6">
+          <AlertsCard />
           <SignInCard />
           <PasswordCard />
           <DeleteCard />
@@ -41,6 +43,60 @@ export const ProfilePage: React.FC = () => {
 }
 
 /* ------------------------------------------------------------------ */
+
+type AlertKey = 'alert_bookings' | 'alert_registrations' | 'alert_applications'
+const ALERTS: { key: AlertKey; label: string; hint: string }[] = [
+  { key: 'alert_bookings', label: 'Ticket bookings', hint: 'Someone books tickets: free, pay at the venue or paid online.' },
+  { key: 'alert_registrations', label: 'Registrations', hint: 'Someone registers for a registration-only event.' },
+  { key: 'alert_applications', label: 'Applications', hint: 'Someone applies or submits an entry.' },
+]
+
+/** Organizer email alerts (module organizer_alerts): one switch per kind, saved right away. */
+const AlertsCard: React.FC = () => {
+  const { user, updateUser } = useAuth()
+  const toast = useToast()
+  const enabled = useModuleEnabled('organizer_alerts')
+  const [saving, setSaving] = useState<AlertKey | null>(null)
+  if (!user || !enabled || (user.role !== 'organizer' && user.role !== 'superadmin')) return null
+
+  const toggle = async (key: AlertKey, on: boolean) => {
+    setSaving(key)
+    try {
+      updateUser(await accountApi.updateProfile({ [key]: on }))
+      toast.success(on ? 'Alert turned on' : 'Alert turned off')
+    } catch (err) {
+      toast.error('Couldn’t save', errText(err))
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader title="Email alerts" description={`We email ${user.email} when someone signs up for one of your events.`} />
+      <div className="space-y-3 p-5">
+        {ALERTS.map((a) => (
+          <label key={a.key} className="flex cursor-pointer items-start gap-3 rounded-xl border border-ink-200 p-3 hover:bg-ink-50">
+            <input
+              type="checkbox"
+              checked={user[a.key] !== false}
+              disabled={saving !== null}
+              onChange={(e) => toggle(a.key, e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-ink-300 text-brand-600 focus:ring-brand-500/30"
+            />
+            <span className="min-w-0">
+              <span className="flex items-center gap-1.5 text-sm font-semibold text-ink-900">
+                <BellRing className="h-3.5 w-3.5 text-brand-600" aria-hidden />
+                {a.label}
+              </span>
+              <span className="block text-xs text-ink-500">{a.hint}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+    </Card>
+  )
+}
 
 const DetailsCard: React.FC = () => {
   const { user, updateUser } = useAuth()

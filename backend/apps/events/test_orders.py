@@ -162,3 +162,11 @@ class OrganizerAlertTests(OrderTests):
         self.assertEqual(self.register([{'ticket_type_id': str(self.general.id), 'quantity': 1}]).status_code, 201)
         self.assertEqual(self.alerts(), [])
         self.assertEqual(len(buyer_mails()), 1)
+
+    def test_organizer_can_switch_booking_alerts_off_in_profile(self):
+        self.client.force_authenticate(self.organizer)
+        res = self.client.patch('/api/auth/me/', {'alert_bookings': False}, format='json')
+        self.assertEqual((res.status_code, res.data['alert_bookings'], res.data['alert_applications']), (200, False, True))
+        self.client.force_authenticate(None)
+        self.assertEqual(self.register([{'ticket_type_id': str(self.general.id), 'quantity': 1}]).status_code, 201)
+        self.assertEqual(self.alerts(), [])

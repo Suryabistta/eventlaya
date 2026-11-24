@@ -15,10 +15,12 @@ def _dashboard(path):
     return f"{getattr(settings, 'FRONTEND_URL', 'https://eventlaya.com').rstrip('/')}{path}"
 
 
-def _enabled(event):
+def _enabled(event, kind):
+    """Module on (superadmin) and this kind on in the organizer's own Profile → Email alerts."""
     from apps.accounts.modules import module_enabled
     organizer = getattr(event, 'organizer', None)
-    return bool(organizer and organizer.email and module_enabled('organizer_alerts', organizer))
+    return bool(organizer and organizer.email and getattr(organizer, f'alert_{kind}', True)
+                and module_enabled('organizer_alerts', organizer))
 
 
 def _dispatch(fn):
@@ -45,13 +47,13 @@ def _send(event, subject, title, paragraphs, details, button):
     _dispatch(lambda: send_branded(
         to, f'{subject} · {display_title(event)}', brand=eventlaya_brand(), title=title, name=name,
         paragraphs=paragraphs, details=[('Event', display_title(event)), *details], button=button,
-        after=['You get these emails because organizer alerts are on for your account.'],
+        after=['You get these emails because organizer alerts are on for your account. Turn them off in Profile → Email alerts.'],
     ))
 
 
 def new_order(order, tickets, event):
     """Tickets booked (free, pay at the venue, or paid online)."""
-    if not _enabled(event) or not tickets:
+    if not _enabled(event, 'bookings') or not tickets:
         return
     who = order.buyer_name if order is not None else tickets[0].attendee_name
     count = len(tickets)
@@ -66,7 +68,7 @@ def new_order(order, tickets, event):
 
 def new_registration(ticket, event):
     """Registration-only events."""
-    if not _enabled(event):
+    if not _enabled(event, 'registrations'):
         return
     _send(event, f'New registration: {ticket.attendee_name}', 'New registration',
           [f'{ticket.attendee_name} registered.'],
@@ -76,7 +78,7 @@ def new_registration(ticket, event):
 
 
 def new_application(response, event):
-    if not _enabled(event):
+    if not _enabled(event, 'applications'):
         return
     _send(event, f'New application: {response.submitter_name}', 'New application',
           [f'{response.submitter_name} applied. Review it and accept or reject.'],

@@ -583,6 +583,10 @@ export interface AuthUser {
   is_verified?: boolean
   /** A platform admin gave out a temporary password: the app sends them to change it first */
   must_change_password?: boolean
+  /** Organizer email alerts (module organizer_alerts), each on unless switched off in Profile */
+  alert_bookings?: boolean
+  alert_registrations?: boolean
+  alert_applications?: boolean
 }
 
 // Token storage. "Remember me" keeps tokens in localStorage; otherwise in sessionStorage,
