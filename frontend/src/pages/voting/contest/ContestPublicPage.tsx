@@ -308,7 +308,7 @@ const ContestHeader: React.FC<{ contest: PublicContest; slug: string }> = ({ con
 
       {/* Stage banner */}
       <div className="relative overflow-hidden rounded-3xl bg-ink-900">
-        <div className="aspect-[16/9] sm:aspect-[21/7]">
+        <div className="aspect-[16/9] sm:aspect-[16/6]">
           <ContestCover src={contest.cover_url} seed={contest.id} />
         </div>
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" aria-hidden />

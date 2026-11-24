@@ -88,7 +88,7 @@ export const VendorDetailPage: React.FC = () => {
           aria-label={`Open ${vendor.business_name} photos full screen`}
           className="block w-full cursor-zoom-in rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
         >
-          <Photo src={photos[0]} alt={vendor.business_name} icon={Store} className="aspect-[5/2] w-full rounded-2xl sm:aspect-[4/1]" />
+          <Photo src={photos[0]} alt={vendor.business_name} icon={Store} className="aspect-[16/9] w-full rounded-2xl sm:aspect-[16/6]" />
         </button>
       )}
 

@@ -611,22 +611,23 @@ export const Partners: React.FC = () => {
           <Eyebrow center>{sec.eyebrow}</Eyebrow>
           <H2>{sec.title}</H2>
         </Reveal>
-        <ul className="mt-10 flex flex-wrap justify-center gap-3">
+        <ul className="mt-10 flex flex-wrap items-center justify-center gap-4 sm:gap-6">
           {items.map((p, i) => {
-            const inner = (
-              <>
-                {safeHref(p.logo) && <img src={p.logo} alt="" className="h-8 w-8 rounded-lg object-contain" />}
-                <span className="font-semibold text-ink-800">{p.name}</span>
-              </>
+            // A logo says it best: show it big, keep the name for screen readers, search and the tooltip
+            const inner = safeHref(p.logo) ? (
+              <img src={p.logo} alt={p.name} loading="lazy" className="h-14 w-auto max-w-[180px] object-contain sm:h-16 sm:max-w-[200px]" />
+            ) : (
+              <span className="font-semibold text-ink-800">{p.name}</span>
             )
+            const box = 'flex h-24 min-w-[150px] items-center justify-center rounded-2xl border border-ink-100 bg-white px-6 sm:h-28 sm:px-8'
             return (
-              <li key={i}>
+              <li key={i} title={p.name}>
                 {safeHref(p.url) ? (
-                  <a href={safeHref(p.url)} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-2xl border border-ink-100 px-5 py-3 hover:border-ink-300">
+                  <a href={safeHref(p.url)} target="_blank" rel="noreferrer" aria-label={p.name} className={`${box} transition hover:border-ink-300 hover:shadow-sm`}>
                     {inner}
                   </a>
                 ) : (
-                  <span className="flex items-center gap-3 rounded-2xl border border-ink-100 px-5 py-3">{inner}</span>
+                  <span className={box}>{inner}</span>
                 )}
               </li>
             )
