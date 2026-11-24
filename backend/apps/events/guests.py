@@ -124,8 +124,29 @@ def _recipients(tickets):
     return out
 
 
-def send_to_guests(event, subject, body, recipients):
-    """Email each recipient (one connection), plus app push to those with the app. Returns how many emails went out."""
+BACKGROUND_OVER = 20
+
+
+def send_to_guests(event, subject, body, recipients, background=False):
+    """Email each recipient (one connection), plus app push to those with the app. Returns how many emails went out.
+
+    background=True (from a request): bigger sends run in a thread, because emails are paced to the provider's
+    per-second limit and hundreds of guests would take minutes. It then returns how many were queued."""
+    if background and len(recipients) > BACKGROUND_OVER:
+        import threading
+        from django.db import connection as db_connection
+
+        def run():
+            try:
+                _send_to_guests(event, subject, body, recipients)
+            finally:
+                db_connection.close()  # this thread's own DB connection
+        threading.Thread(target=run, daemon=True, name=f'guest-mail-{event.id}').start()
+        return len(recipients)
+    return _send_to_guests(event, subject, body, recipients)
+
+
+def _send_to_guests(event, subject, body, recipients):
     from apps.core.email import email_brand, event_url, from_email
     brand, powered = email_brand(event)
     signature = 'Sent via Eventlaya' if brand == 'Eventlaya' else (brand + (' · Powered by Eventlaya' if powered else ''))
@@ -209,7 +230,7 @@ class GuestMessagesView(APIView):
                                 status=status.HTTP_400_BAD_REQUEST)
         if request.data.get('dry_run'):
             return Response({'recipients': len(recipients)})
-        send_to_guests(event, subject, body, recipients)
+        send_to_guests(event, subject, body, recipients, background=True)
         if phones:
             send_sms_to_guests(event, phones, f'{subject}. {body}')
         msg = GuestMessage.objects.create(event=event, subject=subject, body=body, audience=audience,

@@ -162,7 +162,7 @@ deliberately **not** a module — the app stores, Facebook Login and the law nee
 | `MEDIA_ROOT=/mnt/eventlaya_media/media` | set |
 | `REDIS_URL` | set |
 | `FIREBASE_CREDENTIALS_PATH` | set |
-| `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS`, `DEFAULT_FROM_EMAIL` | **missing** — emails only go to the server log |
+| `EMAIL_BACKEND=apps.core.mail_backend.PacedSMTPBackend` (paces sends to Resend's per-second limit, adds Reply-To), `EMAIL_HOST=smtp.resend.com`, `EMAIL_PORT=2465` (DigitalOcean blocks 25/465/587 on the droplet; Resend also listens on 2465), `EMAIL_USE_SSL=true`, `EMAIL_HOST_USER=resend`, `EMAIL_HOST_PASSWORD` (Resend API key, kept in `~/.eventlaya-deploy/resend.env`), optional `DEFAULT_FROM_EMAIL`, `EMAIL_TIMEOUT` (10 s), `EMAIL_MIN_INTERVAL` (0.6 s), `EMAIL_REPLY_TO` and `CONTACT_INBOX` (both default support@eventlaya.com) | Resend chosen 2026-11-24 (eventlaya.com verified there); live on the server since 2026-11-24 |
 | `GOOGLE_CLIENT_IDS` (web client id first) | **missing** |
 | `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET` | **missing** |
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_CUSTOM_ORIGIN` (white-label, see `docs/white-label.md`) | set 2026-10-28 (Cloudflare for SaaS, fallback origin `tenants.eventlaya.com`) |
@@ -198,7 +198,7 @@ key events): `docs/analytics.md` §2.
 - Local DB only: the attendee role has the marketplace module switched off (from testing).
 
 **Needs the owner**
-1. Email provider (Brevo / Mailgun / SES / Gmail app password) → set the `EMAIL_*` variables.
+1. Email: Resend live since 2026-11-24 (support@eventlaya.com gets contact messages and replies — make sure it is read).
 2. Google sign-in: add the Android OAuth client (debug + release SHA-1) and a Web client in project
    `eventlaya`; set `GOOGLE_CLIENT_IDS`.
 3. Facebook login: Meta app → App ID, App Secret, Client Token; then the Android SDK setup

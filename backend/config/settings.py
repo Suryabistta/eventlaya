@@ -183,7 +183,24 @@ if not DEBUG:
 
 # Email Configuration
 EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
-DEFAULT_FROM_EMAIL = 'Eventlaya Passes <passes@eventlaya.com>'
+# SMTP provider (production: Resend — host smtp.resend.com, port 465 with SSL, user "resend", password = API key)
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'localhost')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '25'))
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False').lower() in ('1', 'true', 'yes')
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'False').lower() in ('1', 'true', 'yes') and not EMAIL_USE_SSL
+# Emails go out inside requests: never let a slow mail server hang a worker
+EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', '10'))
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'Eventlaya Passes <passes@eventlaya.com>')
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+# Replies to any email go here (apps.core.mail_backend.PacedSMTPBackend adds it when a message sets none)
+EMAIL_REPLY_TO = os.getenv('EMAIL_REPLY_TO', 'support@eventlaya.com')
+# Seconds between emails, to stay under the provider's per-second limit (Resend: a few per second)
+EMAIL_MIN_INTERVAL = float(os.getenv('EMAIL_MIN_INTERVAL', '0.6'))
+# Where contact-form messages are emailed (they are also listed under Superadmin → Contact messages)
+CONTACT_INBOX = os.getenv('CONTACT_INBOX', 'support@eventlaya.com')
+ADMINS = [('Eventlaya support', CONTACT_INBOX)]
 # Where links in emails (e.g. password reset) point to
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
 

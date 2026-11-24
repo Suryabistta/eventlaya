@@ -71,3 +71,8 @@ google-services.json
 GoogleService-Info.plist
 private_media/
 aakash_sms.env
+
+# Secrets live in ~/.eventlaya-deploy, never here
+*.env
+!*.example.env
+deploy/*.json

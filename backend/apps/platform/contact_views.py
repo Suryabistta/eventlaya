@@ -6,7 +6,8 @@ PATCH /api/platform/contact/messages/<id>/  superadmin: {handled}
 """
 from datetime import timedelta
 
-from django.core.mail import mail_admins
+from django.conf import settings
+from django.core.mail import EmailMessage
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
@@ -48,7 +49,9 @@ class ContactView(APIView):
             return Response({'error': 'You’ve sent several messages already. We’ll reply soon.'}, status=status.HTTP_429_TOO_MANY_REQUESTS)
         role = d.get('role') if d.get('role') in ContactMessage.Role.values else ContactMessage.Role.USER
         m = ContactMessage.objects.create(name=name, email=email, phone=phone, role=role, message=message, ip=ip)
-        mail_admins(f'Contact: {name} ({m.get_role_display()})', f'{message}\n\n{email} {m.phone}', fail_silently=True)
+        # To the support inbox; Reply goes straight to the person who wrote
+        EmailMessage(f'Contact: {name} ({m.get_role_display()})', f'{message}\n\n{name} · {email} · {m.phone}',
+                     settings.DEFAULT_FROM_EMAIL, [settings.CONTACT_INBOX], reply_to=[email]).send(fail_silently=True)
         return Response({'ok': True}, status=status.HTTP_201_CREATED)
 
 
