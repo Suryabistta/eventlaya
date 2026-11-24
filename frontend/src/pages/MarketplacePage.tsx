@@ -15,6 +15,21 @@ import { BannerSlider } from '@/components/BannerSlider'
 /** Category icons are lucide names set in Admin → Catalog; unknown names fall back to a shop. */
 const CATEGORY_ICONS: Record<string, React.ElementType> = { Building2, Camera, Flower2, Mic2, Music, Palette, Shirt, Sparkles, Truck, Utensils, Video }
 
+/** A fitting icon from the category's name when the superadmin didn't pick one */
+const ICON_BY_NAME: [RegExp, React.ElementType][] = [
+  [/photo|video|film|camera/i, Camera],
+  [/sound|light|stage|dj|music|band/i, Music],
+  [/cater|food|cake|bakery/i, Utensils],
+  [/host|mc|anchor|emcee|speaker/i, Mic2],
+  [/decor|flower|floral/i, Flower2],
+  [/make ?up|beauty|mehendi|mehndi|henna/i, Palette],
+  [/dress|cloth|costume|attire/i, Shirt],
+  [/transport|car|bus|travel/i, Truck],
+  [/venue|hall|palace|resort/i, Building2],
+]
+const categoryIcon = (icon: string, name: string): React.ElementType =>
+  CATEGORY_ICONS[icon] ?? ICON_BY_NAME.find(([re]) => re.test(name))?.[1] ?? Sparkles
+
 export const MarketplacePage: React.FC = () => {
   const { inApp, base } = useMarketplaceBase()
   const { status } = useAuth()
@@ -105,12 +120,15 @@ export const MarketplacePage: React.FC = () => {
   const chips: { value: string; label: string; icon: React.ElementType; count?: number }[] = [
     { value: 'all', label: 'All', icon: LayoutGrid },
     { value: 'venues', label: 'Venues', icon: Building2, count: venuesQuery.data?.length },
-    ...categories.map((c) => ({
-      value: `c:${c.slug}`,
-      label: c.name,
-      icon: CATEGORY_ICONS[c.icon] ?? Store,
-      count: vendorsQuery.data ? allVendors.filter((v) => v.category_slug === c.slug).length : undefined,
-    })),
+    ...categories
+      .map((c) => ({
+        value: `c:${c.slug}`,
+        label: c.name,
+        icon: categoryIcon(c.icon, c.name),
+        count: vendorsQuery.data ? allVendors.filter((v) => v.category_slug === c.slug).length : undefined,
+      }))
+      // Empty categories only add noise; the one picked (e.g. from a shared link) stays
+      .filter((c) => c.count !== 0 || chip === c.value),
   ]
 
   return (
@@ -145,7 +163,7 @@ export const MarketplacePage: React.FC = () => {
               >
                 <c.icon className="h-4 w-4" aria-hidden />
                 {c.label}
-                {c.count !== undefined && <span className={cn('tabular', chip === c.value ? 'text-white/70' : 'text-ink-400')}>{c.count}</span>}
+                {!!c.count && <span className={cn('tabular', chip === c.value ? 'text-white/70' : 'text-ink-400')}>{c.count}</span>}
               </button>
             ))}
           </div>
