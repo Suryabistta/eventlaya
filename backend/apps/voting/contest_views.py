@@ -6,7 +6,6 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.http import HttpResponse
@@ -549,15 +548,11 @@ class JudgeListView(JudgingView):
         link = f"{getattr(settings, 'FRONTEND_URL', 'https://eventlaya.com').rstrip('/')}/judge/{judge.id}"
         how = ('An Eventlaya account was created for you. The organizer will give you a temporary password; '
                'change it after signing in.') if created else 'Sign in with your existing Eventlaya account.'
-        try:
-            send_mail(
-                subject=f'You’re a judge for {poll.title}',
-                message=(f'Namaste {judge.display_name},\n\n{poll.event.organizer.organization_name or "The organizer"} invited you to '
-                         f'judge “{poll.title}” ({poll.event.title}).\n\n{how}\n\nOpen your scoring sheet: {link}\n\nEventlaya'),
-                from_email=settings.DEFAULT_FROM_EMAIL, recipient_list=[judge.user.email],
-            )
-        except Exception:
-            pass
+        from apps.core.email_layout import send_branded
+        send_branded(judge.user.email, f'You’re a judge for {poll.title}', event=poll.event,
+                     title='You’re invited to judge', name=judge.display_name,
+                     paragraphs=[f'{poll.event.organizer.organization_name or "The organizer"} invited you to judge “{poll.title}” ({poll.event.title}).', how],
+                     button=('Open my scoring sheet', link))
 
 
 class JudgeDetailView(JudgingView):

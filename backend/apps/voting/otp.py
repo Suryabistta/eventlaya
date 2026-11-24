@@ -11,7 +11,6 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.core import signing
-from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
 
@@ -100,8 +99,12 @@ def send_code(poll, destination_raw, ip_hash=''):
         if channel == VoteOTP.Channel.SMS:
             send_sms(destination, text)
         else:
-            send_mail(subject=f'{code} is your voting code', message=f'Namaste,\n\n{text}\n\nEventlaya',
-                      from_email=settings.DEFAULT_FROM_EMAIL, recipient_list=[destination])
+            from apps.core.email_layout import send_branded
+            if not send_branded(destination, f'{code} is your voting code', event=poll.event, fail_silently=False,
+                                title='Your voting code', preheader=f'{code} · expires in 5 minutes',
+                                paragraphs=[f'Use this code to vote in {poll.title}.'], code=code, code_label='Voting code',
+                                after=['It expires in 5 minutes. Don’t share it with anyone.']):
+                raise RuntimeError('email not sent')
     except (SMSError, Exception) as e:
         row.delete()
         logger.exception('Voting OTP delivery failed (%s)', channel)

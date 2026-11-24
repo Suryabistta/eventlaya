@@ -5,7 +5,6 @@ from django.conf import settings
 from django.contrib.auth import get_user_model, password_validation
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError
-from django.core.mail import send_mail
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework import permissions, status
@@ -33,10 +32,10 @@ class PasswordResetConfirmThrottle(AnonRateThrottle):
     rate = '30/hour'
 
 
-def reset_link(user):
+def reset_link(user, site=None):
     uid = urlsafe_base64_encode(force_bytes(user.pk))
     token = default_token_generator.make_token(user)
-    return f"{settings.FRONTEND_URL.rstrip('/')}/reset-password?uid={uid}&token={token}"
+    return f"{(site or settings.FRONTEND_URL).rstrip('/')}/reset-password?uid={uid}&token={token}"
 
 
 INTRO = {
@@ -59,24 +58,24 @@ INTRO = {
 }
 
 
-def send_password_email(user, kind='reset'):
-    """Email a one-time set-password link. Returns True when the email was handed to the mail server."""
+def send_password_email(user, kind='reset', request=None):
+    """Email a one-time set-password link. Returns True when the email was handed to the mail server.
+    `request` from a client's own site: the email carries the client's brand and the link goes back there."""
+    from apps.core.email_layout import brand_for_request, send_branded
+    brand = brand_for_request(request)
     subject, intro, outro = INTRO[kind]
+    if not brand.is_eventlaya:
+        subject, intro = subject.replace('Eventlaya', brand.name), intro.replace('Eventlaya', brand.name)
     name = user.organization_name or user.username or 'there'
-    try:
-        send_mail(
-            subject=subject,
-            message=(
-                f'Namaste {name},\n\n{intro}\n\n{reset_link(user)}\n\n'
-                f'The link works once and expires in 3 days. {outro}\n\nEventlaya'
-            ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-        )
-        return True
-    except Exception:
-        logger.exception('Password email (%s) failed for user %s', kind, user.pk)
-        return False
+    ok = send_branded(
+        user.email, subject, brand=brand, fail_silently=False, title=subject, preheader=intro, name=name,
+        paragraphs=[intro.rstrip(':') + '.'],
+        button=({'welcome': 'Set my password'}.get(kind, 'Choose a new password'), reset_link(user, brand.site if not brand.is_eventlaya else None)),
+        after=[f'The link works once and expires in 3 days. {outro}'],
+    )
+    if not ok:
+        logger.error('Password email (%s) failed for user %s', kind, user.pk)
+    return ok
 
 
 class PasswordResetRequestView(APIView):
@@ -92,7 +91,7 @@ class PasswordResetRequestView(APIView):
 
         user = User.objects.filter(email__iexact=email, is_active=True).first()
         if user and user.has_usable_password():
-            send_password_email(user)  # never reveal delivery problems to the requester
+            send_password_email(user, request=request)  # never reveal delivery problems to the requester
         return Response({'message': GENERIC_OK})
 
 

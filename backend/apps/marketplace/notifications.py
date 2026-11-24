@@ -3,7 +3,6 @@ import logging
 import threading
 
 from django.conf import settings
-from django.core.mail import send_mail
 from django.db import transaction
 
 from apps.core import fcm
@@ -18,15 +17,12 @@ def _frontend(path):
     return f"{getattr(settings, 'FRONTEND_URL', 'https://eventlaya.com').rstrip('/')}{path}"
 
 
-def _email(to, subject, text):
+def _email(to, subject, title, *, name=None, paragraphs=(), details=(), button=None, after=()):
     if not to:
         return
-    try:
-        send_mail(subject=subject, message=text,
-                  from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'passes@eventlaya.com'),
-                  recipient_list=[to], fail_silently=True)
-    except Exception:  # pragma: no cover - fail_silently doesn't cover everything (e.g. bad backend path)
-        logger.exception('marketplace: booking email to %s failed', to)
+    from apps.core.email_layout import send_branded
+    send_branded(to, subject, title=title, preheader=paragraphs[0] if paragraphs else title, name=name,
+                 paragraphs=paragraphs, details=details, button=button, after=after)
 
 
 def _push(user_id, title, body, data):
@@ -87,20 +83,12 @@ def _data(inquiry, kind, type_):
 
 def _new_request(inquiry):
     kind, name, owner_id, owner_email, when = _describe(inquiry)
-    _email(owner_email, f'New booking request: {name} – {when}', f"""Namaste,
-
-{inquiry.sender_name} wants to book {name} for {when}.
-
-• Phone   : {inquiry.sender_phone}
-• Email   : {inquiry.sender_email}
-• Event   : {inquiry.event_type or '-'}
-• Message : {inquiry.message}
-
-The slot is on hold until you confirm or decline the request in your business portal:
-{_frontend('/app/inquiries')}
-
-Eventlaya
-""")
+    _email(owner_email, f'New booking request: {name} – {when}', 'New booking request',
+           paragraphs=[f'{inquiry.sender_name} wants to book {name} for {when}.'],
+           details=[('Name', inquiry.sender_name), ('Phone', inquiry.sender_phone or '-'), ('Email', inquiry.sender_email or '-'),
+                    ('Event', inquiry.event_type or '-'), ('Message', inquiry.message or '-')],
+           button=('Confirm or decline', _frontend('/app/inquiries')),
+           after=['The slot is on hold until you confirm or decline the request.'])
     _push(owner_id, 'New booking request', f'{inquiry.sender_name} · {name} · {when}',
           _data(inquiry, kind, 'booking_request'))
 
@@ -109,15 +97,10 @@ def _decision(inquiry):
     kind, name, _owner_id, _owner_email, when = _describe(inquiry)
     confirmed = inquiry.status == 'booked'
     verb = 'confirmed' if confirmed else 'declined'
-    note = f'\nMessage from {name}: {inquiry.owner_note}\n' if inquiry.owner_note else ''
-    _email(inquiry.sender_email, f'Your booking with {name} was {verb}', f"""Namaste {inquiry.sender_name},
-
-{name} has {verb} your request for {when}.
-{note}
-See your requests: {_frontend('/app/my/inquiries')}
-
-Eventlaya
-""")
+    _email(inquiry.sender_email, f'Your booking with {name} was {verb}', f'Booking {verb}', name=inquiry.sender_name,
+           paragraphs=[f'{name} has {verb} your request for {when}.' + (' See you there!' if confirmed else ''),
+                       *([f'Message from {name}: {inquiry.owner_note}'] if inquiry.owner_note else [])],
+           button=('See my requests', _frontend('/app/my/inquiries')))
     _push(inquiry.user_id, f'Booking {verb}', f'{name} · {when}',
           _data(inquiry, kind, 'booking_confirmed' if confirmed else 'booking_declined'))
 
@@ -125,28 +108,20 @@ Eventlaya
 def _cancelled(inquiry):
     kind, name, owner_id, owner_email, when = _describe(inquiry)
     reopened = ' The slot is open again for other customers.' if inquiry.slot_id else ''
-    _email(owner_email, f'Booking cancelled: {name} – {when}', f"""Namaste,
-
-{inquiry.sender_name} cancelled their request for {name} on {when}.{reopened}
-
-Eventlaya
-""")
+    _email(owner_email, f'Booking cancelled: {name} – {when}', 'Booking cancelled',
+           paragraphs=[f'{inquiry.sender_name} cancelled their request for {name} on {when}.{reopened}'],
+           button=('Open bookings', _frontend('/app/inquiries')))
     _push(owner_id, 'Booking cancelled', f'{inquiry.sender_name} · {name} · {when}',
           _data(inquiry, kind, 'booking_cancelled'))
 
 
 def _owner_cancelled(inquiry):
     kind, name, _owner_id, _owner_email, when = _describe(inquiry)
-    note = f'\nMessage from {name}: {inquiry.owner_note}\n' if inquiry.owner_note else ''
     if inquiry.sender_email:
-        _email(inquiry.sender_email, f'Your booking with {name} was cancelled', f"""Namaste {inquiry.sender_name},
-
-{name} has cancelled your booking for {when}.
-{note}
-Contact them if you have questions.
-
-Eventlaya
-""")
+        _email(inquiry.sender_email, f'Your booking with {name} was cancelled', 'Booking cancelled', name=inquiry.sender_name,
+               paragraphs=[f'{name} has cancelled your booking for {when}.',
+                           *([f'Message from {name}: {inquiry.owner_note}'] if inquiry.owner_note else [])],
+               after=['Contact them if you have questions.'])
     _push(inquiry.user_id, 'Booking cancelled', f'{name} · {when}', _data(inquiry, kind, 'booking_cancelled'))
 
 

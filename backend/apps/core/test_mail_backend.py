@@ -48,3 +48,32 @@ class ContactEmailTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ['support@eventlaya.com'])
         self.assertEqual(mail.outbox[0].reply_to, ['sita@example.com'])
+
+
+class EmailLayoutTests(SimpleTestCase):
+    def test_escapes_content_and_keeps_text_version(self):
+        from .email_layout import Brand, render
+        text, html = render(brand=Brand(logo='https://eventlaya.com/brand/logo.png'), title='Hi <b>', name='<script>x</script>',
+                            paragraphs=['Line'], details=[('When', 'Today')], button=('Open', 'https://eventlaya.com/e/x?a=1&b=2'))
+        self.assertNotIn('<script>', html)
+        self.assertIn('&lt;script&gt;', html)
+        self.assertIn('https://eventlaya.com/e/x?a=1&amp;b=2', html)
+        self.assertIn('Namaste <script>x</script>,', text)
+        self.assertIn('Open: https://eventlaya.com/e/x?a=1&b=2', text)
+
+    def test_white_label_brand_shows_powered_by(self):
+        from .email_layout import Brand, render
+        text, html = render(brand=Brand(name='Dharan Film Festival', color='#0A7D5C', powered=True), title='T')
+        self.assertIn('#0A7D5C', html)
+        self.assertIn('Powered by', html)
+        self.assertIn('Dharan Film Festival\nPowered by Eventlaya', text)
+
+
+@override_settings(FRONTEND_URL='https://eventlaya.com')
+class SiteLogoTests(TestCase):
+    def test_uses_the_uploaded_site_logo_else_the_built_in_one(self):
+        from apps.platform.models import SiteBranding
+        from .email_layout import eventlaya_brand
+        self.assertEqual(eventlaya_brand().logo, 'https://eventlaya.com/brand/logo.png')
+        SiteBranding.objects.update_or_create(pk=1, defaults={'logo': '/media/uploads/logo/new.png'})
+        self.assertEqual(eventlaya_brand().logo, 'https://eventlaya.com/media/uploads/logo/new.png')

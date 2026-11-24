@@ -80,7 +80,7 @@ class RegisterView(generics.CreateAPIView):
     def perform_create(self, serializer):
         from .verification import send_code
         user = serializer.save()
-        send_code(user)  # 6-digit email code; the app asks for it after the first sign-in
+        send_code(user, self.request)  # 6-digit email code; the app asks for it after the first sign-in
 
 
 class CurrentUserView(APIView):

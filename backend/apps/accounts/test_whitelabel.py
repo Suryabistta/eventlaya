@@ -522,3 +522,25 @@ class EmailTests(TenantBase):
         WhiteLabelRequest.objects.filter(organizer=self.dff).update(status=WhiteLabelRequest.Status.REVOKED)
         self.register('dff-opening', email='b@x.com')
         self.assertIn('https://eventlaya.com/ticket/', mail.outbox[-1].body)
+
+
+@override_settings(FRONTEND_URL='https://eventlaya.com')
+class AccountEmailBrandTests(TenantBase):
+    def setUp(self):
+        super().setUp()
+        from django.core.cache import cache
+        cache.clear()  # the password-reset rate limit is shared with earlier tests
+    def test_password_reset_on_client_site_is_branded_and_links_back_there(self):
+        User.objects.create_user(username='asha', email='asha@x.com', password='pw-12345678', role='attendee')
+        self.client.post('/api/auth/password-reset/', {'email': 'asha@x.com'}, format='json', **self.on(DFF_DOMAIN))
+        msg = mail.outbox[-1]
+        self.assertIn(f'https://{DFF_DOMAIN}/reset-password?uid=', msg.body)
+        self.assertIn('Dharan Film Festival via Eventlaya', msg.from_email)
+        self.assertIn('Dharan Film Festival', msg.subject)
+
+    def test_password_reset_on_eventlaya_stays_eventlaya(self):
+        User.objects.create_user(username='asha', email='asha@x.com', password='pw-12345678', role='attendee')
+        self.client.post('/api/auth/password-reset/', {'email': 'asha@x.com'}, format='json')
+        msg = mail.outbox[-1]
+        self.assertIn('https://eventlaya.com/reset-password?uid=', msg.body)
+        self.assertIn('Eventlaya', msg.subject)

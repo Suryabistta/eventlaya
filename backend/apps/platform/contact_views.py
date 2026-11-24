@@ -7,7 +7,6 @@ PATCH /api/platform/contact/messages/<id>/  superadmin: {handled}
 from datetime import timedelta
 
 from django.conf import settings
-from django.core.mail import EmailMessage
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
@@ -50,8 +49,11 @@ class ContactView(APIView):
         role = d.get('role') if d.get('role') in ContactMessage.Role.values else ContactMessage.Role.USER
         m = ContactMessage.objects.create(name=name, email=email, phone=phone, role=role, message=message, ip=ip)
         # To the support inbox; Reply goes straight to the person who wrote
-        EmailMessage(f'Contact: {name} ({m.get_role_display()})', f'{message}\n\n{name} · {email} · {m.phone}',
-                     settings.DEFAULT_FROM_EMAIL, [settings.CONTACT_INBOX], reply_to=[email]).send(fail_silently=True)
+        from apps.core.email_layout import send_branded
+        send_branded(settings.CONTACT_INBOX, f'Contact: {name} ({m.get_role_display()})', reply_to=[email],
+                     title='New contact message', paragraphs=[message],
+                     details=[('Name', name), ('Email', email), ('Phone', m.phone or '-'), ('Role', m.get_role_display())],
+                     after=['Reply to this email to answer them.'])
         return Response({'ok': True}, status=status.HTTP_201_CREATED)
 
 

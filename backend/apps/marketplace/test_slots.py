@@ -553,11 +553,13 @@ class DecisionTests(Base):
         self.assertEqual((res.json()['status'], s.status), ('rejected', 'open'))
 
     def test_notification_failures_never_break_requests(self):
-        with mock.patch('apps.marketplace.notifications.send_mail', side_effect=RuntimeError('smtp down')), \
+        with mock.patch('apps.core.email_layout.EmailMultiAlternatives.send', side_effect=RuntimeError('smtp down')), \
                 mock.patch('apps.core.fcm.send_push_notification', side_effect=RuntimeError('fcm down')), \
+                self.assertLogs('apps.core.email_layout', 'WARNING') as mail_logs, \
                 self.assertLogs('apps.marketplace.notifications', 'ERROR') as logs:
             res = self.decide('confirm')
-        self.assertEqual(len(logs.records), 2)  # one email, one push failure, both swallowed
+        self.assertEqual(len(mail_logs.records), 1)  # the email failure, swallowed
+        self.assertEqual(len(logs.records), 1)  # the push failure, swallowed
         self.assertEqual(res.status_code, 200)
         self.slot.refresh_from_db()
         self.assertEqual(self.slot.status, 'booked')

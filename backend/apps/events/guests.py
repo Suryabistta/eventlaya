@@ -12,7 +12,6 @@ from datetime import timedelta
 from django.core.mail import get_connection, EmailMultiAlternatives
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.utils.html import escape
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -147,21 +146,17 @@ def send_to_guests(event, subject, body, recipients, background=False):
 
 
 def _send_to_guests(event, subject, body, recipients):
-    from apps.core.email import email_brand, event_url, from_email
-    brand, powered = email_brand(event)
-    signature = 'Sent via Eventlaya' if brand == 'Eventlaya' else (brand + (' · Powered by Eventlaya' if powered else ''))
+    from apps.core.email import event_url, from_email
+    from apps.core.email_layout import brand_for, render
+    brand = brand_for(event)
     sent = 0
     connection = get_connection(fail_silently=True)
     messages = []
     for email, (name, _) in recipients.items():
-        text = f'Namaste {name},\n\n{body}\n\nEvent page: {event_url(event)}\n\n{signature}\n'
-        html = (f'<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#1C1724;">'
-                f'<p style="color:#64748b;margin:0 0 4px;">{escape(event.title)}</p><h2 style="margin:0 0 12px;">{escape(subject)}</h2>'
-                f'<p>Namaste <strong>{escape(name)}</strong>,</p><p style="white-space:pre-line;">{escape(body)}</p>'
-                f'<p><a href="{event_url(event)}" style="color:#C2215A;">Event page</a></p>'
-                f'<p style="color:#94a3b8;font-size:12px;">{escape(signature)}</p></div>')
+        text, html = render(brand=brand, title=subject, preheader=body[:120], name=name, paragraphs=[body],
+                            details=[('Event', event.title)], button=('Event page', event_url(event)))
         msg = EmailMultiAlternatives(subject=f'{subject} · {event.title}', body=text, from_email=from_email(event), to=[email],
-                                     connection=connection)
+                                     connection=connection, reply_to=[brand.reply_to] if brand.reply_to else None)
         msg.attach_alternative(html, 'text/html')
         messages.append(msg)
     try:

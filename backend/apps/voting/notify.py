@@ -64,9 +64,8 @@ def voting_opened(poll):
 
 
 def send_reminders(poll):
-    from django.conf import settings
-    from django.core.mail import send_mail
     from apps.core.email import site_url
+    from apps.core.email_layout import send_branded
     from .models import ContestReminder
     rows = list(ContestReminder.objects.filter(poll=poll))
     if not rows:
@@ -80,8 +79,10 @@ def send_reminders(poll):
         for r in rows:
             try:
                 if r.channel == 'email':
-                    send_mail(subject=f'Voting is open: {poll.title}', from_email=settings.DEFAULT_FROM_EMAIL, recipient_list=[r.destination],
-                              message=f'Namaste,\n\nVoting is now open in {poll.title}. Vote for your favourite here:\n{url}\n\nYou asked us to tell you. We won\'t message you again about it.\n\nEventlaya')
+                    send_branded(r.destination, f'Voting is open: {poll.title}', event=poll.event, title='Voting is open',
+                                 paragraphs=[f'Voting is now open in {poll.title}. Vote for your favourite.'],
+                                 button=('Vote now', url),
+                                 after=['You asked us to tell you. We won’t message you again about it.'])
                 else:
                     send_paid_sms(poll.event.organizer, r.destination, f'Voting is open in {title}. Vote here: {url}', f'{title}: reminder')
             except Exception as e:  # one failed reminder must not stop the rest

@@ -6,7 +6,6 @@ import secrets
 from datetime import timedelta
 
 from django.conf import settings
-from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import permissions, status
@@ -43,7 +42,7 @@ def _wait_seconds(user, now):
     return int(max(waits) + 0.999)
 
 
-def send_code(user):
+def send_code(user, request=None):
     """Create and email a fresh code (older open codes stop working). Returns the code row."""
     code = f'{secrets.randbelow(1_000_000):06d}'
     now = timezone.now()
@@ -53,21 +52,16 @@ def send_code(user):
             user=user, email=user.email, code_hash=_hash(user, code), expires_at=now + CODE_TTL,
         )
     name = user.first_name or user.organization_name or 'there'
-    try:
-        send_mail(
-            subject=f'{code} is your Eventlaya verification code',
-            message=(
-                f'Namaste {name},\n\n'
-                f'Your Eventlaya verification code is:\n\n    {code}\n\n'
-                'Enter it in the app to confirm this email address. It expires in 15 minutes.\n'
-                'If you didn’t create an Eventlaya account, you can ignore this email.\n\n'
-                'Eventlaya'
-            ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-        )
-    except Exception:
-        logger.exception('Verification email failed for user %s', user.pk)
+    from apps.core.email_layout import brand_for_request, send_branded
+    brand = brand_for_request(request)
+    if not send_branded(
+        user.email, f'{code} is your {brand.name} verification code', brand=brand, fail_silently=False,
+        title='Confirm your email', preheader=f'Your code is {code}', name=name,
+        paragraphs=[f'Enter this code on {brand.name} to confirm your email address.'],
+        code=code, code_label='Verification code',
+        after=[f'It expires in 15 minutes. If you didn’t create an account, you can ignore this email.'],
+    ):
+        logger.error('Verification email failed for user %s', user.pk)
     return row
 
 
@@ -87,7 +81,7 @@ class SendVerificationCodeView(APIView):
                  'retry_after': wait},
                 status=status.HTTP_429_TOO_MANY_REQUESTS, headers={'Retry-After': str(wait)},
             )
-        send_code(user)
+        send_code(user, request)
         return Response({
             'message': f'We sent a 6-digit code to {user.email}.',
             'email': user.email,
