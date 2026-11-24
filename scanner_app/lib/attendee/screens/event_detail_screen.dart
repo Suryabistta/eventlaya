@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/bs_date.dart';
 import '../../core/legal.dart';
 import '../../models/event_model.dart';
@@ -135,7 +136,8 @@ class EventDetailScreen extends ConsumerWidget {
                             ),
                         ],
                       ),
-                    if (event.stages.length > 1)
+                    // While applying is the only way in, the Apply bar says it all: no step timeline
+                    if (event.stages.length > 1 && !event.applyFirst)
                       GroupedSection(
                         header: 'Stages',
                         children: [
@@ -181,7 +183,7 @@ class EventDetailScreen extends ConsumerWidget {
                             ),
                         ],
                       ),
-                    if (event.ticketTypes.isNotEmpty && !event.registrationOnly) _TicketsSection(event: event),
+                    if (event.ticketTypes.isNotEmpty && !event.registrationOnly && event.externalRegisterUrl == null) _TicketsSection(event: event),
                     if (event.agenda.isNotEmpty) _AgendaSection(items: event.agenda),
                     if (event.speakers.isNotEmpty)
                       GroupedSection(
@@ -349,7 +351,7 @@ class _TitleBlock extends StatelessWidget {
             const SizedBox(height: 6),
             Text(event.tagline!, style: AppType.body(15, color: AppColors.textSecondary)),
           ],
-          if (event.organizerName.isNotEmpty) ...[
+          if (event.organizerName.isNotEmpty && !event.hideOrganizer) ...[
             const SizedBox(height: 10),
             Row(children: [
               Flexible(child: Text('by ${event.organizerName}', style: AppType.body(13, weight: FontWeight.w500, color: AppColors.ink600))),
@@ -673,10 +675,32 @@ class _RegisterBar extends StatelessWidget {
           ),
         ],
       ]);
-    } else if (!event.registrationOpen && event.applicationsOpen) {
+    } else if (event.externalRegisterUrl != null && event.phase != EventPhase.ended && event.phase != EventPhase.cancelled) {
+      // Superadmin set an external registration link: Register opens it in the browser
+      content = Row(children: [
+        Expanded(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(event.title, style: AppType.heading(17), maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text('Opens in your browser', style: AppType.caption, maxLines: 1),
+          ]),
+        ),
+        PrimaryButton(
+          label: event.ctaLabel ?? 'Register',
+          icon: Icons.open_in_new_rounded,
+          expand: false,
+          onPressed: () => launchUrl(Uri.parse(event.externalRegisterUrl!), mode: LaunchMode.externalApplication),
+        ),
+      ]);
+    } else if (event.applyFirst) {
       // Applications stage: the form (with photo and file uploads) is on the website for now
       content = Row(children: [
-        Expanded(child: Text(event.isOpenCall ? 'Free to apply' : 'Applications are open', style: AppType.body(14, weight: FontWeight.w600))),
+        Expanded(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(event.isOpenCall ? 'Free to apply' : 'Applications are open', style: AppType.body(14, weight: FontWeight.w600)),
+            if (event.applicationsClose != null)
+              Text('Until ${BsDate.format('d MMM y', event.applicationsClose!)}', style: AppType.caption, maxLines: 1),
+          ]),
+        ),
         PrimaryButton(
           label: event.applyLabel,
           expand: false,
@@ -695,7 +719,10 @@ class _RegisterBar extends StatelessWidget {
         const Icon(Icons.info_outline_rounded, color: AppColors.ink500, size: 20),
         const SizedBox(width: 8),
         Expanded(
-          child: Text(event.registrationClosedReason ?? 'Bookings are closed.',
+          child: Text(
+              event.registrationOpensLater
+                  ? 'Registration opens ${BsDate.format('d MMM y', event.registrationOpens!)}'
+                  : event.registrationClosedReason ?? 'Bookings are closed.',
               style: AppType.body(14, weight: FontWeight.w500, color: AppColors.ink700)),
         ),
       ]);

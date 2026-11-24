@@ -992,7 +992,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           chevron: true,
           onTap: () async {
             final now = DateTime.now();
-            final picked = await showDatePicker(
+            final picked = await showBsDatePicker(
               context: context,
               initialDate: v == null ? now : DateTime.parse(v),
               firstDate: DateTime(1900),

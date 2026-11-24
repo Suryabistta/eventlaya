@@ -191,7 +191,7 @@ class _ApplyScreenState extends ConsumerState<ApplyScreen> {
           chevron: true,
           onTap: () async {
             final now = DateTime.now();
-            final picked = await showDatePicker(context: context, initialDate: v == null ? DateTime(now.year - 20) : DateTime.parse(v), firstDate: DateTime(1900), lastDate: DateTime(now.year + 10));
+            final picked = await showBsDatePicker(context: context, initialDate: v == null ? DateTime(now.year - 20) : DateTime.parse(v), firstDate: DateTime(1900), lastDate: DateTime(now.year + 10));
             if (picked != null) {
               setState(() {
                 _answers[f.id] = DateFormat('yyyy-MM-dd').format(picked); // the API takes AD

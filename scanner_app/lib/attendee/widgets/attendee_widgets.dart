@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/api_client.dart';
+import '../../core/bs_date.dart';
 import '../../models/event_model.dart';
 import '../../screens/common/event_phase.dart';
 import '../../screens/common/format.dart';
@@ -209,7 +210,14 @@ class EventCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            e.isFull ? 'Fully booked' : e.priceLabel,
+                            // Same order as the website's cards: apply first, then a scheduled opening
+                            e.externalRegisterUrl != null
+                                ? 'Register'
+                                : e.applyFirst
+                                    ? e.applyLabel
+                                    : e.registrationOpensLater
+                                        ? 'Opens ${BsDate.format('d MMM', e.registrationOpens!)}'
+                                        : e.isFull ? 'Fully booked' : e.priceLabel,
                             style: AppType.body(13,
                                 weight: FontWeight.w600, color: e.isFull ? AppColors.ink500 : AppColors.textPrimary),
                           ),

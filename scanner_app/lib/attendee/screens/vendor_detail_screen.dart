@@ -79,11 +79,23 @@ class VendorDetailScreen extends ConsumerWidget {
                       leading: const RowIcon(Icons.payments_outlined, background: AppColors.ink600),
                       title: 'From ${formatRupees(v.startingPrice)}',
                       subtitle: 'Starting price',
+                    )
+                  else if (v.hidePrice)
+                    const ListRow(
+                      leading: RowIcon(Icons.payments_outlined, background: AppColors.ink600),
+                      title: 'Price on request',
+                      subtitle: 'Ask the vendor',
                     ),
                   if (v.address.isNotEmpty || v.city.isNotEmpty)
                     ListRow(
                       leading: const RowIcon(Icons.place_rounded, background: AppColors.success),
                       title: [v.address, v.city].where((x) => x.isNotEmpty).join(', '),
+                    ),
+                  if (v.serviceAreas.isNotEmpty)
+                    ListRow(
+                      leading: const RowIcon(Icons.map_outlined, background: AppColors.brand),
+                      title: v.serviceAreas.join(', '),
+                      subtitle: 'Also serves',
                     ),
                 ],
               ),

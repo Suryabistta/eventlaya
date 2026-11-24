@@ -546,7 +546,7 @@ class _SlotEditorState extends ConsumerState<_SlotEditor> {
           onTap: editable
               ? () async {
                   final now = dayOf(DateTime.now());
-                  final d = await showDatePicker(
+                  final d = await showBsDatePicker(
                     context: context,
                     initialDate: _date.isBefore(now) ? now : _date,
                     firstDate: now,

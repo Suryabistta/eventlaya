@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../attendee/data/attendee_api.dart' show friendlyError;
 import '../../core/api_client.dart';
+import '../../core/bs_date.dart';
 import '../../providers/modules_provider.dart';
 import '../../ui/ui.dart';
 
@@ -51,7 +52,7 @@ class _EventControlsSectionState extends ConsumerState<EventControlsSection> {
   Future<DateTime?> _pickDateTime(DateTime? initial) async {
     final now = DateTime.now();
     final start = initial != null && initial.isAfter(now) ? initial : now.add(const Duration(days: 1));
-    final d = await showDatePicker(context: context, initialDate: start, firstDate: now, lastDate: DateTime(now.year + 3));
+    final d = await showBsDatePicker(context: context, initialDate: start, firstDate: now, lastDate: DateTime(now.year + 3));
     if (d == null || !mounted) return null;
     final t = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(initial ?? DateTime(d.year, d.month, d.day, 23, 59)));
     if (t == null) return null;
@@ -64,11 +65,7 @@ class _EventControlsSectionState extends ConsumerState<EventControlsSection> {
   }
 
   static DateTime? _date(Object? v) => v == null ? null : DateTime.tryParse('$v')?.toLocal();
-  static String _fmt(DateTime d) {
-    const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
-    return '${d.day} ${m[d.month - 1]}, $h:${d.minute.toString().padLeft(2, '0')} ${d.hour < 12 ? 'AM' : 'PM'}';
-  }
+  static String _fmt(DateTime d) => BsDate.format('d MMM, h:mm a', d);
 
   Widget _row({required IconData icon, required String title, required String state, required Tone tone, required String detail, required List<Widget> actions}) {
     return Padding(
@@ -122,6 +119,23 @@ class _EventControlsSectionState extends ConsumerState<EventControlsSection> {
     final salesReason = e['registration_closed_reason'] as String?;
     final salesOpen = ticketsOn && salesReason == null;
 
+    // Registration set to open by itself (module stage_schedule); "linked" = it opens the moment applications close
+    final scheduleOn = ref.watch(moduleEnabledProvider(AppModule.stageSchedule));
+    final opensAt = scheduleOn ? _date(e['registration_opens']) : null;
+    final scheduled = opensAt != null && opensAt.isAfter(now);
+    final linked = scheduled && appsClose != null && opensAt.difference(appsClose).inSeconds.abs() < 60;
+    final ticketWord = formOnly ? 'Registration' : (isPageant ? 'Finale tickets' : 'Ticketing');
+
+    Future<void> pickOpening() async {
+      final d = await _pickDateTime(opensAt ?? appsClose);
+      if (d == null) return;
+      if (deadline != null && !d.isBefore(deadline)) {
+        if (context.mounted) AppToast.error(context, 'Registration must open before its deadline.');
+        return;
+      }
+      await _patch({'registration_opens': d.toUtc().toIso8601String()}, 'Opens by itself ${_fmt(d)}');
+    }
+
     final warnings = <String>[
       if (appsNoForm) 'Applications can’t open yet: this event has no application form. Add one on the website (Dynamic forms).',
       if (!published && (appsOpen || salesOpen || contests.any((c) => c['status'] == 'open')))
@@ -158,13 +172,25 @@ class _EventControlsSectionState extends ConsumerState<EventControlsSection> {
             actions: [
               if (appsOpen)
                 _btn('Close now', () async {
-                  if (await confirmSheet(context, title: 'Close applications now?', message: 'Nobody can apply after this. Reopen by picking a new closing date.', confirmLabel: 'Close now')) {
-                    await _patch({'applications_close': DateTime.now().toUtc().toIso8601String()}, 'Applications closed');
+                  if (await confirmSheet(context,
+                      title: 'Close applications now?',
+                      message: linked
+                          ? 'Nobody can apply after this, and ${ticketWord.toLowerCase()} opens now instead of on its scheduled time.'
+                          : 'Nobody can apply after this. Reopen by picking a new closing date.',
+                      confirmLabel: 'Close now')) {
+                    final at = DateTime.now().toUtc().toIso8601String();
+                    await _patch(
+                        linked ? {'applications_close': at, 'tickets_enabled': true, 'allow_registration': true} : {'applications_close': at},
+                        'Applications closed');
                   }
                 }),
               _btn(appsOpen ? 'Change date' : 'Reopen…', () async {
                 final d = await _pickDateTime(appsClose);
-                if (d != null) await _patch({'applications_close': d.toUtc().toIso8601String()}, 'Closing date saved');
+                // Linked schedule: moving the applications deadline moves the registration opening with it
+                if (d != null) {
+                  final at = d.toUtc().toIso8601String();
+                  await _patch({'applications_close': at, if (linked) 'registration_opens': at}, 'Closing date saved');
+                }
               }, primary: !appsOpen),
             ],
           ),
@@ -207,10 +233,23 @@ class _EventControlsSectionState extends ConsumerState<EventControlsSection> {
               ],
             );
           }),
-        if (ticketsOn)
+        if (scheduled)
           _row(
             icon: Icons.confirmation_number_outlined,
-            title: formOnly ? 'Registration' : (isPageant ? 'Finale tickets' : 'Ticketing'),
+            title: ticketWord,
+            state: 'Scheduled',
+            tone: Tone.brand,
+            detail: 'Opens by itself ${_fmt(opensAt)}${linked ? ' (when applications close)' : ''}',
+            actions: [
+              _btn('Open now', () => _patch({'tickets_enabled': true, 'allow_registration': true}, '$ticketWord is open'), primary: true),
+              _btn('Cancel schedule', () => _patch({'registration_opens': null}, 'Schedule cancelled')),
+              _btn('Change time', pickOpening),
+            ],
+          ),
+        if (ticketsOn && !scheduled)
+          _row(
+            icon: Icons.confirmation_number_outlined,
+            title: ticketWord,
             state: salesOpen ? 'Open' : 'Closed',
             tone: salesOpen ? Tone.success : Tone.neutral,
             detail: !salesOpen && salesReason != null
@@ -230,7 +269,15 @@ class _EventControlsSectionState extends ConsumerState<EventControlsSection> {
                     await _patch({'allow_registration': true}, 'Open again');
                   }
                 }, primary: true),
+              if (!salesOpen && scheduleOn && !over) _btn('Schedule', pickOpening),
             ],
+          ),
+        if (!ticketsOn && !scheduled && scheduleOn && !over && e['date_tba'] != true)
+          ListRow(
+            title: '${formOnly ? 'Registration' : 'Tickets'} later (scheduled)',
+            subtitle: 'Opens by itself at the time you pick',
+            leading: const Icon(Icons.schedule_rounded, color: AppColors.brand),
+            onTap: _busy ? null : pickOpening,
           ),
         if (contestsOn && isPageant && contests.isEmpty)
           ListRow(

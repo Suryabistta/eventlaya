@@ -62,6 +62,12 @@ class Vendor {
   /// Number of visible reviews (`review_total`).
   final int reviewTotal;
 
+  /// Places the vendor travels to, besides [city].
+  final List<String> serviceAreas;
+
+  /// The vendor shows "Price on request" (the server then sends no price).
+  final bool hidePrice;
+
   const Vendor({
     required this.id,
     required this.businessName,
@@ -78,6 +84,8 @@ class Vendor {
     this.isFeatured = false,
     this.rating,
     this.reviewTotal = 0,
+    this.serviceAreas = const [],
+    this.hidePrice = false,
   });
 
   factory Vendor.fromJson(Map<String, dynamic> j) => Vendor(
@@ -96,6 +104,8 @@ class Vendor {
         isFeatured: j['is_featured'] == true,
         rating: j['rating'] == null ? null : parseMoney(j['rating']),
         reviewTotal: _int(j['review_total']) ?? 0,
+        serviceAreas: _strings(j['service_areas']),
+        hidePrice: j['hide_price'] == true,
       );
 }
 

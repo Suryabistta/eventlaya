@@ -158,6 +158,23 @@ class PublicEvent {
   /// Picked by the superadmin: listed first on Explore, with a badge.
   final bool isFeatured;
 
+  /// Superadmin hid "Organised by" for this event.
+  final bool hideOrganizer;
+
+  /// Superadmin set an external registration link: Register opens it in the browser.
+  final String? externalRegisterUrl;
+
+  /// Registration opens by itself at this time (module stage_schedule); null = no schedule.
+  final DateTime? registrationOpens;
+
+  /// When applications close (list data; the detail uses `applications.open`).
+  final DateTime? applicationsClose;
+
+  bool get registrationOpensLater => !registrationOpen && registrationOpens != null && registrationOpens!.isAfter(DateTime.now());
+
+  /// Applying is the way in: applications open and (open call, or registration closed).
+  bool get applyFirst => applicationsOpen && (isOpenCall || !registrationOpen) && externalRegisterUrl == null;
+
   /// Server display name of [category] ('' for none/other).
   final String? categoryName;
 
@@ -227,6 +244,10 @@ class PublicEvent {
     this.stages = const [],
     this.ctaLabel,
     this.isFeatured = false,
+    this.hideOrganizer = false,
+    this.externalRegisterUrl,
+    this.registrationOpens,
+    this.applicationsClose,
     this.bannerUrl,
     this.organizerName = '',
     this.partnerLabel,
@@ -265,7 +286,16 @@ class PublicEvent {
       registrationOnly: j['registration_mode'] == 'form',
       phoneRequired: j['phone_required'] != false,
       isOpenCall: j['applications_enabled'] == true && j['tickets_enabled'] == false,
-      applicationsOpen: j['applications'] is Map ? (j['applications'] as Map)['open'] == true : false,
+      applicationsOpen: j['applications'] is Map
+          ? (j['applications'] as Map)['open'] == true
+          : j['applications_enabled'] == true &&
+              (DateTime.tryParse(_str(j['applications_close']) ?? '')?.isAfter(DateTime.now()) ?? false),
+      applicationsClose: DateTime.tryParse(_str(j['applications'] is Map ? (j['applications'] as Map)['closes_at'] : j['applications_close']) ?? '')?.toLocal(),
+      hideOrganizer: j['hide_organizer'] == true,
+      externalRegisterUrl: j['external_register_enabled'] == true && (_str(j['external_register_url']) ?? '').startsWith('https://')
+          ? _str(j['external_register_url'])
+          : null,
+      registrationOpens: DateTime.tryParse(_str(j['registration_opens']) ?? '')?.toLocal(),
       applicationForm: j['applications'] is Map && (j['applications'] as Map)['form'] is Map
           ? FormSchema.fromJson(Map<String, dynamic>.from((j['applications'] as Map)['form'] as Map))
           : null,

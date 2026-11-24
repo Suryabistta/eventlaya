@@ -61,7 +61,7 @@ class _InquiryScreenState extends ConsumerState<InquiryScreen> {
 
   Future<void> _pickDate() async {
     final now = DateTime.now();
-    final d = await showDatePicker(
+    final d = await showBsDatePicker(
       context: context,
       initialDate: _date ?? now.add(const Duration(days: 30)),
       firstDate: now,

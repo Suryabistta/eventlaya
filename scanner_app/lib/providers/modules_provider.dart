@@ -16,6 +16,9 @@ class AppModule {
   static const applications = 'applications';
   static const sms = 'sms';
 
+  /// Registration / tickets open by themselves at a set time.
+  static const stageSchedule = 'stage_schedule';
+
   /// Saved events (hearts) for signed-in people.
   static const favourites = 'favourites';
 
