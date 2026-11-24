@@ -173,10 +173,16 @@ export function spotsInfo(e: Pick<PublicEvent, 'capacity' | 'registered_count' |
 export const registrationOpensLater = (e: Pick<Event, 'registration_opens'>): e is { registration_opens: string } =>
   Boolean(e.registration_opens && new Date(e.registration_opens).getTime() > Date.now())
 
+/** Superadmin set an external registration link: price, spots and our checkout don't apply. */
+export const externalRegister = (e: Pick<PublicEvent, 'external_register_enabled' | 'external_register_url'>) =>
+  e.external_register_enabled && e.external_register_url ? e.external_register_url : null
+
 export function registrationState(e: PublicEvent): { open: boolean; reason?: string; label?: string; phase: EventPhase } {
   const phase = eventPhase(e)
   if (phase === 'cancelled') return { open: false, phase, label: 'Event cancelled', reason: e.registration_closed_reason || 'The organizer cancelled this event.' }
   if (phase === 'ended') return { open: false, phase, label: 'Event has ended', reason: e.registration_closed_reason || 'This event has already happened.' }
+  // Registration happens on another site (superadmin setting): the button always goes there
+  if (externalRegister(e)) return { open: true, phase }
   if (e.is_full) return { open: false, phase, label: 'Fully booked', reason: e.registration_closed_reason || 'Every spot has been taken.' }
   // Scheduled to open by itself (module stage_schedule): say when, in the viewer's calendar
   if (e.registration_open === false && registrationOpensLater(e))

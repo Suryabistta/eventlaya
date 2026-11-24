@@ -165,8 +165,14 @@ export const EventRegisterPage: React.FC = () => {
     enabled: Boolean(slug),
     retry: (count, err) => !isNotFound(err) && count < 1,
   })
+  // Registration happens on another site (superadmin setting): go there, except to show a pass already held
+  const externalUrl = data?.event?.external_register_enabled ? data.event.external_register_url : ''
+  const showingPass = new URLSearchParams(window.location.search).get('view') === 'pass'
+  useEffect(() => {
+    if (externalUrl && !showingPass) window.location.replace(externalUrl)
+  }, [externalUrl, showingPass])
 
-  if (isLoading) {
+  if (isLoading || (externalUrl && !showingPass)) {
     return (
       <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 sm:py-10" aria-busy="true">
         <Skeleton className="h-5 w-32" />

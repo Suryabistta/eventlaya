@@ -56,12 +56,19 @@ interface ButtonLinkProps extends LinkProps {
   icon?: React.ReactNode
 }
 
-export const ButtonLink: React.FC<ButtonLinkProps> = ({ variant = 'primary', size = 'md', icon, className, children, ...props }) => (
-  <Link className={buttonClass(variant, size, className as string)} {...props}>
-    {icon}
-    {children}
-  </Link>
-)
+/** Full http(s) links open in a new tab (e.g. an event's external registration); site paths use the router. */
+export const ButtonLink: React.FC<ButtonLinkProps> = ({ variant = 'primary', size = 'md', icon, className, children, ...props }) =>
+  typeof props.to === 'string' && /^https?:\/\//.test(props.to) ? (
+    <a href={props.to} target="_blank" rel="noopener noreferrer" className={buttonClass(variant, size, className as string)} aria-label={props['aria-label']}>
+      {icon}
+      {children}
+    </a>
+  ) : (
+    <Link className={buttonClass(variant, size, className as string)} {...props}>
+      {icon}
+      {children}
+    </Link>
+  )
 
 interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   label: string

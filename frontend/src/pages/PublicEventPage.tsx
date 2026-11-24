@@ -40,6 +40,7 @@ import {
   initials,
   priceLabel,
   registrationState,
+  externalRegister,
   registrationOpensLater,
   shareOrCopy,
   spotsInfo,
@@ -131,7 +132,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
     if (event.description || event.highlights?.length) s.push('about')
     if (event.sub_events?.length) s.push('sessions')
     const tt = event.ticket_types ?? []
-    if (event.registration_mode !== 'form' && (tt.length > 1 || tt.some((t) => Number(t.price) > 0 || t.remaining !== null || t.description))) s.push('tickets')
+    if (!externalRegister(event) && event.registration_mode !== 'form' && (tt.length > 1 || tt.some((t) => Number(t.price) > 0 || t.remaining !== null || t.description))) s.push('tickets')
     if (event.agenda?.length) s.push('schedule')
     if (event.speakers?.length) s.push('speakers')
     if (!event.date_tba) s.push('venue')
@@ -152,7 +153,9 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
     toast.success('Calendar file downloaded', 'Open it to add the event to your calendar.')
   }
 
-  const registerHref = `/e/${event.slug}/register`
+  // Superadmin set an external registration link: every Register button opens it in a new tab
+  const external = externalRegister(event)
+  const registerHref = external ?? `/e/${event.slug}/register`
   /** Ended or cancelled: keep the page readable, drop the call to action */
   const over = state.phase === 'ended' || state.phase === 'cancelled'
   const showCta = !over || Boolean(storedPass)
@@ -231,12 +234,12 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
               </a>
             </Fact>
           )}
-          {event.tickets_enabled !== false && (event.registration_mode !== 'form' || event.capacity > 0) && (
+          {!external && event.tickets_enabled !== false && (event.registration_mode !== 'form' || event.capacity > 0) && (
             <Fact icon={<Users className="h-5 w-5" aria-hidden />} label="Spots">
               <SpotsMeter event={event} />
             </Fact>
           )}
-          {event.tickets_enabled !== false && (event.registration_mode ?? 'pass') === 'pass' && (
+          {!external && event.tickets_enabled !== false && (event.registration_mode ?? 'pass') === 'pass' && (
             <Fact icon={<TicketIcon className="h-5 w-5" aria-hidden />} label="Price">
               <span className="font-semibold text-ink-900">{price}</span>
               {hasPaidTickets(event) && <span className="block text-ink-500">{event.payment_options?.online ? paymentNote(event.payment_options).replace(/\.$/, '') : 'Pay at the venue'}</span>}
@@ -399,9 +402,11 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
       <div className={`fixed inset-x-0 z-30 border-t border-ink-200 bg-white/95 backdrop-blur lg:hidden ${tenant ? 'bottom-0 pb-[env(safe-area-inset-bottom)]' : 'bottom-[calc(60px+env(safe-area-inset-bottom))] md:bottom-0'}`}>
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-6">
           <div className="min-w-0 flex-1">
-            <p className="font-display text-lg font-bold leading-tight text-ink-900">{price}</p>
+            <p className="truncate font-display text-lg font-bold leading-tight text-ink-900">{external ? event.title : price}</p>
             <p className="truncate text-xs text-ink-500">
-              {applyFirst && event.applications
+              {external
+                ? 'Opens in a new tab'
+                : applyFirst && event.applications
                 ? event.applications.closes_at
                   ? `Applications open until ${formatDate(event.applications.closes_at, 'short')}`
                   : 'Applications are open'
@@ -1016,12 +1021,18 @@ const RegistrationCard: React.FC<{ event: PublicEvent; state: ReturnType<typeof 
     <div className="space-y-4">
     <Card className="p-5">
       <h2 className="text-base font-bold text-ink-900">Registration</h2>
-      <p className="mt-3 font-display text-3xl font-bold text-ink-900">{price}</p>
-      {hasPaidTickets(event) && <p className="text-sm text-ink-500">{paymentNote(event.payment_options)}</p>}
-      <div className="mt-4 text-sm">
-        <SpotsMeter event={event} />
-      </div>
-      {countdown && (
+      {externalRegister(event) ? (
+        <p className="mt-2 text-sm text-ink-500">Registration opens in a new tab.</p>
+      ) : (
+        <>
+          <p className="mt-3 font-display text-3xl font-bold text-ink-900">{price}</p>
+          {hasPaidTickets(event) && <p className="text-sm text-ink-500">{paymentNote(event.payment_options)}</p>}
+          <div className="mt-4 text-sm">
+            <SpotsMeter event={event} />
+          </div>
+        </>
+      )}
+      {countdown && !externalRegister(event) && (
         <p className="mt-4 flex items-center gap-2 rounded-lg bg-marigold-50 px-3 py-2 text-sm text-marigold-900">
           <Clock className="h-4 w-4 shrink-0" aria-hidden />
           Registration closes in {countdown}

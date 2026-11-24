@@ -107,7 +107,7 @@ class EventViewSet(viewsets.ModelViewSet):
                 transaction.on_commit(lambda: send_to_guests(
                     event, 'Event cancelled',
                     f'{event.title} has been cancelled by the organizer. Your ticket will not be used. '
-                    'If you paid, the organizer will contact you about a refund.', recipients))
+                    'If you paid, the organizer will contact you about a refund.', recipients, background=True))
         # Older screens edit one event price: apply it when there's a single ticket type.
         if (event.is_paid, event.ticket_price) != before:
             types = list(event.ticket_types.filter(is_active=True))
@@ -203,6 +203,9 @@ class PublicEventDetailView(APIView):
         data['sub_events'] = sub_event_cards(event)
         data['parent'] = parent_card(event)
         data['hide_organizer'] = event.hide_organizer
+        if event.external_register_enabled and event.external_register_url:
+            data['external_register_enabled'] = True
+            data['external_register_url'] = event.external_register_url
         data['managed_by_info'] = (
             {'name': event.managed_by, 'logo': event.managed_by_logo or None, 'label': event.managed_by_label.strip() or 'Managed by'}
             if event.show_managed_by and event.managed_by.strip() else None

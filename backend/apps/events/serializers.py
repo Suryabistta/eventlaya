@@ -119,7 +119,7 @@ class EventSerializer(serializers.ModelSerializer):
             'registered_count', 'checked_in_count', 'created_at', 'updated_at',
             'tagline', 'category', 'category_name', 'event_kind', 'is_featured', 'phase', 'registration_open', 'registration_closed_reason', 'applications_closed_reason', 'hidden_by_admin', 'hidden_reason',
             'max_tickets_per_order', 'show_spots_left',
-            'managed_by', 'managed_by_logo', 'show_managed_by', 'hide_organizer', 'managed_by_label', 'ticket_layout', 'show_seat_number', 'registration_mode', 'cta_label',
+            'managed_by', 'managed_by_logo', 'show_managed_by', 'hide_organizer', 'managed_by_label', 'ticket_layout', 'show_seat_number', 'registration_mode', 'cta_label', 'external_register_enabled', 'external_register_url',
             'tickets_enabled', 'date_tba', 'applications_enabled', 'application_form', 'applications_close', 'application_cta', 'registration_opens',
             'phone_required', 'arrival_alerts', 'reminders_enabled', 'reminders_sms', 'bib_numbers', 'bib_start',
             'parent', 'parent_title',
@@ -155,6 +155,31 @@ class EventSerializer(serializers.ModelSerializer):
         if getattr(user, 'is_superadmin', False):
             return value
         return self.instance.hide_organizer if self.instance else False
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Superadmin-only setting: nobody else sees that it exists (the public page adds the link only when it's on)
+        if not self._superadmin():
+            data.pop('external_register_enabled', None)
+            data.pop('external_register_url', None)
+        return data
+
+    def _superadmin(self):
+        return getattr(getattr(self.context.get('request'), 'user', None), 'is_superadmin', False)
+
+    def validate_external_register_enabled(self, value):
+        """Only a superadmin may change it; anyone else keeps the saved value."""
+        if self._superadmin():
+            return value
+        return self.instance.external_register_enabled if self.instance else False
+
+    def validate_external_register_url(self, value):
+        if not self._superadmin():
+            return self.instance.external_register_url if self.instance else ''
+        value = (value or '').strip()
+        if value and not value.startswith('https://'):
+            raise serializers.ValidationError('The link must start with https://.')
+        return value
 
     def validate_managed_by_logo(self, value):
         from apps.platform.catalog import safe_url
@@ -218,6 +243,10 @@ class EventSerializer(serializers.ModelSerializer):
         return self._apply_banner(super().update(instance, validated_data), path)
 
     def validate(self, attrs):
+        ext_on = attrs.get('external_register_enabled', self.instance.external_register_enabled if self.instance else False)
+        ext_url = attrs.get('external_register_url', self.instance.external_register_url if self.instance else '')
+        if ext_on and not ext_url:
+            raise serializers.ValidationError({'external_register_url': 'Add the link the Register button should open.'})
         title = attrs.get('title') or (self.instance.title if self.instance else '')
         slug = attrs.get('slug')
 

@@ -105,6 +105,9 @@ class Event(models.Model):
     registration_mode = models.CharField(max_length=10, choices=RegistrationMode.choices, default=RegistrationMode.PASS)
     # Text of the main button (Get tickets, Register, Book a spot...); blank = chosen from the registration type
     cta_label = models.CharField(max_length=30, blank=True)
+    # Superadmin only: the Register button opens this link (new tab) instead of our registration
+    external_register_enabled = models.BooleanField(default=False)
+    external_register_url = models.URLField(max_length=500, blank=True)
 
     # Stages (docs/plan-2026-11-event-journeys.md). Each one is switched on or off per event.
     # Tickets / registration stage: off while only applications are open (tickets go on sale later).
@@ -275,6 +278,8 @@ class Event(models.Model):
             return 'This event was cancelled by the organizer.'
         if phase == 'ended':
             return 'This event has ended.'
+        if self.external_register_enabled and self.external_register_url:
+            return 'Registration for this event happens on another site.'
         scheduled = self.registration_schedule()
         if scheduled == 'waiting':
             return 'Registration opens soon.'

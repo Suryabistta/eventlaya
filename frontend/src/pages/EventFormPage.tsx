@@ -61,6 +61,8 @@ interface EventDraft {
   show_seat_number: boolean
   registration_mode: 'pass' | 'form'
   cta_label: string
+  external_register_enabled: boolean
+  external_register_url: string
   // Stages (docs/plan-2026-11-event-journeys.md)
   tickets_enabled: boolean
   date_tba: boolean
@@ -154,6 +156,8 @@ const emptyDraft: EventDraft = {
   show_seat_number: false,
   registration_mode: 'pass',
   cta_label: '',
+  external_register_enabled: false,
+  external_register_url: '',
   tickets_enabled: true,
   date_tba: false,
   applications_enabled: false,
@@ -235,6 +239,8 @@ function fromEvent(ev: Event, page?: EventPageContent): EventDraft {
     show_seat_number: ev.show_seat_number ?? false,
     registration_mode: ev.registration_mode ?? 'pass',
     cta_label: ev.cta_label ?? '',
+    external_register_enabled: ev.external_register_enabled ?? false,
+    external_register_url: ev.external_register_url ?? '',
     tickets_enabled: ev.tickets_enabled ?? true,
     date_tba: ev.date_tba ?? false,
     applications_enabled: ev.applications_enabled ?? false,
@@ -354,7 +360,7 @@ const localToday = () => {
 const FIELD_STEP: Record<string, StepId> = {
   title: 'basics', tagline: 'basics', parent: 'basics', category: 'basics', description: 'basics', banner: 'basics', banner_url: 'basics',
   start_date: 'when', start_time: 'when', end_date: 'when', end_time: 'when', location: 'when', map_query: 'when',
-  capacity: 'registration', limit_spots: 'registration', show_spots_left: 'registration', status: 'registration', registration_deadline: 'registration', ticket_price: 'registration', is_paid: 'registration', allow_registration: 'registration', ticket_layout: 'registration', show_seat_number: 'registration', registration_mode: 'registration', cta_label: 'registration', tickets_enabled: 'stages', applications_enabled: 'stages', applications_close: 'stages', application_cta: 'stages', registration_opens: 'registration', opens_after_apps: 'stages', date_tba: 'when', phone_required: 'registration', bib_numbers: 'registration', bib_start: 'registration', form_template: 'form', buyer_form_template: 'form', arrival_alerts: 'registration', reminders_enabled: 'registration', reminders_sms: 'registration',
+  capacity: 'registration', limit_spots: 'registration', show_spots_left: 'registration', status: 'registration', registration_deadline: 'registration', ticket_price: 'registration', is_paid: 'registration', allow_registration: 'registration', ticket_layout: 'registration', show_seat_number: 'registration', registration_mode: 'registration', cta_label: 'registration', external_register_enabled: 'registration', external_register_url: 'registration', tickets_enabled: 'stages', applications_enabled: 'stages', applications_close: 'stages', application_cta: 'stages', registration_opens: 'registration', opens_after_apps: 'stages', date_tba: 'when', phone_required: 'registration', bib_numbers: 'registration', bib_start: 'registration', form_template: 'form', buyer_form_template: 'form', arrival_alerts: 'registration', reminders_enabled: 'registration', reminders_sms: 'registration',
   managed_by: 'page', managed_by_label: 'page', managed_by_logo: 'page', show_managed_by: 'page', hide_organizer: 'page',
 }
 
@@ -630,7 +636,7 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
   const [moreOpen, setMoreOpen] = useState(false)
   const errors: Errors = { ...(attempted.has(step.id) ? check(step.id) : {}), ...serverErrors }
   // Fields folded under "More settings": show them when one needs fixing
-  const moreFields = ['status', 'bib_start', 'cta_label', 'application_cta', ...(kind === 'pageant' ? [] : ['applications_close'])]
+  const moreFields = ['status', 'bib_start', 'cta_label', 'external_register_url', 'application_cta', ...(kind === 'pageant' ? [] : ['applications_close'])]
   const moreShown = moreOpen || moreFields.some((f) => errors[f])
 
   // Focus the step heading after a step change
@@ -711,7 +717,9 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
         allow_registration: draft.allow_registration,
         show_spots_left: draft.show_spots_left,
         show_managed_by: draft.show_managed_by,
-        ...(isSuperadmin ? { hide_organizer: draft.hide_organizer } : {}),
+        ...(isSuperadmin
+          ? { hide_organizer: draft.hide_organizer, external_register_enabled: draft.external_register_enabled, external_register_url: draft.external_register_url.trim() }
+          : {}),
         ticket_layout: draft.ticket_layout,
         show_seat_number: draft.show_seat_number,
         registration_mode: draft.registration_mode,
@@ -1215,6 +1223,26 @@ const EventBuilder: React.FC<{ event?: Event; page?: EventPageContent }> = ({ ev
                         auto={bookLabel({ ...(event ?? {}), registration_mode: draft.registration_mode, is_paid: draft.is_paid, ticket_price: draft.ticket_price, ticket_types: event?.ticket_types, cta_label: '', tickets_enabled: true } as Event)}
                         onChange={(v) => set('cta_label', v)}
                       />
+                      {isSuperadmin && (
+                        <div className="space-y-3 rounded-xl border border-ink-200 bg-ink-50 p-4">
+                          <Checkbox
+                            label="Register button opens an external link"
+                            hint="Superadmin only. The button opens this link in a new tab, and registration on Eventlaya is turned off for this event."
+                            checked={draft.external_register_enabled}
+                            onChange={(v) => set('external_register_enabled', v)}
+                          />
+                          {draft.external_register_enabled && (
+                            <Input
+                              label="Registration link"
+                              type="url"
+                              placeholder="https://"
+                              value={draft.external_register_url}
+                              error={errors.external_register_url}
+                              onChange={(e) => set('external_register_url', e.target.value)}
+                            />
+                          )}
+                        </div>
+                      )}
                       {/* Ticketed events set this on Tickets & prices */}
                       {draft.limit_spots && kind === 'registration' && (
                         <Checkbox

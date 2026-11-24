@@ -44,6 +44,9 @@ export interface Event {
   bib_start?: number
   /** Main button text set by the organizer ('' = from the registration type) */
   cta_label?: string
+  /** Superadmin only: the Register button opens this link in a new tab instead of our registration */
+  external_register_enabled?: boolean
+  external_register_url?: string
   title: string
   slug: string
   description: string
