@@ -605,29 +605,50 @@ export const Partners: React.FC = () => {
   const items = sec.items.filter((p) => p.name.trim())
   if (!sec.show || !items.length) return null
   return (
-    <section className="bg-white pt-14 sm:pt-16">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+    <section className="relative overflow-hidden bg-gradient-to-b from-brand-50/70 via-brand-50/40 to-white py-14 sm:py-20">
+      {/* soft brand glows */}
+      <div aria-hidden className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-brand-200/30 blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-marigold-200/30 blur-3xl" />
+      <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
         <Reveal className="text-center">
           <Eyebrow center>{sec.eyebrow}</Eyebrow>
           <H2>{sec.title}</H2>
         </Reveal>
-        <ul className="mt-10 flex flex-wrap items-center justify-center gap-4 sm:gap-6">
+        <ul className="mt-10 grid grid-cols-2 gap-4 sm:mt-12 sm:flex sm:flex-wrap sm:justify-center sm:gap-6">
           {items.map((p, i) => {
-            // A logo says it best: show it big, keep the name for screen readers, search and the tooltip
-            const inner = safeHref(p.logo) ? (
-              <img src={p.logo} alt={p.name} loading="lazy" className="h-14 w-auto max-w-[180px] object-contain sm:h-16 sm:max-w-[200px]" />
+            const href = safeHref(p.url)
+            // On devices with a mouse, logos rest muted and come to full colour on hover; touch screens always show colour
+            const logo = safeHref(p.logo) ? (
+              <img
+                src={p.logo}
+                alt=""
+                loading="lazy"
+                className="h-14 w-auto max-w-[160px] object-contain transition duration-300 sm:h-16 sm:max-w-[200px] [@media(hover:hover)]:opacity-70 [@media(hover:hover)]:grayscale [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-hover:grayscale-0"
+              />
             ) : (
-              <span className="font-semibold text-ink-800">{p.name}</span>
+              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-50 text-xl font-bold text-brand-700 sm:h-16 sm:w-16">{p.name.trim()[0]}</span>
             )
-            const box = 'flex h-24 min-w-[150px] items-center justify-center rounded-2xl border border-ink-100 bg-white px-6 sm:h-28 sm:px-8'
+            const card = (
+              <>
+                <span className="flex h-20 items-center justify-center sm:h-24">{logo}</span>
+                <span className="mt-3 block text-center text-sm font-semibold text-ink-600 transition group-hover:text-brand-700">{p.name}</span>
+              </>
+            )
+            const box =
+              'group flex h-full flex-col items-center justify-center rounded-3xl border border-white bg-white/90 px-6 pb-5 pt-4 shadow-[0_6px_24px_rgba(28,23,36,0.06)] backdrop-blur transition duration-300 sm:w-60'
             return (
-              <li key={i} title={p.name}>
-                {safeHref(p.url) ? (
-                  <a href={safeHref(p.url)} target="_blank" rel="noreferrer" aria-label={p.name} className={`${box} transition hover:border-ink-300 hover:shadow-sm`}>
-                    {inner}
+              <li key={i}>
+                {href ? (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`${box} hover:-translate-y-1 hover:border-brand-100 hover:shadow-[0_14px_36px_rgba(194,33,90,0.14)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500`}
+                  >
+                    {card}
                   </a>
                 ) : (
-                  <span className={box}>{inner}</span>
+                  <span className={`${box} hover:-translate-y-1`}>{card}</span>
                 )}
               </li>
             )
