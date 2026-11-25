@@ -621,7 +621,7 @@ export const Partners: React.FC = () => {
             const logo = safeHref(p.logo) ? (
               <img
                 src={p.logo}
-                alt={p.name}""
+                alt={href ? '' : p.name}
                 loading="lazy"
                 className="h-14 w-auto max-w-[160px] object-contain transition duration-300 sm:h-16 sm:max-w-[200px] [@media(hover:hover)]:opacity-70 [@media(hover:hover)]:grayscale [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-hover:grayscale-0"
               />
