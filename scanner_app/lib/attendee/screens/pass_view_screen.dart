@@ -132,7 +132,8 @@ class _PassViewScreenState extends ConsumerState<PassViewScreen> {
   Widget build(BuildContext context) {
     final pass = _pass;
     final orderLabel = passOrderLabel(pass, inGroup: _many);
-    return AppScaffold(
+    return BrightScreen(
+        child: AppScaffold(
       title: _many ? 'Your passes' : 'Your pass',
       slivers: [
         SliverToBoxAdapter(
@@ -259,7 +260,7 @@ class _PassViewScreenState extends ConsumerState<PassViewScreen> {
           ),
         ),
       ],
-    );
+    ));
   }
 
   Widget _passCard(StoredPass p) => Center(
@@ -343,7 +344,7 @@ class _Dots extends StatelessWidget {
 }
 
 /// White full-screen QR with the ticket code, kept awake.
-/// (No screen-brightness package is bundled, so brightness isn't changed.)
+/// Full brightness while open (BrightScreen).
 class FullScreenQr extends StatefulWidget {
   final StoredPass pass;
   const FullScreenQr({super.key, required this.pass});
@@ -368,7 +369,8 @@ class _FullScreenQrState extends State<FullScreenQr> {
   @override
   Widget build(BuildContext context) {
     final p = widget.pass;
-    return AnnotatedRegion<SystemUiOverlayStyle>(
+    return BrightScreen(
+        child: AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.dark.copyWith(statusBarColor: Colors.transparent),
       child: Scaffold(
         backgroundColor: Colors.white,
@@ -381,8 +383,7 @@ class _FullScreenQrState extends State<FullScreenQr> {
               return Stack(children: [
                 Center(
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    Text(p.eventTitle,
-                        textAlign: TextAlign.center, maxLines: 2, style: AppType.heading(20)),
+                    Text(p.eventTitle, textAlign: TextAlign.center, maxLines: 2, style: AppType.heading(20)),
                     const SizedBox(height: 4),
                     Text(p.attendeeName, style: AppType.body(15, color: AppColors.textSecondary)),
                     const SizedBox(height: 20),
@@ -414,6 +415,6 @@ class _FullScreenQrState extends State<FullScreenQr> {
           ),
         ),
       ),
-    );
+    ));
   }
 }

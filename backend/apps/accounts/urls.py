@@ -5,6 +5,7 @@ from .team import TeamListView, TeamMemberView
 from .password_reset import PasswordResetRequestView, PasswordResetConfirmView
 from .account import ChangePasswordView
 from .social import FacebookLoginView, GoogleLoginView, SocialConfigView
+from .phone_verification import SendPhoneCodeView
 from .verification import SendVerificationCodeView, VerifyEmailView
 from .views import (
     RegisterView, CurrentUserView, CustomTokenObtainPairView, FCMTokenView,
@@ -14,6 +15,7 @@ from .views import (
 
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='auth_register'),
+    path('phone/send-code/', SendPhoneCodeView.as_view(), name='auth_phone_send_code'),
     path('email-available/', EmailAvailableView.as_view(), name='auth_email_available'),
     path('login/', CustomTokenObtainPairView.as_view(), name='auth_login'),
     path('password-reset/', PasswordResetRequestView.as_view(), name='auth_password_reset'),

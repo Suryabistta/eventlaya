@@ -30,6 +30,7 @@ def code_from_outbox():
     return mail.outbox[-1].subject.split()[0]
 
 
+@mock.patch('apps.accounts.phone_verification.check_code', new=lambda phone, code: None)  # SMS code: see apps.accounts.test_phone_verification
 class AttendeeSignupTests(APITestCase):
     def test_attendee_signup_gets_attendee_role_and_a_code(self):
         res = self.client.post('/api/auth/register/', {
@@ -420,6 +421,7 @@ class FacebookLoginTests(APITestCase):
 
 
 @override_settings(TERMS_VERSION='2026-10-28', **GOOGLE)
+@mock.patch('apps.accounts.phone_verification.check_code', new=lambda phone, code: None)  # SMS code: see apps.accounts.test_phone_verification
 class TermsConsentTests(APITestCase):
     """Sign-up records consent to the Terms of Service + Privacy Policy (terms_accepted_at / terms_version)."""
 
@@ -494,6 +496,7 @@ class TermsConsentTests(APITestCase):
         self.assertEqual(self.client.get('/api/auth/social/config/').data['terms_version'], '2026-10-28')
 
 
+@mock.patch('apps.accounts.phone_verification.check_code', new=lambda phone, code: None)  # SMS code: see apps.accounts.test_phone_verification
 class SignupPhoneRuleTests(APITestCase):
     URL = '/api/auth/register/'
 

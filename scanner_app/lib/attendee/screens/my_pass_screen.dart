@@ -58,96 +58,100 @@ class _MyPassScreenState extends ConsumerState<MyPassScreen> {
     final topPad = MediaQuery.paddingOf(context).top;
     final current = passes.isEmpty ? null : passes[_index.clamp(0, passes.length - 1)];
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent),
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        body: Stack(
-          children: [
-            // Brand backdrop behind the top half of the pass.
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: topPad + 260,
-              child: const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: brandGradient,
-                  borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
+    return BrightScreen(
+        // Full brightness while this tab shows a pass, for fast scans at the gate
+        active: widget.active && current != null,
+        child: AnnotatedRegion<SystemUiOverlayStyle>(
+          value: SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent),
+          child: Scaffold(
+            backgroundColor: AppColors.background,
+            body: Stack(
+              children: [
+                // Brand backdrop behind the top half of the pass.
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: topPad + 260,
+                  child: const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: brandGradient,
+                      borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            Positioned.fill(
-              child: Padding(
-                padding: EdgeInsets.only(top: topPad + 12, bottom: bottomPad + 22),
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Row(children: [
-                        Expanded(
-                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text('My Pass', style: AppType.heading(28, weight: FontWeight.w800, color: Colors.white)),
-                            Text(
-                              current == null
-                                  ? 'Your next event, ready to scan'
-                                  : current.phase == EventPhase.live
-                                      ? 'Happening now — show this at the gate'
-                                      : 'Next up · ${eventWhen(current.event)}',
-                              style: AppType.body(13, color: Colors.white.withValues(alpha: 0.8)),
+                Positioned.fill(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: topPad + 12, bottom: bottomPad + 22),
+                    child: Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Row(children: [
+                            Expanded(
+                              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Text('My Pass',
+                                    style: AppType.heading(28, weight: FontWeight.w800, color: Colors.white)),
+                                Text(
+                                  current == null
+                                      ? 'Your next event, ready to scan'
+                                      : current.phase == EventPhase.live
+                                          ? 'Happening now — show this at the gate'
+                                          : 'Next up · ${eventWhen(current.event)}',
+                                  style: AppType.body(13, color: Colors.white.withValues(alpha: 0.8)),
+                                ),
+                              ]),
                             ),
+                            if (current != null)
+                              AppIconButton(
+                                icon: Icons.fullscreen_rounded,
+                                tooltip: 'Full screen',
+                                color: Colors.white,
+                                background: Colors.white.withValues(alpha: 0.16),
+                                onPressed: () => openFullScreenQr(context, current),
+                              ),
                           ]),
                         ),
-                        if (current != null)
-                          AppIconButton(
-                            icon: Icons.fullscreen_rounded,
-                            tooltip: 'Full screen',
-                            color: Colors.white,
-                            background: Colors.white.withValues(alpha: 0.16),
-                            onPressed: () => openFullScreenQr(context, current),
-                          ),
-                      ]),
-                    ),
-                    const SizedBox(height: 16),
-                    Expanded(
-                      child: passes.isEmpty
-                          ? (loading
-                              ? const Center(child: CircularProgressIndicator(color: Colors.white))
-                              : const _NoPass())
-                          : _PassPager(
-                              passes: passes,
-                              controller: _page,
-                              onChanged: (i) => setState(() => _index = i),
-                            ),
-                    ),
-                    if (passes.length > 1)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            for (var i = 0; i < passes.length; i++)
-                              AnimatedContainer(
-                                duration: const Duration(milliseconds: 180),
-                                margin: const EdgeInsets.symmetric(horizontal: 3),
-                                width: i == _index ? 18 : 6,
-                                height: 6,
-                                decoration: BoxDecoration(
-                                  color: i == _index ? AppColors.brand : AppColors.ink300,
-                                  borderRadius: BorderRadius.circular(3),
+                        const SizedBox(height: 16),
+                        Expanded(
+                          child: passes.isEmpty
+                              ? (loading
+                                  ? const Center(child: CircularProgressIndicator(color: Colors.white))
+                                  : const _NoPass())
+                              : _PassPager(
+                                  passes: passes,
+                                  controller: _page,
+                                  onChanged: (i) => setState(() => _index = i),
                                 ),
-                              ),
-                          ],
                         ),
-                      ),
-                  ],
+                        if (passes.length > 1)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                for (var i = 0; i < passes.length; i++)
+                                  AnimatedContainer(
+                                    duration: const Duration(milliseconds: 180),
+                                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                                    width: i == _index ? 18 : 6,
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      color: i == _index ? AppColors.brand : AppColors.ink300,
+                                      borderRadius: BorderRadius.circular(3),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
+          ),
+        ));
   }
 }
 

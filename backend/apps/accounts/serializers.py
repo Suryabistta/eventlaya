@@ -12,7 +12,7 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'username', 'email', 'phone', 'role', 'organization_name', 'avatar', 'marketplace_access',
                   'business_type', 'city', 'first_name', 'last_name', 'full_name',
-                  'email_verified', 'email_verified_at', 'has_password', 'social_providers', 'date_joined',
+                  'email_verified', 'email_verified_at', 'phone_verified', 'has_password', 'social_providers', 'date_joined',
                   'terms_accepted_at', 'terms_version', 'is_verified', 'must_change_password',
                   'alert_bookings', 'alert_registrations', 'alert_applications']
         read_only_fields = ['id', 'marketplace_access', 'email_verified', 'email_verified_at', 'date_joined',
@@ -65,6 +65,8 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         path = validated_data.pop('avatar_url', None)
+        if 'phone' in validated_data and validated_data['phone'] != instance.phone:
+            validated_data['phone_verified'] = False  # a new number is not proven yet
         instance = super().update(instance, validated_data)
         if path is not None:
             instance.avatar.name = path or None
@@ -86,13 +88,15 @@ class RegisterSerializer(serializers.ModelSerializer):
     # The "I agree to the Terms of Service and Privacy Policy" box. Required: sign-ups without it are refused.
     TERMS_ERROR = 'Agree to the Terms of Service and Privacy Policy to create your account.'
     terms = serializers.BooleanField(write_only=True, required=True, error_messages={'required': TERMS_ERROR})
+    # 6-digit SMS code from POST /api/auth/phone/send-code/ (required with a phone number)
+    phone_code = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'password', 'phone', 'organization_name', 'role',
                   'account_type', 'marketplace_access', 'business_type', 'city', 'first_name', 'last_name',
-                  'email_verified', 'terms']
-        read_only_fields = ['id', 'role', 'marketplace_access', 'email_verified']
+                  'email_verified', 'terms', 'phone_code', 'phone_verified']
+        read_only_fields = ['id', 'role', 'marketplace_access', 'email_verified', 'phone_verified']
         extra_kwargs = {
             'email': {'error_messages': {'unique': 'An account with this email already exists.'}},
             'first_name': {'required': False, 'allow_blank': True, 'max_length': 150},
@@ -115,13 +119,16 @@ class RegisterSerializer(serializers.ModelSerializer):
                 and not request.headers.get('X-Eventlaya-Client'))
 
     def validate_phone(self, value):
-        # A mobile number is required for every account (platform rule); blank is caught in validate()
+        # A mobile number is required for every account (platform rule) and proven by SMS code; blank is caught
+        # in validate(). Stored normalized (10 digits) since the SMS provider only reaches Nepali mobiles.
         value = (value or '').strip()
         if not value:
             return value
-        if not 7 <= sum(c.isdigit() for c in value) <= 15:
-            raise serializers.ValidationError('Enter a valid mobile number.')
-        return value
+        from apps.voting.sms import normalize_nepal_mobile
+        try:
+            return normalize_nepal_mobile(value)
+        except ValueError as e:
+            raise serializers.ValidationError(str(e))
 
     def validate(self, attrs):
         if not (attrs.get('phone') or '').strip() and not self._legacy_app_signup(attrs):
@@ -134,6 +141,12 @@ class RegisterSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(errors)
         elif attrs.get('business_type') and attrs['business_type'] not in self.BUSINESS_TYPES:
             raise serializers.ValidationError({'business_type': 'Choose what your business offers.'})
+        if attrs.get('phone'):
+            from .phone_verification import CodeError, check_code
+            try:
+                check_code(attrs['phone'], attrs.get('phone_code'))
+            except CodeError as e:
+                raise serializers.ValidationError({'phone_code': e.message})
         return attrs
 
     def validate_terms(self, value):
@@ -147,6 +160,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
+        validated_data.pop('phone_code', None)
         account_type = validated_data.get('account_type')
         is_vendor = account_type == 'vendor'
         role = {'vendor': User.Role.VENDOR, 'attendee': User.Role.ATTENDEE}.get(account_type, User.Role.ORGANIZER)
@@ -164,6 +178,11 @@ class RegisterSerializer(serializers.ModelSerializer):
             marketplace_access=User.MarketplaceAccess.APPROVED if is_vendor else User.MarketplaceAccess.NONE,
         )
         user.accept_terms()
+        if user.phone:
+            from .phone_verification import use_code
+            use_code(user.phone)
+            user.phone_verified = True
+            user.save(update_fields=['phone_verified'])
         return user
 
 

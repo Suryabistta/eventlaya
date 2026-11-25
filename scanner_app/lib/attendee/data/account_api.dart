@@ -59,6 +59,13 @@ class AccountApi {
     }
   }
 
+  /// `POST /api/auth/phone/send-code/`: texts a 6-digit sign-up code. Returns seconds until a resend is allowed.
+  Future<int> sendPhoneCode(String phone) => _wrap(() async {
+        final resp = await _api.post('/api/auth/phone/send-code/', data: {'phone': phone});
+        final d = Map<String, dynamic>.from(resp.data as Map);
+        return int.tryParse('${d['resend_available_in'] ?? 60}') ?? 60;
+      });
+
   /// `POST /api/auth/register/` as an attendee. Returns no tokens: sign in
   /// afterwards. The server emails a 6-digit verification code.
   Future<void> registerAttendee({
@@ -67,8 +74,10 @@ class AccountApi {
     required String email,
     required String password,
     required String phone,
+    required String phoneCode,
   }) =>
       _wrap(() => _api.post('/api/auth/register/', data: {
+            'phone_code': phoneCode,
             'account_type': 'attendee',
             'first_name': firstName,
             'last_name': lastName,

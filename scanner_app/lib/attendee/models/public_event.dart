@@ -380,6 +380,20 @@ class PublicEvent {
   /// What to show as the price: registration-only events read "Free · Registration".
   String get priceLabel => isOpenCall ? 'Free · Open call' : registrationOnly ? 'Free · Registration' : priceSummary;
 
+  /// Lowest price on sale (0 = free), for sorting.
+  double get lowestPrice {
+    final onSale = [for (final t in ticketTypes) if (t.onSale) t.price]..sort();
+    if (onSale.isNotEmpty) return onSale.first;
+    return isPaid ? ticketPrice : 0;
+  }
+
+  /// Whether the event runs on any day from [from] to [to] (local dates, inclusive).
+  bool runsBetween(DateTime from, DateTime to) {
+    final start = base.startDay, last = base.lastDay ?? start;
+    if (start == null || last == null) return false;
+    return !start.isAfter(to) && !last.isBefore(from);
+  }
+
   String get priceSummary {
     final onSale = ticketTypes.where((t) => t.onSale).toList();
     if (onSale.isEmpty) {

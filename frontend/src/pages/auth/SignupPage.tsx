@@ -60,6 +60,8 @@ const CityOptions: React.FC = () => (
   </>
 )
 const OTHER_CITY = '__other'
+/** Mobiles the SMS code can reach: 10 digits starting 98 or 97. */
+const NEPALI_MOBILE = /^9[78]\d{8}$/
 
 /** Which step owns each field, so server errors can send the user back to it. */
 const FIELD_STEP: Partial<Record<string, number>> = {
@@ -74,6 +76,7 @@ const FIELD_STEP: Partial<Record<string, number>> = {
   password: 3,
   username: 3,
   terms: 3,
+  phone_code: 4,
 }
 
 const isVendorData = (d: SignupData) => d.account_type === 'vendor'
@@ -91,7 +94,7 @@ function validateStep(step: number, d: SignupData): Errors {
     if (vendor && !d.city) e.city = 'Choose the city you work from.'
     if (d.city === OTHER_CITY && !d.city_other.trim()) e.city_other = 'Enter your city.'
     if (!d.phone.trim()) e.phone = 'Enter your mobile number.'
-    else if (d.phone.trim() && !/^[+\d][\d\s-]{6,}$/.test(d.phone.trim())) e.phone = 'Enter a phone number like 98XXXXXXXX.'
+    else if (!NEPALI_MOBILE.test(d.phone.replace(/\D/g, '').replace(/^977(?=\d{10}$)/, ''))) e.phone = 'Enter a 10-digit mobile number like 98XXXXXXXX (we text you a code).'
   }
   if (step === 3) {
     if (!/^\S+@\S+\.\S+$/.test(d.email.trim())) e.email = 'Enter a valid email address.'
@@ -521,6 +524,16 @@ export const SignupPage: React.FC = () => {
   const [errors, setErrors] = useState<Errors>({})
   const [checkingEmail, setCheckingEmail] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  // SMS code for the mobile number (required to create the account)
+  const [phoneCode, setPhoneCode] = useState('')
+  const [codeSentTo, setCodeSentTo] = useState<string | null>(null)
+  const [resendIn, setResendIn] = useState(0)
+  const [sendingCode, setSendingCode] = useState(false)
+  useEffect(() => {
+    if (resendIn <= 0) return
+    const t = setTimeout(() => setResendIn((s) => s - 1), 1000)
+    return () => clearTimeout(t)
+  }, [resendIn])
   const formRef = useRef<HTMLFormElement>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
   const focusField = useRef<Field | null>(null)
@@ -594,7 +607,28 @@ export const SignupPage: React.FC = () => {
     }
   }
 
+  const sendCode = async () => {
+    setSendingCode(true)
+    try {
+      const res = await request<{ phone: string; resend_available_in: number }>('/auth/phone/send-code/', {
+        method: 'POST',
+        body: JSON.stringify({ phone: data.phone.trim() }),
+      })
+      setCodeSentTo(data.phone.trim())
+      setResendIn(res.resend_available_in || 60)
+      setErrors((e) => ({ ...e, phone_code: undefined }))
+      toast.success('Code sent', `We texted a 6-digit code to ${res.phone}.`)
+      requestAnimationFrame(() => formRef.current?.querySelector<HTMLElement>('[name="phone_code"]')?.focus())
+    } catch (err) {
+      toast.error('Couldn’t send the code', err instanceof Error ? err.message : 'Try again in a moment.')
+    } finally {
+      setSendingCode(false)
+    }
+  }
+
   const create = async () => {
+    if (codeSentTo !== data.phone.trim()) return sendCode()
+    if (!/^\d{6}$/.test(phoneCode.trim())) return showErrors({ phone_code: 'Enter the 6-digit code we texted you.' } as Errors)
     setSubmitting(true)
     try {
       await api.register({
@@ -605,6 +639,7 @@ export const SignupPage: React.FC = () => {
         email: data.email.trim(),
         password: data.password,
         phone: data.phone.trim() || undefined,
+        phone_code: phoneCode.trim(),
         ...(vendor ? { business_type: data.business_type || undefined } : {}),
         city: cityValue(data) || undefined,
         terms: data.terms,
@@ -625,7 +660,10 @@ export const SignupPage: React.FC = () => {
       const m = msg.match(/^(\w+): (.*)$/)
       const field = m?.[1]
       const target = field ? FIELD_STEP[field] : undefined
-      if (m && target) {
+      if (m && field === 'phone_code') {
+        setErrors({ phone_code: m[2] } as Errors)
+        toast.error('Couldn’t create your account', m[2])
+      } else if (m && target) {
         const key = (field === 'username' ? 'email' : field) as Field
         setErrors({ [key]: m[2] })
         goTo(target, key)
@@ -662,8 +700,8 @@ export const SignupPage: React.FC = () => {
           Back
         </Button>
       )}
-      <Button type="submit" form="signup-form" size="lg" className="flex-1" loading={submitting || checkingEmail}>
-        {step === LAST ? 'Create account' : 'Continue'}
+      <Button type="submit" form="signup-form" size="lg" className="flex-1" loading={submitting || checkingEmail || sendingCode}>
+        {step === LAST ? (codeSentTo === data.phone.trim() ? 'Create account' : 'Text me a code') : 'Continue'}
       </Button>
     </div>
   )
@@ -712,6 +750,38 @@ export const SignupPage: React.FC = () => {
           {step === 2 && <OrganizationStep data={data} errors={errors} set={set} />}
           {step === 3 && <CredentialsStep data={data} errors={errors} set={set} checkingEmail={checkingEmail} />}
           {step === 4 && <ReviewStep data={data} goTo={(s) => goTo(s)} />}
+          {step === 4 && (
+            <section className="mt-3 rounded-2xl border border-brand-200 bg-brand-50/60 p-4">
+              <h3 className="text-sm font-semibold text-ink-900">Verify your mobile number</h3>
+              {codeSentTo === data.phone.trim() ? (
+                <>
+                  <p className="mt-1 text-xs text-ink-600">Enter the 6-digit code we texted to {codeSentTo}. It expires in 10 minutes.</p>
+                  <Input
+                    name="phone_code"
+                    label="SMS code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    placeholder="123456"
+                    className="mt-3 h-11 tracking-[0.3em]"
+                    value={phoneCode}
+                    error={(errors as Record<string, string | undefined>).phone_code}
+                    onChange={(e) => setPhoneCode(e.target.value.replace(/\D/g, ''))}
+                  />
+                  <button
+                    type="button"
+                    disabled={resendIn > 0 || sendingCode}
+                    onClick={sendCode}
+                    className="mt-2 text-sm font-semibold text-brand-700 hover:underline disabled:text-ink-400 disabled:no-underline"
+                  >
+                    {resendIn > 0 ? `Resend code in ${resendIn}s` : 'Resend code'}
+                  </button>
+                </>
+              ) : (
+                <p className="mt-1 text-xs text-ink-600">We’ll text a 6-digit code to {data.phone.trim()} to confirm it’s yours.</p>
+              )}
+            </section>
+          )}
         </div>
 
         <div className="mt-8 hidden sm:block">{actions}</div>

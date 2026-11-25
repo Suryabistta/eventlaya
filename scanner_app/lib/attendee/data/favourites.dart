@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api_client.dart';
 import '../../providers/auth_provider.dart';
@@ -49,6 +50,7 @@ class _FavouriteButtonState extends ConsumerState<FavouriteButton> {
       AppToast.info(context, 'Sign in from the Profile tab to save events.');
       return;
     }
+    HapticFeedback.lightImpact();
     setState(() {
       _busy = true;
       _optimistic = !saved;

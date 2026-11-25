@@ -1,6 +1,9 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:smart_auth/smart_auth.dart';
 import '../../core/legal.dart';
 import '../../providers/auth_provider.dart';
 import '../../ui/ui.dart';
@@ -14,6 +17,9 @@ class CreateAccountScreen extends ConsumerStatefulWidget {
   final bool keepSignedIn;
   const CreateAccountScreen({super.key, this.keepSignedIn = true});
 
+  /// Android SMS autofill (off in widget tests).
+  static bool smsAutofill = true;
+
   @override
   ConsumerState<CreateAccountScreen> createState() => _CreateAccountScreenState();
 }
@@ -25,20 +31,82 @@ class _CreateAccountScreenState extends ConsumerState<CreateAccountScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _phone = TextEditingController();
+  final _code = TextEditingController();
   bool _obscure = true;
+  /// The number the SMS code went to; null until "Send code" succeeds.
+  String? _codeSentTo;
+  int _resendIn = 0;
+  Timer? _timer;
+  bool _listening = false;
+
+  /// Android: the system asks "Allow Eventlaya to read this message?", then the code fills in and the
+  /// account is created. No SMS permission needed; typing still works.
+  Future<void> _listenForSms() async {
+    if (!CreateAccountScreen.smsAutofill || kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    if (_listening) await SmartAuth.instance.removeUserConsentApiListener();
+    _listening = true;
+    try {
+      final res = await SmartAuth.instance.getSmsWithUserConsentApi(matcher: r'\d{6}');
+      final code = res.data?.code;
+      if (!mounted || code == null || _busy) return;
+      _code.text = code;
+      unawaited(_submit());
+    } catch (_) {
+      // Autofill is a bonus.
+    } finally {
+      _listening = false;
+    }
+  }
   bool _busy = false;
   late bool _keep = widget.keepSignedIn;
 
   @override
   void dispose() {
-    for (final c in [_first, _last, _email, _password, _phone]) {
+    _timer?.cancel();
+    if (_listening) unawaited(SmartAuth.instance.removeUserConsentApiListener());
+    for (final c in [_first, _last, _email, _password, _phone, _code]) {
       c.dispose();
     }
     super.dispose();
   }
 
+  void _startTimer(int seconds) {
+    _timer?.cancel();
+    setState(() => _resendIn = seconds);
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted || _resendIn <= 1) {
+        t.cancel();
+        if (mounted) setState(() => _resendIn = 0);
+        return;
+      }
+      setState(() => _resendIn--);
+    });
+  }
+
+  /// Step 1: text a 6-digit code to the mobile number.
+  Future<void> _sendCode() async {
+    FocusScope.of(context).unfocus();
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _busy = true);
+    final phone = _phone.text.trim();
+    try {
+      final wait = await AccountApi().sendPhoneCode(phone);
+      if (!mounted) return;
+      setState(() => _codeSentTo = phone);
+      _startTimer(wait);
+      unawaited(_listenForSms());
+      AppToast.success(context, 'Code sent to $phone');
+    } catch (e) {
+      if (mounted) AppToast.error(context, AccountError.from(e).message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Step 2: create the account with the code.
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
+    if (_codeSentTo == null || _phone.text.trim() != _codeSentTo) return _sendCode();
     if (!_formKey.currentState!.validate()) return;
     setState(() => _busy = true);
     final email = _email.text.trim();
@@ -49,6 +117,7 @@ class _CreateAccountScreenState extends ConsumerState<CreateAccountScreen> {
         email: email,
         password: _password.text,
         phone: _phone.text.trim(),
+        phoneCode: _code.text.trim(),
       );
       final ok = await ref.read(authProvider.notifier).login(email, _password.text, keepSignedIn: _keep);
       if (!mounted) return;
@@ -74,7 +143,12 @@ class _CreateAccountScreenState extends ConsumerState<CreateAccountScreen> {
   Widget build(BuildContext context) {
     return AppScaffold(
       title: 'Create account',
-      bottomBar: PrimaryButton(label: 'Create account', loading: _busy, onPressed: _submit),
+      bottomBar: PrimaryButton(
+        label: _codeSentTo == null ? 'Send code to my phone' : 'Create account',
+        icon: _codeSentTo == null ? Icons.sms_outlined : null,
+        loading: _busy,
+        onPressed: _submit,
+      ),
       slivers: [
         SliverToBoxAdapter(
           child: AutofillGroup(
@@ -126,9 +200,15 @@ class _CreateAccountScreenState extends ConsumerState<CreateAccountScreen> {
                       icon: Icons.phone_iphone_rounded,
                       keyboardType: TextInputType.phone,
                       autofillHints: const [AutofillHints.telephoneNumber],
+                      onChanged: (v) {
+                        // A new number needs a new code
+                        if (_codeSentTo != null && v.trim() != _codeSentTo) setState(() => _codeSentTo = null);
+                      },
                       validator: (v) {
-                        final digits = (v ?? '').replaceAll(RegExp(r'\D'), '').length;
-                        return digits < 7 || digits > 15 ? 'Enter your mobile number' : null;
+                        var d = (v ?? '').replaceAll(RegExp(r'\D'), '');
+                        if (d.startsWith('977') && d.length == 13) d = d.substring(3);
+                        if (d.isEmpty) return 'Enter your mobile number';
+                        return RegExp(r'^9[78]\d{8}$').hasMatch(d) ? null : 'Enter a 10-digit mobile number (98… or 97…)';
                       },
                     ),
                     FieldRow(
@@ -146,8 +226,35 @@ class _CreateAccountScreenState extends ConsumerState<CreateAccountScreen> {
                     ),
                   ],
                 ),
+                if (_codeSentTo != null)
+                  GroupedSection(
+                    header: 'Verify your mobile',
+                    footer: 'Enter the 6-digit code we sent by SMS to $_codeSentTo. It expires in 10 minutes.',
+                    children: [
+                      FieldRow(
+                        controller: _code,
+                        label: 'SMS code',
+                        hint: '6-digit code',
+                        icon: Icons.sms_outlined,
+                        keyboardType: TextInputType.number,
+                        autofillHints: const [AutofillHints.oneTimeCode],
+                        validator: (v) =>
+                            RegExp(r'^\d{6}$').hasMatch((v ?? '').trim()) ? null : 'Enter the 6-digit code',
+                      ),
+                      ListRow(
+                        title: '',
+                        titleWidget: Text(
+                          _resendIn > 0 ? 'Resend code in ${_resendIn}s' : 'Resend code',
+                          style: AppType.body(15,
+                              weight: FontWeight.w600,
+                              color: _resendIn > 0 ? AppColors.textTertiary : AppColors.brand),
+                        ),
+                        onTap: _resendIn > 0 || _busy ? null : _sendCode,
+                      ),
+                    ],
+                  ),
                 GroupedSection(
-                  footer: 'We\'ll email you a 6-digit code to confirm your address.',
+                  footer: 'We\'ll text a code to your mobile, and email a code to confirm your address.',
                   children: [
                     ListRow(
                       title: 'Keep me signed in',

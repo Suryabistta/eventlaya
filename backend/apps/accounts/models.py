@@ -39,6 +39,8 @@ class User(AbstractUser):
     # Tickets registered under this email are attached to the account once it is verified.
     email_verified = models.BooleanField(default=False)
     email_verified_at = models.DateTimeField(null=True, blank=True)
+    # Proven by a 6-digit SMS code at sign-up (apps.accounts.phone_verification). Reset when the number changes.
+    phone_verified = models.BooleanField(default=False)
     # Consent to the Terms of Service + Privacy Policy (eventlaya.com/terms, /privacy): when, and which version
     # (settings.TERMS_VERSION). Set on email sign-up (the "I agree" box) and on the first Google/Facebook sign-in
     # ("By continuing you agree…"). Null for accounts created before consent was recorded or by an admin.
@@ -108,6 +110,24 @@ class EmailVerificationCode(models.Model):
 
     def __str__(self):
         return f"{self.email} ({'used' if self.used_at else 'open'})"
+
+
+class PhoneVerificationCode(models.Model):
+    """A 6-digit code sent by SMS before sign-up, to prove the person owns the mobile number. Hash only."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    phone = models.CharField(max_length=20, db_index=True, help_text='Normalized 10-digit Nepali mobile')
+    code_hash = models.CharField(max_length=128)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)
+    used_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.phone} ({'used' if self.used_at else 'open'})"
 
 
 class SocialAccount(models.Model):

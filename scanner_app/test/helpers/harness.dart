@@ -1,3 +1,4 @@
+import 'package:eventlaya_scanner/attendee/screens/create_account_screen.dart';
 import 'dart:io';
 import 'package:clock/clock.dart';
 import 'package:dio/dio.dart';
@@ -63,6 +64,8 @@ void resetFakeRoutes() {
 }
 
 void installFakeApi({bool withSessionHandling = false}) {
+  BrightScreen.enabled = false; // no platform channel in tests
+  CreateAccountScreen.smsAutofill = false;
   final dio = Dio();
   dio.interceptors.add(InterceptorsWrapper(onRequest: (o, h) {
     fakeRequests.add(o);

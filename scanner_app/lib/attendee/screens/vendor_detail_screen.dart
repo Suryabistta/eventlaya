@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/ticket_type_model.dart';
 import '../../ui/ui.dart';
@@ -11,7 +10,7 @@ import '../widgets/attendee_widgets.dart';
 import '../widgets/gallery_header.dart';
 import '../widgets/packages_section.dart';
 import 'inquiry_screen.dart';
-import 'vendors_screen.dart' show RatingLabel;
+import '../widgets/listing_widgets.dart';
 
 /// Vendor profile: portfolio, details and how to get in touch.
 class VendorDetailScreen extends ConsumerWidget {
@@ -28,124 +27,77 @@ class VendorDetailScreen extends ConsumerWidget {
         appBar: AppBar(leading: const BackButton(color: AppColors.brand)),
         body: async.hasError
             ? AsyncErrorView(error: async.error!, onRetry: () => ref.invalidate(vendorDetailProvider(id)))
-            : const Center(child: CircularProgressIndicator()),
+            : const DetailSkeleton(),
       );
     }
 
-    void copy(String label, String value) {
-      Clipboard.setData(ClipboardData(text: value));
-      AppToast.success(context, '$label copied');
-    }
+    void inquire() => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => InquiryScreen.vendor(vendor: v)),
+        );
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      bottomNavigationBar: InquiryBar(
+        caption: v.startingPrice > 0 && !v.hidePrice ? 'Starting from' : 'Pricing',
+        price: v.startingPrice > 0 && !v.hidePrice ? formatRupees(v.startingPrice) : 'Price on request',
+        onInquiry: inquire,
+      ),
       body: LayoutBuilder(builder: (context, c) {
         final gutter = AppScaffold.gutterFor(c.maxWidth);
-        return CustomScrollView(slivers: [
-          GalleryHeader(
-            images: v.images,
-            icon: Icons.storefront_rounded,
-            chips: [if (v.categoryName.isNotEmpty) GlassChip(v.categoryName)],
-          ),
-          SliverPadding(
-            padding: EdgeInsets.fromLTRB(gutter, 20, gutter, MediaQuery.paddingOf(context).bottom + 24),
-            sliver: SliverList.list(children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(children: [
-                    Flexible(child: Text(v.businessName, style: AppType.heading(26, weight: FontWeight.w800))),
-                    if (v.isVerified) ...[
-                      const SizedBox(width: 6),
-                      const Icon(Icons.verified_rounded, color: AppColors.verified, size: 22),
-                    ],
-                  ]),
-                  const SizedBox(height: 6),
-                  Row(children: [
-                    if (v.rating != null && v.rating! > 0) ...[
-                      RatingLabel(rating: v.rating!, reviews: v.reviewTotal),
-                      const SizedBox(width: 10),
-                    ],
-                    if (v.city.isNotEmpty) Text(v.city, style: AppType.rowSubtitle),
-                  ]),
-                ]),
-              ),
-              const SizedBox(height: 20),
-              GroupedSection(
-                separatorInset: 58,
-                children: [
-                  if (v.startingPrice > 0)
-                    ListRow(
-                      leading: const RowIcon(Icons.payments_outlined, background: AppColors.ink600),
-                      title: 'From ${formatRupees(v.startingPrice)}',
-                      subtitle: 'Starting price',
-                    )
-                  else if (v.hidePrice)
-                    const ListRow(
-                      leading: RowIcon(Icons.payments_outlined, background: AppColors.ink600),
-                      title: 'Price on request',
-                      subtitle: 'Ask the vendor',
+        return RefreshIndicator(
+          color: AppColors.brand,
+          onRefresh: () async {
+            ref.invalidate(vendorDetailProvider(id));
+            try {
+              await ref.read(vendorDetailProvider(id).future);
+            } catch (_) {}
+          },
+          child: CustomScrollView(slivers: [
+            GalleryHeader(images: v.images, icon: vendorCategoryIcon(v.categoryName), chips: const []),
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(gutter, 16, gutter, 28),
+              sliver: SliverList.list(children: [
+                ListingTitleCard(
+                  name: v.businessName,
+                  verified: v.isVerified,
+                  featured: v.isFeatured,
+                  category: v.categoryName,
+                  categoryIcon: vendorCategoryIcon(v.categoryName),
+                  rating: v.rating,
+                  reviews: v.reviewTotal,
+                  location: [v.address, v.city].where((x) => x.isNotEmpty).join(', '),
+                  facts: [
+                    (
+                      Icons.payments_outlined,
+                      v.startingPrice > 0 && !v.hidePrice ? formatRupees(v.startingPrice) : 'On request',
+                      'Price'
                     ),
-                  if (v.address.isNotEmpty || v.city.isNotEmpty)
-                    ListRow(
-                      leading: const RowIcon(Icons.place_rounded, background: AppColors.success),
-                      title: [v.address, v.city].where((x) => x.isNotEmpty).join(', '),
-                    ),
-                  if (v.serviceAreas.isNotEmpty)
-                    ListRow(
-                      leading: const RowIcon(Icons.map_outlined, background: AppColors.brand),
-                      title: v.serviceAreas.join(', '),
-                      subtitle: 'Also serves',
-                    ),
-                ],
-              ),
-              if (v.description.isNotEmpty)
-                GroupedSection(
-                  header: 'About',
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(v.description, style: AppType.body(15, height: 1.55)),
-                    ),
+                    if (v.city.isNotEmpty) (Icons.place_outlined, v.city, 'Based in'),
+                    if (v.serviceAreas.isNotEmpty)
+                      (Icons.map_outlined, '${v.serviceAreas.length} area${v.serviceAreas.length == 1 ? '' : 's'}', 'Also serves'),
                   ],
                 ),
-              PackagesSection(kind: 'vendor', listingId: v.id),
-              GroupedSection(
-                header: 'Get in touch',
-                footer: 'Tap a number or email to copy it.',
-                separatorInset: 58,
-                children: [
-                  ListRow(
-                    leading: const RowIcon(Icons.forum_rounded, background: AppColors.success),
-                    title: 'Send inquiry',
-                    subtitle: 'Ask about availability and prices',
-                    chevron: true,
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => InquiryScreen.vendor(vendor: v)),
-                    ),
+                const SizedBox(height: 14),
+                ContactActions(onInquiry: inquire, phone: v.phone, email: v.email),
+                if (v.description.isNotEmpty)
+                  ListingSection(
+                    title: 'About',
+                    child: Text(v.description, style: AppType.body(15, height: 1.6, color: AppColors.ink700)),
                   ),
-                  if (v.phone.isNotEmpty)
-                    ListRow(
-                      leading: const RowIcon(Icons.call_rounded),
-                      title: v.phone,
-                      subtitle: 'Phone',
-                      trailing: const Icon(Icons.copy_rounded, size: 18, color: AppColors.ink400),
-                      onTap: () => copy('Phone number', v.phone),
-                    ),
-                  if (v.email.isNotEmpty)
-                    ListRow(
-                      leading: const RowIcon(Icons.mail_rounded, background: AppColors.ink500),
-                      title: v.email,
-                      subtitle: 'Email',
-                      trailing: const Icon(Icons.copy_rounded, size: 18, color: AppColors.ink400),
-                      onTap: () => copy('Email', v.email),
-                    ),
-                ],
-              ),
-              ReviewsSection(target: ReviewTarget.vendor(v.id, v.businessName)),
-            ]),
-          ),
-        ]);
+                if (v.serviceAreas.isNotEmpty)
+                  ListingSection(
+                    title: 'Service areas',
+                    child: Wrap(spacing: 8, runSpacing: 8, children: [
+                      for (final a in v.serviceAreas) StatusBadge(a, tone: Tone.brand, dot: false),
+                    ]),
+                  ),
+                const SizedBox(height: 8),
+                PackagesSection(kind: 'vendor', listingId: v.id),
+                ReviewsSection(target: ReviewTarget.vendor(v.id, v.businessName)),
+              ]),
+            ),
+          ]),
+        );
       }),
     );
   }

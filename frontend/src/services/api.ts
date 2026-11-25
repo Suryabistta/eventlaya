@@ -741,6 +741,8 @@ export const api = {
     password: string
     organization_name?: string
     phone?: string
+    /** 6-digit SMS code from POST /auth/phone/send-code/ */
+    phone_code?: string
     account_type?: 'organizer' | 'vendor' | 'attendee'
     business_type?: string
     city?: string

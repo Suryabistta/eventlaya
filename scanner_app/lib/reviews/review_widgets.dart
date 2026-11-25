@@ -239,6 +239,7 @@ class ReviewsSection extends ConsumerWidget {
             chevron: true,
             onTap: () async {
               if (await showWriteReviewSheet(context, ref, target) && context.mounted) {
+                HapticFeedback.mediumImpact();
                 AppToast.success(context, 'Thanks for your review');
               }
             },

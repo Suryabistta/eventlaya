@@ -4,6 +4,7 @@ library;
 export 'adaptive_shell.dart';
 export 'app_scaffold.dart';
 export 'app_toast.dart';
+export 'bright_screen.dart';
 export 'bs_date_picker.dart';
 export 'buttons.dart';
 export 'frosted_tab_bar.dart';

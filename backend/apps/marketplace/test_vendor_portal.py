@@ -1,4 +1,6 @@
 """Vendor accounts, marketplace access requests, listing approval and the business portal."""
+from unittest import mock
+
 from django.contrib.auth import get_user_model
 from rest_framework.test import APITestCase
 
@@ -34,6 +36,7 @@ def inquiry(venue, name='Asha', status='pending'):
     )
 
 
+@mock.patch('apps.accounts.phone_verification.check_code', new=lambda phone, code: None)  # SMS code: see apps.accounts.test_phone_verification
 class SignupTests(APITestCase):
     url = '/api/auth/register/'
 

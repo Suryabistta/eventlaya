@@ -5,7 +5,8 @@ class Segment<T> {
   final T value;
   final String label;
   final int? count;
-  const Segment(this.value, this.label, {this.count});
+  final IconData? icon;
+  const Segment(this.value, this.label, {this.count, this.icon});
 }
 
 /// Horizontally scrolling filter pills ("All 120 · Checked in 48 …").
@@ -27,13 +28,15 @@ class FilterPills<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: padding,
+      padding: padding.add(const EdgeInsets.symmetric(vertical: 6)),
+      clipBehavior: Clip.none,
       child: Row(
         children: [
           for (final s in segments) ...[
             _Pill(
               label: s.label,
               count: s.count,
+              icon: s.icon,
               selected: s.value == selected,
               onTap: () => onChanged(s.value),
             ),
@@ -48,9 +51,10 @@ class FilterPills<T> extends StatelessWidget {
 class _Pill extends StatelessWidget {
   final String label;
   final int? count;
+  final IconData? icon;
   final bool selected;
   final VoidCallback onTap;
-  const _Pill({required this.label, required this.count, required this.selected, required this.onTap});
+  const _Pill({required this.label, required this.count, this.icon, required this.selected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -59,21 +63,38 @@ class _Pill extends StatelessWidget {
     return Semantics(
       selected: selected,
       button: true,
-      child: Material(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        decoration: ShapeDecoration(
+          shape: const StadiumBorder(),
+          shadows: [
+            BoxShadow(
+              color: selected ? active.withValues(alpha: 0.28) : AppColors.ink900.withValues(alpha: 0.05),
+              blurRadius: selected ? 12 : 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Material(
         color: selected ? active : AppColors.surface,
         shape: StadiumBorder(
-          side: BorderSide(color: selected ? active : AppColors.ink200),
+          side: BorderSide(color: selected ? active : AppColors.ink200.withValues(alpha: 0.8)),
         ),
         child: InkWell(
           customBorder: const StadiumBorder(),
           onTap: onTap,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 36),
+            constraints: const BoxConstraints(minHeight: 40),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              padding: EdgeInsets.fromLTRB(icon != null ? 12 : 16, 6, 16, 6),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (icon != null) ...[
+                    Icon(icon, size: 17, color: selected ? Colors.white : AppColors.ink700),
+                    const SizedBox(width: 6),
+                  ],
                   Text(label, style: AppType.body(14, weight: FontWeight.w500, color: fg)),
                   if (count != null) ...[
                     const SizedBox(width: 6),
@@ -89,6 +110,7 @@ class _Pill extends StatelessWidget {
             ),
           ),
         ),
+      ),
       ),
     );
   }

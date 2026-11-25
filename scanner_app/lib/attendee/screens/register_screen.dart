@@ -38,7 +38,10 @@ class RegisterScreen extends ConsumerStatefulWidget {
 
   /// Getting more tickets on top of passes this email already has.
   final bool additional;
-  const RegisterScreen({super.key, required this.event, this.form, this.additional = false});
+
+  /// Ticket type tapped on the event page: starts with one of it chosen.
+  final String? preselectTicketId;
+  const RegisterScreen({super.key, required this.event, this.form, this.additional = false, this.preselectTicketId});
 
   @override
   ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
@@ -185,6 +188,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
     final onSale = widget.event.ticketTypes.where((t) => t.onSale).toList();
     if (onSale.length == 1) _qty[onSale.first.id] = 1;
+    if (onSale.any((t) => t.id == widget.preselectTicketId)) _qty[widget.preselectTicketId!] = 1;
     _step = widget.event.ticketTypes.isEmpty ? 1 : 0;
     for (final f in _questions) {
       if (!['select', 'radio', 'checkbox', 'date', 'heading'].contains(f.type)) _text[f.id] = TextEditingController();
@@ -488,6 +492,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         if (!mounted) return;
         final order = data['order'] is Map ? Map<String, dynamic>.from(data['order'] as Map) : const <String, dynamic>{};
         final pay = order['payment'] is Map ? (order['payment'] as Map)['label']?.toString() : null;
+        HapticFeedback.mediumImpact();
         AppToast.success(context, 'Payment received — you\'re in!');
         Navigator.of(context).pushReplacement(MaterialPageRoute(
           builder: (_) => PassViewScreen(

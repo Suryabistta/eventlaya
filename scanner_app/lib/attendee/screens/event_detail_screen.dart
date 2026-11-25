@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/bs_date.dart';
 import '../../core/legal.dart';
@@ -22,6 +23,7 @@ import '../providers/explore_providers.dart';
 import '../providers/pass_providers.dart';
 import '../widgets/attendee_widgets.dart';
 import '../widgets/contest_widgets.dart';
+import '../widgets/listing_widgets.dart';
 import 'apply_screen.dart';
 import 'contest_screen.dart';
 import 'pass_view_screen.dart';
@@ -67,7 +69,7 @@ class EventDetailScreen extends ConsumerWidget {
                 error: async.error!,
                 onRetry: () => ref.invalidate(eventDetailProvider(slug)),
               )
-            : const Center(child: CircularProgressIndicator()),
+            : const DetailSkeleton(),
       );
     }
 
@@ -89,8 +91,10 @@ class EventDetailScreen extends ConsumerWidget {
                 SliverPadding(
                   padding: EdgeInsets.fromLTRB(gutter, 20, gutter, 24),
                   sliver: SliverList.list(children: [
-                    _TitleBlock(event: event),
-                    const SizedBox(height: 20),
+                    _TitleCard(event: event),
+                    const SizedBox(height: 14),
+                    _EventActions(event: event),
+                    const SizedBox(height: 16),
                     if (pass != null) ...[
                       _YourPassCard(passes: passes),
                       const SizedBox(height: 16),
@@ -103,7 +107,6 @@ class EventDetailScreen extends ConsumerWidget {
                       const SizedBox(height: 16),
                     ],
                     _VotingCard(slug: slug, pass: pass),
-                    _InfoSection(event: event),
                     if (event.parent != null)
                       GroupedSection(children: [
                         ListRow(
@@ -163,27 +166,33 @@ class EventDetailScreen extends ConsumerWidget {
                         ],
                       ),
                     if ((event.description ?? '').trim().isNotEmpty)
-                      GroupedSection(
-                        header: 'About',
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Text(event.description!.trim(), style: AppType.body(15, height: 1.55)),
-                          ),
-                        ],
+                      ListingSection(
+                        title: 'About',
+                        child: Text(event.description!.trim(), style: AppType.body(15, height: 1.6, color: AppColors.ink700)),
                       ),
                     if (event.highlights.isNotEmpty)
-                      GroupedSection(
-                        header: 'Highlights',
-                        children: [
+                      ListingSection(
+                        title: 'Highlights',
+                        child: Column(children: [
                           for (final h in event.highlights)
-                            ListRow(
-                              leading: const Icon(Icons.check_rounded, color: AppColors.brand, size: 20),
-                              title: h,
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 5),
+                              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Container(
+                                  width: 22,
+                                  height: 22,
+                                  decoration: const BoxDecoration(color: AppColors.brandTint, shape: BoxShape.circle),
+                                  child: const Icon(Icons.check_rounded, color: AppColors.brand, size: 15),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(child: Text(h, style: AppType.body(14.5))),
+                              ]),
                             ),
-                        ],
+                        ]),
                       ),
-                    if (event.ticketTypes.isNotEmpty && !event.registrationOnly && event.externalRegisterUrl == null) _TicketsSection(event: event),
+                    if (event.ticketTypes.isNotEmpty && !event.registrationOnly && event.externalRegisterUrl == null)
+                      _TicketsSection(event: event, detail: detail),
+                    const SizedBox(height: 8),
                     if (event.agenda.isNotEmpty) _AgendaSection(items: event.agenda),
                     if (event.speakers.isNotEmpty)
                       GroupedSection(
@@ -225,14 +234,9 @@ class EventDetailScreen extends ConsumerWidget {
                         ],
                       ),
                     if (event.terms != null)
-                      GroupedSection(
-                        header: 'Terms & conditions',
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Text(event.terms!, style: AppType.body(14, height: 1.55, color: AppColors.textSecondary)),
-                          ),
-                        ],
+                      ListingSection(
+                        title: 'Terms & conditions',
+                        child: Text(event.terms!, style: AppType.body(14, height: 1.55, color: AppColors.textSecondary)),
                       ),
                     if (event.phase == EventPhase.live || event.phase == EventPhase.ended)
                       ReviewsSection(target: ReviewTarget.event(event.slug, event.title), hideWhenEmpty: true),
@@ -288,6 +292,16 @@ class _BannerHeader extends StatelessWidget {
       actions: [
         Padding(
           padding: const EdgeInsets.all(6),
+          child: _GlassCircle(
+            child: IconButton(
+              tooltip: 'Share',
+              icon: const Icon(Icons.ios_share_rounded, size: 20, color: Colors.white),
+              onPressed: () => shareEvent(context, event),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(6),
           child: _GlassCircle(child: FavouriteButton(eventId: event.base.id, eventSlug: event.slug)),
         ),
       ],
@@ -332,107 +346,210 @@ class _GlassCircle extends StatelessWidget {
   }
 }
 
-class _TitleBlock extends StatelessWidget {
-  final PublicEvent event;
-  const _TitleBlock({required this.event});
+/// Public web link of an event.
+String eventWebUrl(PublicEvent e) => '${Legal.baseUrl}/e/${e.slug}';
 
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(eventWhen(event.base).toUpperCase(),
-              style: AppType.body(12.5, weight: FontWeight.w600, color: AppColors.brand)),
-          const SizedBox(height: 6),
-          Text(event.title, style: AppType.heading(28, weight: FontWeight.w800)),
-          if (event.tagline != null) ...[
-            const SizedBox(height: 6),
-            Text(event.tagline!, style: AppType.body(15, color: AppColors.textSecondary)),
-          ],
-          if (event.organizerName.isNotEmpty && !event.hideOrganizer) ...[
-            const SizedBox(height: 10),
-            Row(children: [
-              Flexible(child: Text('by ${event.organizerName}', style: AppType.body(13, weight: FontWeight.w500, color: AppColors.ink600))),
-              if (event.organizerVerified) ...[
-                const SizedBox(width: 4),
-                const Icon(Icons.verified_rounded, size: 16, color: AppColors.verified, semanticLabel: 'Verified by Eventlaya'),
-              ],
-            ]),
-          ],
-          if (event.partnerName != null) ...[
-            const SizedBox(height: 2),
-            Text('${event.partnerLabel} ${event.partnerName}', style: AppType.body(13, color: AppColors.ink600)),
-          ],
-        ],
-      ),
-    );
-  }
+Future<void> shareEvent(BuildContext context, PublicEvent e) async {
+  HapticFeedback.selectionClick();
+  final box = context.findRenderObject() as RenderBox?;
+  await SharePlus.instance.share(ShareParams(
+    text: '${e.title} · ${eventWhen(e.base)} · ${e.venue}\n${eventWebUrl(e)}',
+    subject: e.title,
+    sharePositionOrigin: box == null ? null : box.localToGlobal(Offset.zero) & box.size,
+  ));
 }
 
-class _InfoSection extends StatelessWidget {
+/// Google Calendar "add event" link (opens the Calendar app or the browser).
+Uri calendarUrl(PublicEvent e) {
+  final start = e.base.startsAt!;
+  String stamp(DateTime d) => '${d.toUtc().toIso8601String().replaceAll(RegExp(r'[-:]'), '').split('.').first}Z';
+  String day(DateTime d) => '${d.year}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}';
+  final String dates;
+  if (e.base.startTime == null) {
+    final last = e.base.lastDay ?? start;
+    dates = '${day(start)}/${day(last.add(const Duration(days: 1)))}';
+  } else {
+    final end = e.base.endsAt != null && e.base.endsAt!.isAfter(start) ? e.base.endsAt! : start.add(const Duration(hours: 2));
+    dates = '${stamp(start)}/${stamp(end)}';
+  }
+  return Uri.https('calendar.google.com', '/calendar/render', {
+    'action': 'TEMPLATE',
+    'text': e.title,
+    'dates': dates,
+    'location': e.venue,
+    'details': eventWebUrl(e),
+  });
+}
+
+/// Title, organizer and the key facts (when · price · spots).
+class _TitleCard extends StatelessWidget {
   final PublicEvent event;
-  const _InfoSection({required this.event});
+  const _TitleCard({required this.event});
 
   @override
   Widget build(BuildContext context) {
     final e = event;
-    final notice = PhaseCopy.startsIn(e.base, DateTime.now());
-    return GroupedSection(
-      separatorInset: 58,
-      children: [
-        ListRow(
-          leading: const RowIcon(Icons.calendar_month_rounded),
-          title: eventWhen(e.base),
-          subtitle: switch (e.phase) {
-            EventPhase.live => 'Happening now',
-            EventPhase.upcoming => notice,
-            EventPhase.ended => 'This event has ended',
-            EventPhase.cancelled => 'Cancelled by the organizer',
-            EventPhase.draft => null,
-          },
-        ),
-        ListRow(
-          leading: const RowIcon(Icons.place_rounded, background: AppColors.success),
-          title: e.venue,
-        ),
-        if (e.fullyBooked || e.spotsLeftLabel != null)
-          ListRow(
-            leading: const RowIcon(Icons.groups_rounded, background: AppColors.marigold),
-            title: e.fullyBooked ? 'Fully booked' : e.spotsLeftLabel!,
+    final when = switch (e.phase) {
+      EventPhase.live => 'Happening now',
+      EventPhase.upcoming => PhaseCopy.startsIn(e.base, DateTime.now()),
+      EventPhase.ended => 'Ended',
+      EventPhase.cancelled => 'Cancelled',
+      EventPhase.draft => null,
+    };
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(AppRadius.xl), boxShadow: softShadow),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(e.title, style: AppType.heading(25, weight: FontWeight.w800)),
+        if (e.tagline != null) ...[
+          const SizedBox(height: 6),
+          Text(e.tagline!, style: AppType.body(14.5, color: AppColors.textSecondary)),
+        ],
+        if (e.organizerName.isNotEmpty && !e.hideOrganizer) ...[
+          const SizedBox(height: 10),
+          Row(children: [
+            InitialsAvatar(name: e.organizerName, size: 26),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text('by ${e.organizerName}',
+                  maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.body(13, weight: FontWeight.w500, color: AppColors.ink600)),
+            ),
+            if (e.organizerVerified) ...[
+              const SizedBox(width: 4),
+              const Icon(Icons.verified_rounded, size: 16, color: AppColors.verified, semanticLabel: 'Verified by Eventlaya'),
+            ],
+          ]),
+        ],
+        if (e.partnerName != null) ...[
+          const SizedBox(height: 4),
+          Text('${e.partnerLabel} ${e.partnerName}', style: AppType.body(13, color: AppColors.ink600)),
+        ],
+        const SizedBox(height: 14),
+        IconLine(icon: Icons.calendar_month_outlined, text: [eventWhen(e.base), if (when != null) when].join('  ·  ')),
+        const SizedBox(height: 6),
+        IconLine(icon: Icons.place_outlined, text: e.venue, maxLines: 2),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(
+            child: FactBox(
+              icon: Icons.payments_outlined,
+              value: e.priceLabel,
+              label: e.priceSummary == 'Free' ? 'Entry' : e.paymentOptions.shortNote,
+            ),
           ),
-        ListRow(
-          leading: const RowIcon(Icons.payments_outlined, background: AppColors.ink600),
-          title: e.priceLabel,
-          subtitle: e.priceSummary == 'Free' ? null : e.paymentOptions.note,
-        ),
-      ],
+          if (e.fullyBooked || e.spotsLeftLabel != null) ...[
+            const SizedBox(width: 8),
+            Expanded(
+              child: FactBox(
+                icon: Icons.groups_rounded,
+                value: e.fullyBooked ? 'Full' : e.spotsLeftLabel!,
+                label: 'Availability',
+              ),
+            ),
+          ],
+          if (e.category != null && e.category != 'other') ...[
+            const SizedBox(width: 8),
+            Expanded(child: FactBox(icon: categoryIcon(e.category), value: e.categoryLabel, label: 'Type')),
+          ],
+        ]),
+      ]),
     );
+  }
+}
+
+/// Directions · Add to calendar · Share · Contact.
+class _EventActions extends StatelessWidget {
+  final PublicEvent event;
+  const _EventActions({required this.event});
+
+  @override
+  Widget build(BuildContext context) {
+    final e = event;
+    final upcoming = e.phase == EventPhase.upcoming || e.phase == EventPhase.live;
+    final phone = e.contactPhone ?? '';
+    final email = e.contactEmail ?? '';
+    return ActionCircles(items: [
+      if (e.venue.trim().isNotEmpty)
+        ActionItem(
+          Icons.directions_rounded,
+          'Directions',
+          () => openOrCopy(context, Uri.https('www.google.com', '/maps/search/', {'api': '1', 'query': e.venue}), e.venue, 'Address'),
+          primary: true,
+        ),
+      if (upcoming && e.base.startsAt != null)
+        ActionItem(Icons.event_available_rounded, 'Calendar', () => openOrCopy(context, calendarUrl(e), eventWebUrl(e), 'Link')),
+      ActionItem(Icons.ios_share_rounded, 'Share', () => shareEvent(context, e)),
+      if (phone.isNotEmpty)
+        ActionItem(Icons.call_rounded, 'Call', () => openOrCopy(context, Uri(scheme: 'tel', path: phoneDigits(phone)), phone, 'Phone number'))
+      else if (email.isNotEmpty)
+        ActionItem(Icons.mail_rounded, 'Email', () => openOrCopy(context, Uri(scheme: 'mailto', path: email), email, 'Email')),
+    ]);
   }
 }
 
 class _TicketsSection extends StatelessWidget {
   final PublicEvent event;
-  const _TicketsSection({required this.event});
+  final EventDetail? detail;
+  const _TicketsSection({required this.event, required this.detail});
 
   @override
   Widget build(BuildContext context) {
-    return GroupedSection(
-      header: 'Tickets',
-      children: [
-        for (final t in event.ticketTypes)
-          ListRow(
-            title: t.name,
-            subtitle: [if (t.description.isNotEmpty) t.description, if (t.availabilityLabel != null) t.availabilityLabel!]
-                .join(' · '),
-            trailing: Text(
-              t.priceLabel,
-              style: AppType.heading(16, color: t.onSale ? AppColors.textPrimary : AppColors.ink400),
+    final canBook = detail != null && event.registrationOpen && !event.fullyBooked && !event.applyFirst;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(4, 18, 4, 10),
+        child: Text('Tickets', style: AppType.heading(19)),
+      ),
+      for (final t in event.ticketTypes)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(AppRadius.lg + 2),
+              boxShadow: softShadow,
             ),
+            child: Row(children: [
+              Container(
+                width: 42,
+                height: 42,
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  color: t.onSale ? AppColors.brandTint : AppColors.ink100,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                child: Icon(Icons.confirmation_number_outlined, color: t.onSale ? AppColors.brand : AppColors.ink400),
+              ),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(t.name, style: AppType.heading(16.5)),
+                  if (t.description.isNotEmpty || t.availabilityLabel != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        [if (t.description.isNotEmpty) t.description, if (t.availabilityLabel != null) t.availabilityLabel!].join(' · '),
+                        style: AppType.caption,
+                      ),
+                    ),
+                  const SizedBox(height: 6),
+                  Text(t.priceLabel,
+                      style: AppType.body(15, weight: FontWeight.w700, color: t.onSale ? AppColors.brand : AppColors.ink400)),
+                ]),
+              ),
+              if (t.onSale && canBook)
+                PillButton(
+                  label: 'Select',
+                  dense: true,
+                  filled: true,
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => RegisterScreen(event: detail!.event, form: detail!.form, preselectTicketId: t.id),
+                  )),
+                ),
+            ]),
           ),
-      ],
-    );
+        ),
+    ]);
   }
 }
 
@@ -731,7 +848,7 @@ class _RegisterBar extends StatelessWidget {
       content = Row(children: [
         Expanded(
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(event.priceLabel, style: AppType.heading(19)),
+            Text(event.priceLabel, style: AppType.heading(19, color: AppColors.brand)),
             Text(soldOut ? 'Fully booked' : (event.priceSummary == 'Free' ? 'Free' : event.paymentOptions.shortNote),
                 style: AppType.caption, maxLines: 1, overflow: TextOverflow.ellipsis),
           ]),
@@ -754,8 +871,8 @@ class _RegisterBar extends StatelessWidget {
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: Container(
           decoration: BoxDecoration(
-            color: AppColors.ink50.withValues(alpha: 0.9),
-            border: const Border(top: BorderSide(color: AppColors.separator, width: 0.5)),
+            color: Colors.white.withValues(alpha: 0.92),
+            boxShadow: [BoxShadow(color: AppColors.ink900.withValues(alpha: 0.08), blurRadius: 20, offset: const Offset(0, -4))],
           ),
           child: SafeArea(
             top: false,
