@@ -621,21 +621,16 @@ export const Partners: React.FC = () => {
             const logo = safeHref(p.logo) ? (
               <img
                 src={p.logo}
-                alt=""
+                alt={p.name}""
                 loading="lazy"
                 className="h-14 w-auto max-w-[160px] object-contain transition duration-300 sm:h-16 sm:max-w-[200px] [@media(hover:hover)]:opacity-70 [@media(hover:hover)]:grayscale [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-hover:grayscale-0"
               />
             ) : (
               <span className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-50 text-xl font-bold text-brand-700 sm:h-16 sm:w-16">{p.name.trim()[0]}</span>
             )
-            const card = (
-              <>
-                <span className="flex h-20 items-center justify-center sm:h-24">{logo}</span>
-                <span className="mt-3 block text-center text-sm font-semibold text-ink-600 transition group-hover:text-brand-700">{p.name}</span>
-              </>
-            )
-            const box =
-              'group flex h-full flex-col items-center justify-center rounded-3xl border border-white bg-white/90 px-6 pb-5 pt-4 shadow-[0_6px_24px_rgba(28,23,36,0.06)] backdrop-blur transition duration-300 sm:w-60'
+            // Just the logo on the band; the name stays for screen readers and the tooltip
+            const card = <span className="flex h-20 items-center justify-center sm:h-24">{logo}</span>
+            const box = 'group flex h-full items-center justify-center rounded-2xl px-4 transition duration-300 sm:w-56'
             return (
               <li key={i}>
                 {href ? (
@@ -643,12 +638,16 @@ export const Partners: React.FC = () => {
                     href={href}
                     target="_blank"
                     rel="noreferrer"
-                    className={`${box} hover:-translate-y-1 hover:border-brand-100 hover:shadow-[0_14px_36px_rgba(194,33,90,0.14)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500`}
+                    aria-label={p.name}
+                    title={p.name}
+                    className={`${box} hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500`}
                   >
                     {card}
                   </a>
                 ) : (
-                  <span className={`${box} hover:-translate-y-1`}>{card}</span>
+                  <span className={`${box} hover:-translate-y-1`} title={p.name}>
+                    {card}
+                  </span>
                 )}
               </li>
             )
