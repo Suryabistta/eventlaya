@@ -1,9 +1,9 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { Building2, MapPin, Store, Users } from 'lucide-react'
+import { Building2, MapPin, Star, Store } from 'lucide-react'
 import type { Vendor, VenueWithSpaces } from '@/services/api'
 import { Badge, ButtonLink, Card } from '@/components/ui'
-import { BusinessLogo, Photo, Rating, Verified, formatRs, priceHidden } from './shared'
+import { BusinessLogo, Photo, Verified, formatRs, priceHidden } from './shared'
 import { mediaUrl } from '@/lib/account'
 import { cn } from '@/lib/utils'
 
@@ -20,6 +20,12 @@ export const VenueCard: React.FC<{ venue: VenueWithSpaces; to: string; compact?:
         <Badge className="bg-white/95 text-ink-800 shadow-2xs">{venue.venue_type_display || venue.venue_type}</Badge>
         {venue.is_featured && <Badge tone="warning" className="shadow-2xs">Featured</Badge>}
       </div>
+      {Number(venue.review_average ?? venue.rating) > 0 && (
+        <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-0.5 text-xs font-bold text-ink-900 shadow-2xs">
+          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" aria-hidden />
+          {Number(venue.review_average ?? venue.rating).toFixed(1)}
+        </span>
+      )}
     </div>
 
     {/* Same body and footer as the vendor card: name, place, rating; price on the left, button on the right */}
@@ -34,15 +40,6 @@ export const VenueCard: React.FC<{ venue: VenueWithSpaces; to: string; compact?:
         <MapPin className="h-4 w-4 shrink-0 text-ink-400" aria-hidden />
         <span className="truncate">{venue.city || venue.address}</span>
       </p>
-      {!compact && (
-        <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1 pt-1 text-sm text-ink-700">
-          <span className="inline-flex items-center gap-1.5">
-            <Users className="h-4 w-4 text-ink-400" aria-hidden />
-            {venue.capacity_min.toLocaleString()}–{venue.capacity_max.toLocaleString()} guests
-          </span>
-          <Rating value={venue.review_average ?? venue.rating} count={venue.review_total || undefined} />
-        </div>
-      )}
     </div>
 
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ink-100 px-5 py-3">
@@ -73,6 +70,12 @@ export const VendorCard: React.FC<{ vendor: Vendor; to: string; compact?: boolea
         {vendor.category_name && <Badge className="bg-white/95 text-ink-800 shadow-2xs">{vendor.category_name}</Badge>}
         {vendor.is_featured && <Badge tone="warning" className="shadow-2xs">Featured</Badge>}
       </div>
+      {Number(vendor.review_average ?? vendor.rating) > 0 && (
+        <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-0.5 text-xs font-bold text-ink-900 shadow-2xs">
+          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" aria-hidden />
+          {Number(vendor.review_average ?? vendor.rating).toFixed(1)}
+        </span>
+      )}
     </div>
     <div className="flex flex-1 flex-col gap-2 p-5">
       <div className="flex min-w-0 items-center gap-3">
@@ -90,11 +93,6 @@ export const VendorCard: React.FC<{ vendor: Vendor; to: string; compact?: boolea
           </p>
         </div>
       </div>
-      {!compact && (
-        <div className="mt-auto flex items-center gap-4 pt-1 text-sm text-ink-700">
-          <Rating value={vendor.review_average ?? vendor.rating} count={vendor.review_total || undefined} />
-        </div>
-      )}
     </div>
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ink-100 px-5 py-3">
       <p className="text-sm text-ink-500">

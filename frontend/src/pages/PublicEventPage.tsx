@@ -281,7 +281,7 @@ const EventLanding: React.FC<{ event: PublicEvent }> = ({ event }) => {
         <div className="min-w-0 space-y-10 lg:space-y-14">
           {sections.includes('about') && (
             <Section id="about" title="About this event">
-              {event.description && <p className="whitespace-pre-line text-base leading-relaxed text-ink-700">{event.description}</p>}
+              {event.description && <p className="whitespace-pre-line text-sm leading-relaxed text-ink-700">{event.description}</p>}
               {event.highlights?.length > 0 && (
                 <Card className="mt-5">
                   <CardHeader title="Highlights" />
