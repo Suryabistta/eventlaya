@@ -168,7 +168,7 @@ class EventDetailScreen extends ConsumerWidget {
                     if ((event.description ?? '').trim().isNotEmpty)
                       ListingSection(
                         title: 'About',
-                        child: Text(event.description!.trim(), style: AppType.body(15, height: 1.6, color: AppColors.ink700)),
+                        child: Text(event.description!.trim(), style: AppType.body(13.5, height: 1.55, color: AppColors.ink700)),
                       ),
                     if (event.highlights.isNotEmpty)
                       ListingSection(

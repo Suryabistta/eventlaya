@@ -114,6 +114,7 @@ class _VendorsScreenState extends ConsumerState<VendorsScreen> {
   Widget build(BuildContext context) {
     return AppScaffold(
       title: 'Vendors',
+      compact: true,
       onRefresh: _refresh,
       padded: false,
       slivers: [
@@ -213,7 +214,7 @@ class _VendorsScreenState extends ConsumerState<VendorsScreen> {
       segments: [
         const Segment('', 'All'),
         for (final c in cats)
-          if (c.vendorsCount > 0) Segment(c.slug, c.name, icon: vendorCategoryIcon(c.name)),
+          if (c.vendorsCount > 0) Segment(c.slug, c.name),
       ],
       selected: _category,
       onChanged: (v) => setState(() => _category = v),
@@ -225,7 +226,7 @@ class _VendorsScreenState extends ConsumerState<VendorsScreen> {
       padding: EdgeInsets.symmetric(horizontal: gutter),
       segments: [
         const Segment('', 'All'),
-        for (final e in Venue.types.entries) Segment(e.key, e.value, icon: Icons.location_city_rounded),
+        for (final e in Venue.types.entries) Segment(e.key, e.value),
       ],
       selected: _type,
       onChanged: (v) => setState(() => _type = v),
@@ -319,7 +320,6 @@ class _VendorsScreenState extends ConsumerState<VendorsScreen> {
           title: v.name,
           subtitle: v.typeLabel,
           city: v.city,
-          detail: v.capacityLabel.isEmpty ? null : v.capacityLabel,
           rating: v.rating,
           reviews: v.reviewCount,
           price: v.priceFrom > 0 ? '${formatRupees(v.priceFrom)}/day' : null,
@@ -350,7 +350,7 @@ class MarketCard extends StatelessWidget {
   final VoidCallback onTap;
 
   /// Height the card needs in a grid.
-  static const double extent = 268;
+  static const double extent = 256;
 
   const MarketCard({
     super.key,
@@ -388,6 +388,21 @@ class MarketCard extends StatelessWidget {
                   child: Stack(fit: StackFit.expand, children: [
                     NetImage(url: imageUrl, icon: icon),
                     if (featured) const Positioned(left: 6, top: 6, child: FeaturedBadge()),
+                    if (rating != null && rating! > 0)
+                      Positioned(
+                        right: 6,
+                        top: 6,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(99)),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            const Icon(Icons.star_rounded, size: 14, color: AppColors.marigold),
+                            const SizedBox(width: 2),
+                            Text(rating!.toStringAsFixed(1),
+                                style: AppType.body(12, weight: FontWeight.w700, height: 1.2)),
+                          ]),
+                        ),
+                      ),
                   ]),
                 ),
               ),
@@ -408,16 +423,8 @@ class MarketCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.caption),
                     ],
-                    if (detail != null)
-                      Text(detail!, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.caption),
                     const SizedBox(height: 4),
-                    Row(children: [
-                      if (city.isNotEmpty)
-                        Expanded(child: IconLine(icon: Icons.place_outlined, text: city))
-                      else
-                        const Spacer(),
-                      if (rating != null && rating! > 0) RatingLabel(rating: rating!, reviews: reviews),
-                    ]),
+                    IconLine(icon: Icons.place_outlined, text: city.isEmpty ? '—' : city),
                     const Spacer(),
                     Text(price ?? 'Ask for price',
                         maxLines: 1,

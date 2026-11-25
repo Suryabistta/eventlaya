@@ -82,7 +82,7 @@ class VendorDetailScreen extends ConsumerWidget {
                 if (v.description.isNotEmpty)
                   ListingSection(
                     title: 'About',
-                    child: Text(v.description, style: AppType.body(15, height: 1.6, color: AppColors.ink700)),
+                    child: Text(v.description, style: AppType.body(13.5, height: 1.55, color: AppColors.ink700)),
                   ),
                 if (v.serviceAreas.isNotEmpty)
                   ListingSection(

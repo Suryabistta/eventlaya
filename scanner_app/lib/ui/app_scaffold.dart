@@ -37,7 +37,11 @@ class AppScaffold extends StatelessWidget {
     this.automaticBack = true,
     this.controller,
     this.padded = true,
+    this.compact = false,
   });
+
+  /// Top-level tab pages: the title sits right under the status bar (no empty nav-bar row above it).
+  final bool compact;
 
   /// Horizontal padding that keeps content to [Breakpoints.content] wide.
   static double gutterFor(double width) =>
@@ -73,7 +77,18 @@ class AppScaffold extends StatelessWidget {
             controller: controller,
             physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
             slivers: [
-              LargeTitleBar(title: title, leading: lead, actions: actions, gutter: gutter),
+              if (compact && lead == null)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(gutter + 4, MediaQuery.paddingOf(context).top + 12, gutter, 12),
+                    child: Row(children: [
+                      Expanded(child: Text(title, style: AppType.largeTitle)),
+                      ...actions,
+                    ]),
+                  ),
+                )
+              else
+                LargeTitleBar(title: title, leading: lead, actions: actions, gutter: gutter),
               if (onRefresh != null)
                 CupertinoSliverRefreshControl(onRefresh: onRefresh),
               for (final s in slivers)

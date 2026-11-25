@@ -7,7 +7,6 @@ import '../../models/ticket_type_model.dart' show formatRupees;
 import '../../providers/modules_provider.dart';
 import '../models/marketplace.dart';
 import '../attendee_shell.dart';
-import '../data/favourites.dart';
 import '../providers/marketplace_providers.dart';
 import 'vendor_detail_screen.dart';
 import 'vendors_screen.dart' show MarketCard;
@@ -496,18 +495,11 @@ class _QuickActions extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final voting = ref.watch(moduleEnabledProvider(AppModule.contests));
     final market = ref.watch(moduleEnabledProvider(AppModule.marketplace));
-    final saved = ref.watch(moduleEnabledProvider(AppModule.favourites));
     final tiles = <(IconData, String, VoidCallback)>[
       (Icons.event_note_rounded, 'Events', onEvents),
       (Icons.confirmation_number_outlined, 'Tickets', () => AttendeeShell.goTo(context, AttendeeShell.ticketsTab)),
       if (voting) (Icons.how_to_vote_outlined, 'Voting', () => AttendeeShell.goTo(context, _tabIndex(ref, 'voting'))),
-      if (saved)
-        (
-          Icons.favorite_border_rounded,
-          'Saved',
-          () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SavedEventsScreen())),
-        )
-      else if (market)
+      if (market)
         (Icons.storefront_outlined, 'Vendors', () => AttendeeShell.goTo(context, _tabIndex(ref, 'vendors'))),
     ];
     return Row(children: [
