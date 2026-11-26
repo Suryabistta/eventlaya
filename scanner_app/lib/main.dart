@@ -1,3 +1,4 @@
+import 'core/site_branding.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -51,6 +52,9 @@ Future<void> main() async {
     debugPrint('Firebase init skipped (not yet configured): $e');
   }
 
+  // Superadmin's Site logo (cached copy first, refreshed in the background)
+  await SiteBranding.init();
+
   runApp(const ProviderScope(child: EventlayaApp()));
 }
 
@@ -64,7 +68,8 @@ class EventlayaApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       navigatorKey: appNavigatorKey,
-      builder: (context, child) => SessionGuard(child: child ?? const SizedBox()),
+      builder: (context, child) =>
+          SessionGuard(child: child ?? const SizedBox()),
       home: const SplashScreen(),
     );
   }
